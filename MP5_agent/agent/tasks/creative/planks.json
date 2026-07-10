@@ -1,0 +1,11 @@
+[
+    {
+        "task": "planks",
+        "quantity": 1,
+        "material": null,
+        "tool": null,
+        "platform": "crafting table",
+        "tips": "crafting 4 planks need 1 log and crafting table ",
+        "description": "crafting 4 planks need 1 log and crafting table "
+    }
+]

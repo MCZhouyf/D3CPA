@@ -1,0 +1,9 @@
+[
+    {
+        "task": "iron ingot",
+        "quantity": 1,
+        "material": {"iron ore": 8},
+        "tool": null,
+        "platform": "furnace"
+    }
+]

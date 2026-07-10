@@ -1,0 +1,11 @@
+[
+    {
+        "task": "sapling",
+        "quantity": 1,
+        "material": null,
+        "tool": null,
+        "platform": null,
+        "tips": "sapling can be obtained by breaking blocks that contain them.",
+        "description": "sapling can only be mined with bare hands."
+    }
+]

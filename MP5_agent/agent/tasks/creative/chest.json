@@ -1,0 +1,11 @@
+[
+    {
+        "task": "chest",
+        "quantity": 1,
+        "material": null,
+        "tool": null,
+        "platform": "crafting table",
+        "tips": "crafting chest need some logs",
+        "description": "crafting chest need some logs"
+    }
+]

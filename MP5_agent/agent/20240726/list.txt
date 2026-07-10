@@ -1,0 +1,913 @@
+/home/zzz/anaconda3/envs/MP5_agent/lib/python3.9/site-packages/langchain/_api/module_import.py:92: LangChainDeprecationWarning: Importing OpenAIEmbeddings from langchain.embeddings is deprecated. Please replace deprecated imports:
+
+>> from langchain.embeddings import OpenAIEmbeddings
+
+with new imports of:
+
+>> from langchain_community.embeddings import OpenAIEmbeddings
+You can use the langchain cli to **automatically** upgrade many imports. Please see documentation here <https://python.langchain.com/v0.2/docs/versions/v0_2/>
+  warn_deprecated(
+523928545861
+/home/zzz/anaconda3/envs/MP5_agent/lib/python3.9/site-packages/gym/spaces/box.py:73: UserWarning: WARN: Box bound precision lowered by casting to float32
+  logger.warn(
+/home/zzz/anaconda3/envs/MP5_agent/lib/python3.9/site-packages/numpy/core/numeric.py:330: RuntimeWarning: invalid value encountered in cast
+  multiarray.copyto(a, fill_value, casting='unsafe')
+[INFO:minedojo.tasks] Loaded 1581 Programmatic tasks, 1560 Creative tasks, and 1 special task: "Playthrough". Totally 3142 tasks loaded.
+/home/zzz/anaconda3/envs/MP5_agent/lib/python3.9/site-packages/langchain_core/_api/deprecation.py:139: LangChainDeprecationWarning: The class `OpenAIEmbeddings` was deprecated in LangChain 0.0.9 and will be removed in 0.3.0. An updated version of the class exists in the langchain-openai package and should be used instead. To use it run `pip install -U langchain-openai` and import as `from langchain_openai import OpenAIEmbeddings`.
+  warn_deprecated(
+***********Loading Workflow from ./memory***********
+Adding a successful workflow about 'log' to the memory.
+Adding a successful workflow about 'stone pickaxe' to the memory.
+***********use_history:True***********
+[{'task': 'furnace', 'quantity': 1, 'material': {'cobblestone': 8}, 'tool': None, 'platform': 'crafting table'}]
+every_task_max_retries : 
+My inventory: {'dirt': 6.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+/home/zzz/anaconda3/envs/MP5_agent/lib/python3.9/site-packages/langchain_core/_api/deprecation.py:139: LangChainDeprecationWarning: The method `BaseChatModel.__call__` was deprecated in langchain-core 0.1.7 and will be removed in 0.3.0. Use invoke instead.
+  warn_deprecated(
+Plan are finished
+Create Workflow Result: { 
+    "explanation": "", 
+    "workflow": [ 
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"wooden pickaxe": 1}, "materials": {"planks": 3, "stick": 2}, "platform": "crafting table"} } ] },
+        {"times": "1", "actions": [ {"name": "equip", "args": {"obj": "wooden pickaxe"} } ] },
+        {"times": "1", "actions": [ {"name": "dig_down", "args": {"y_level": 60, "tool": "wooden pickaxe"} } ] },
+        {"times": "8", "actions": [ {"name": "find", "args": {"obj": "cobblestone"} },  
+                                    {"name": "move_to", "args": {"obj": "cobblestone"} },
+                                    {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"} } 
+                                  ]
+        },
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"furnace": 1}, "materials": {"cobblestone": 8}, "platform": ""} } ] }
+    ]
+}
+GET  {'explanation': '', 'workflow': [{'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3, 'stick': 2}, 'platform': 'crafting table'}}]}, {'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '8', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'furnace': 1}, 'materials': {'cobblestone': 8}, 'platform': ''}}]}]}
+Stage2: Interface & Update Inventory
+action is craft,and  args is {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3, 'stick': 2}, 'platform': 'crafting table'}
+wooden_pickaxe,1
+Crafting my inventory is {'dirt': 6.0, 'coal': 3.0}
+Action Preparation Failure: {'feedback': "You do not have crafting table to complete the 'craft' action.", 'success': False, 'suggestion': 'Craft a crafting table using 4 planks. If you do not have enough planks, please craft 4 planks using 1 log first.'}
+Craft a crafting table using 4 planks. If you do not have enough planks, please craft 4 planks using 1 log first.
+every_task_max_retries : 
+My inventory: {'dirt': 6.0, 'coal': 3.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+Plan are finished
+Create Workflow Result: { 
+    "explanation": "The previous workflow failed because we do not have a crafting table to complete the 'craft' action. We need to adjust our workflow to include crafting a crafting table before we craft the furnace. Additionally, we do not have enough cobblestones in the inventory and we need to dig some first.", 
+    "workflow": [ 
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"crafting table": 1}, "materials": {"planks": 4}, "platform": ""} } ] },
+        {"times": "1", "actions": [ {"name": "equip", "args": {"obj": "wooden pickaxe"} } ] },
+        {"times": "1", "actions": [ {"name": "dig_down", "args": {"y_level": 60, "tool": "wooden pickaxe"} } ] },
+        {"times": "8", "actions": [ {"name": "find", "args": {"obj": "cobblestone"} },  
+                                    {"name": "move_to", "args": {"obj": "cobblestone"} },
+                                    {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"} } 
+                                  ]
+        },
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"furnace": 1}, "materials": {"cobblestone": 8}, "platform": "crafting table"} } ] }
+    ]
+}
+GET  {'explanation': "The previous workflow failed because we do not have a crafting table to complete the 'craft' action. We need to adjust our workflow to include crafting a crafting table before we craft the furnace. Additionally, we do not have enough cobblestones in the inventory and we need to dig some first.", 'workflow': [{'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'crafting table': 1}, 'materials': {'planks': 4}, 'platform': ''}}]}, {'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '8', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'furnace': 1}, 'materials': {'cobblestone': 8}, 'platform': 'crafting table'}}]}]}
+Stage2: Interface & Update Inventory
+action is craft,and  args is {'obj': {'crafting table': 1}, 'materials': {'planks': 4}, 'platform': ''}
+crafting_table,1
+Crafting my inventory is {'dirt': 6.0, 'coal': 3.0}
+Action Preparation Failure: {'feedback': "You do not have planks to complete the 'craft' action. You need 4 planks but you do not have planks in your inventory.", 'success': False, 'suggestion': 'Mine or Craft enough planks first.'}
+Mine or Craft enough planks first.
+every_task_max_retries : 
+My inventory: {'dirt': 6.0, 'coal': 3.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+Plan are finished
+Create Workflow Result: { 
+    "explanation": "We currently lack cobblestone, which is necessary to craft a furnace. we need to collect it first. We also lack a tool, so we first craft a wooden pickaxe with planks and stick, then go below ground to mine 8 cobblestone. Finally, use crafting table to craft furnace.", 
+    "workflow": [ 
+        {"times": "1", "actions": [ 
+            {"name": "find", "args": {"obj": "log"} },
+            {"name": "move_to", "args": {"obj": "log"} },
+            {"name": "mine", "args": {"obj": "log", "tool": null} } 
+        ] },
+        {"times": "1", "actions": [ 
+            {"name": "craft", "args": {"obj": {"planks": 4}, "materials": {"log":1}, "platform": ""} }
+        ] },
+        {"times": "1", "actions": [ 
+            {"name": "craft", "args": {"obj": {"wooden pickaxe":1}, "materials": {"planks":3, "stick":2}, "platform": "crafting table"} }
+        ] },
+        {"times": "1", "actions": [ 
+            {"name": "equip", "args": {"obj": "wooden pickaxe"} }
+        ] },
+        {"times": "1", "actions": [ 
+            {"name": "dig_down", "args": {"y_level": 60, "tool": "wooden pickaxe"} }
+        ] },
+        {"times": "8", "actions": [ 
+            {"name": "find", "args": {"obj": "cobblestone"} },
+            {"name": "move_to", "args": {"obj": "cobblestone"} },
+            {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"} }
+        ] },
+        {"times": "1", "actions": [ 
+            {"name": "craft", "args": {"obj": {"furnace": 1}, "materials": {"cobblestone": 8}, "platform": "crafting table"} }
+        ] }
+    ]
+}
+GET  {'explanation': 'We currently lack cobblestone, which is necessary to craft a furnace. we need to collect it first. We also lack a tool, so we first craft a wooden pickaxe with planks and stick, then go below ground to mine 8 cobblestone. Finally, use crafting table to craft furnace.', 'workflow': [{'times': '1', 'actions': [{'name': 'find', 'args': {'obj': 'log'}}, {'name': 'move_to', 'args': {'obj': 'log'}}, {'name': 'mine', 'args': {'obj': 'log', 'tool': None}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'planks': 4}, 'materials': {'log': 1}, 'platform': ''}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3, 'stick': 2}, 'platform': 'crafting table'}}]}, {'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '8', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'furnace': 1}, 'materials': {'cobblestone': 8}, 'platform': 'crafting table'}}]}]}
+Stage2: Interface & Update Inventory
+action is find,and  args is {'obj': 'log'}
+my inventory is {'dirt': 6.0, 'coal': 3.0}
+find_obj is wood
+exploring once, front floorgrass block
+ block in front of body is air 
+ and block in front of head is air
+ 
+try_steps: 0
+my inventory is {'dirt': 6.0, 'coal': 3.0}
+try step is 0 and dir is 0
+explore step is 0 and position is [-158.5   64.   127.5]
+find time is 0
+executing check find!
+found block
+x coordinate is 127.5, z_index is 8
+present position is -158.5,64.0,127.5
+goal position is -157.5,64.0,130.5
+Find successfully!
+action is move_to,and  args is {'obj': 'log'}
+executing approach
+object is near here
+the voxels is flower
+the voxels is flower
+the voxels is flower
+the voxels is flower
+the voxels is flower
+the voxels is wood
+found block
+x coordinate is 127.5, z_index is 8
+have to move right
+present position is -158.5,64.0,127.5
+trying to mine ahead
+第1次，approaching, walking right. present position is [-158.5       64.       127.71014], goal position is -157.5,64.0,130.5
+trying to mine ahead
+第2次，approaching, walking right. present position is [-158.5       64.       127.92028], goal position is -157.5,64.0,130.5
+trying to mine ahead
+第3次，approaching, walking right. present position is [-158.5       64.       128.13042], goal position is -157.5,64.0,130.5
+trying to mine ahead
+第4次，approaching, walking right. present position is [-158.5       64.       128.34056], goal position is -157.5,64.0,130.5
+trying to mine ahead
+第5次，approaching, walking right. present position is [-158.5      64.      128.5507], goal position is -157.5,64.0,130.5
+trying to mine ahead
+第6次，approaching, walking right. present position is [-158.5       64.       128.76083], goal position is -157.5,64.0,130.5
+trying to mine ahead
+第7次，approaching, walking right. present position is [-158.5       64.       128.97098], goal position is -157.5,64.0,130.5
+trying to mine ahead
+第8次，approaching, walking right. present position is [-158.5       64.       129.18112], goal position is -157.5,64.0,130.5
+第9次，approaching, walking right. present position is [-158.5       63.       131.89935], goal position is -157.5,64.0,130.5
+finished moving sideways
+APPROACH ended:). present position is [-158.5       63.       131.89935], goal position is -157.5,64.0,130.5
+action is mine,and  args is {'obj': 'log', 'tool': None}
+executing mining of log with 
+no equipment  found
+found equipment 
+1  positions found
+mining UNsuccessful
+1  positions found
+mining UNsuccessful
+Present inventory:['log' 'air' 'air' 'air' 'air' 'air' 'air' 'air' 'air' 'dirt' 'air' 'air'
+ 'air' 'air' 'air' 'air' 'air' 'coal' 'air' 'air' 'air' 'air' 'air' 'air'
+ 'air' 'air' 'air' 'air' 'air' 'air' 'air' 'air' 'air' 'air' 'air' 'air']
+Present inventory:[1. 0. 0. 0. 0. 0. 0. 0. 0. 6. 0. 0. 0. 0. 0. 0. 0. 3. 0. 0. 0. 0. 0. 0.
+ 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0. 0.]
+exploring once, front floorgrass block
+ block in front of body is air 
+ and block in front of head is air
+ 
+try step is 0 and dir is 0
+explore step is 0 and position is [-158.5       63.       131.92287]
+explore_steps is 0, front floor is grass block, block in front of body is air, in front of head is air
+went forward as planned, want to continue forward
+try step is 1 and dir is 0
+explore step is 0 and position is [-158.5       63.       131.92287]
+explore_steps is 0, front floor is dirt, block in front of body is grass block, in front of head is air
+can't move because of climb
+meant to go forward, rightward instead
+try step is 2 and dir is 2
+explore step is 0 and position is [-158.5       63.       131.92287]
+went rightward as planned, want to go forward now
+try step is 3 and dir is 0
+explore step is 0 and position is [-158.5       63.       131.92287]
+stuck!!!
+retry times is 1
+mining to walk left in approach
+trying to mine ahead
+mining to walk left in approach
+trying to mine ahead
+mining to walk left in approach
+trying to mine ahead
+mining to walk left in approach
+trying to mine ahead
+mining to walk left in approach
+trying to mine ahead
+Exception encountered, may be stuck permanently!! but i will venture a step forward
+moving back, present position is -157.45150756835938
+present x is -157.45150756835938 and it should be less than -157.45
+horizontal delta is 0.3000030517578125
+moving right, present position is 129.45150756835938
+moving to middle, present location is [-157.49667   63.       129.4515 ]
+trying to mine ahead
+trying to mine
+action is craft,and  args is {'obj': {'planks': 4}, 'materials': {'log': 1}, 'platform': ''}
+planks,4
+Crafting my inventory is {'log': 2.0, 'dirt': 9.0, 'coal': 3.0}
+action_crafting-----
+action is craft,and  args is {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3, 'stick': 2}, 'platform': 'crafting table'}
+wooden_pickaxe,1
+Crafting my inventory is {'log': 1.0, 'planks': 4.0, 'dirt': 9.0, 'coal': 3.0}
+Action Preparation Failure: {'feedback': "You do not have crafting table to complete the 'craft' action.", 'success': False, 'suggestion': 'Craft a crafting table using 4 planks. If you do not have enough planks, please craft 4 planks using 1 log first.'}
+Craft a crafting table using 4 planks. If you do not have enough planks, please craft 4 planks using 1 log first.
+every_task_max_retries : 
+My inventory: {'log': 1.0, 'planks': 4.0, 'dirt': 9.0, 'coal': 3.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+Plan are finished
+Create Workflow Result: { 
+    "explanation": "The previous workflow failed as there was no crafting table available to craft a stone pickaxe. We will need to craft a crafting table using 4 planks first. If we do not have enough planks, we will need to craft 4 planks using 1 log.", 
+    "workflow": [ 
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"planks": 4}, "materials": {"log": 1}, "platform": null} } ] },
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"crafting table": 1}, "materials": {"planks": 4}, "platform": null} } ] },
+        {"times": "1", "actions": [ {"name": "equip", "args": {"obj": "wooden pickaxe"} } ] },
+        {"times": "1", "actions": [ {"name": "dig_down", "args": {"y_level": 60, "tool": "wooden pickaxe"} } ] },
+        {"times": "8", "actions": [ {"name": "find", "args": {"obj": "cobblestone"} },  
+                                    {"name": "move_to", "args": {"obj": "cobblestone"} },
+                                    {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"} } 
+                                  ]
+        },
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"furnace": 1}, "materials": {"cobblestone": 8}, "platform": "crafting table"} } ] }
+    ]
+}
+GET  {'explanation': 'The previous workflow failed as there was no crafting table available to craft a stone pickaxe. We will need to craft a crafting table using 4 planks first. If we do not have enough planks, we will need to craft 4 planks using 1 log.', 'workflow': [{'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'planks': 4}, 'materials': {'log': 1}, 'platform': None}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'crafting table': 1}, 'materials': {'planks': 4}, 'platform': None}}]}, {'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '8', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'furnace': 1}, 'materials': {'cobblestone': 8}, 'platform': 'crafting table'}}]}]}
+Stage2: Interface & Update Inventory
+action is craft,and  args is {'obj': {'planks': 4}, 'materials': {'log': 1}, 'platform': None}
+planks,4
+action is craft,and  args is {'obj': {'crafting table': 1}, 'materials': {'planks': 4}, 'platform': None}
+crafting_table,1
+Crafting my inventory is {'log': 1.0, 'planks': 4.0, 'dirt': 9.0, 'coal': 3.0}
+action_crafting-----
+action is equip,and  args is {'obj': 'wooden pickaxe'}
+Action Preparation Failure: {'feedback': "You do not have 1 wooden pickaxe to complete the 'equip' action.", 'success': False, 'suggestion': 'Craft 1 wooden pickaxe on a crafting table as the platform first.'}
+Craft 1 wooden pickaxe on a crafting table as the platform first.
+every_task_max_retries : 
+My inventory: {'log': 1.0, 'crafting table': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+Plan are finished
+Create Workflow Result: { 
+    "explanation": "You do not have 1 wooden pickaxe to complete the 'equip' action. Craft 1 wooden pickaxe on a crafting table as the platform first.", 
+    "workflow": [ 
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"wooden pickaxe": 1}, "materials": {"planks": 3, "stick": 2 }, "platform": "crafting table"} } ] },
+        {"times": "1", "actions": [ {"name": "equip", "args": {"obj": "wooden pickaxe"} } ] },
+        {"times": "1", "actions": [ {"name": "dig_down", "args": {"y_level": 60, "tool": "wooden pickaxe"} } ] },
+        {"times": "8", "actions": [ {"name": "find", "args": {"obj": "cobblestone"} },  
+                                    {"name": "move_to", "args": {"obj": "cobblestone"} },
+                                    {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"} } 
+                                  ]
+        },
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"furnace": 1}, "materials": {"cobblestone": 8}, "platform": null} } ] }
+    ]
+}
+GET  {'explanation': "You do not have 1 wooden pickaxe to complete the 'equip' action. Craft 1 wooden pickaxe on a crafting table as the platform first.", 'workflow': [{'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3, 'stick': 2}, 'platform': 'crafting table'}}]}, {'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '8', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'furnace': 1}, 'materials': {'cobblestone': 8}, 'platform': None}}]}]}
+Stage2: Interface & Update Inventory
+action is craft,and  args is {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3, 'stick': 2}, 'platform': 'crafting table'}
+wooden_pickaxe,1
+Crafting my inventory is {'log': 1.0, 'crafting table': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Action Preparation Failure: {'feedback': "You do not have planks to complete the 'craft' action. You need 3 planks but you do not have planks in your inventory.", 'success': False, 'suggestion': 'Mine or Craft enough planks first.'}
+Mine or Craft enough planks first.
+every_task_max_retries : 
+My inventory: {'log': 1.0, 'crafting table': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+Plan are finished
+Create Workflow Result: { 
+    "explanation": "You do not have planks to complete the 'craft' action. You need 3 planks but you do not have planks in your inventory. You should craft planks first with a log. And then, you should craft a wooden pickaxe with planks and sticks. After equipping the wooden pickaxe, you can mine cobblestone.", 
+    "workflow": [ 
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"planks": 4}, "materials": {"log": 1}, "platform": ""}} ] },
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"wooden pickaxe": 1}, "materials": {"planks": 3, "stick": 2}, "platform": "crafting table"}} ] },
+        {"times": "1", "actions": [ {"name": "equip", "args": {"obj": "wooden pickaxe"}} ] },
+        {"times": "8", "actions": [ {"name": "find", "args": {"obj": "cobblestone"}},  
+                                    {"name": "move_to", "args": {"obj": "cobblestone"} },
+                                    {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"} } 
+        ] },
+                {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"furnace": 1}, "materials": {"cobblestone": 8}, "platform": ""} } ] }
+
+    ]
+}
+GET  {'explanation': "You do not have planks to complete the 'craft' action. You need 3 planks but you do not have planks in your inventory. You should craft planks first with a log. And then, you should craft a wooden pickaxe with planks and sticks. After equipping the wooden pickaxe, you can mine cobblestone.", 'workflow': [{'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'planks': 4}, 'materials': {'log': 1}, 'platform': ''}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3, 'stick': 2}, 'platform': 'crafting table'}}]}, {'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '8', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'furnace': 1}, 'materials': {'cobblestone': 8}, 'platform': ''}}]}]}
+Stage2: Interface & Update Inventory
+action is craft,and  args is {'obj': {'planks': 4}, 'materials': {'log': 1}, 'platform': ''}
+planks,4
+Crafting my inventory is {'log': 1.0, 'crafting table': 1.0, 'dirt': 9.0, 'coal': 3.0}
+action_crafting-----
+action is craft,and  args is {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3, 'stick': 2}, 'platform': 'crafting table'}
+wooden_pickaxe,1
+Crafting my inventory is {'planks': 4.0, 'crafting table': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Action Preparation Failure: {'feedback': "You do not have stick to complete the 'craft' action. You need 2 stick but you do not have stick in your inventory.", 'success': False, 'suggestion': 'Mine or Craft enough stick first.'}
+Mine or Craft enough stick first.
+every_task_max_retries : 
+My inventory: {'planks': 4.0, 'crafting table': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+Plan are finished
+Create Workflow Result: { 
+    "explanation": "In order to craft a furnace, first we require to mine enough cobblestones. To mine cobblestone, we need to dig down to the appropriate Y-level. For this we should first equip wooden pickaxe. We have sufficient planks required to create a wooden pickaxe. After mining cobblestone, we should craft a furnace using the obtained cobblestones.", 
+    "workflow": [ 
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"wooden pickaxe": 1}, "materials": {"planks": 3}, "platform": ""} } ] },
+        {"times": "1", "actions": [ {"name": "equip", "args": {"obj": "wooden pickaxe"} } ] },
+        {"times": "1", "actions": [ {"name": "dig_down", "args": {"y_level": 60, "tool": "wooden pickaxe"} } ] },
+        {"times": "8", "actions": [ {"name": "find", "args": {"obj": "cobblestone"} },  
+                                    {"name": "move_to", "args": {"obj": "cobblestone"} },
+                                    {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"} } 
+                                  ]
+        },
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"furnace": 1}, "materials": {"cobblestone": 8}, "platform": ""} } ] }
+    ]
+}
+GET  {'explanation': 'In order to craft a furnace, first we require to mine enough cobblestones. To mine cobblestone, we need to dig down to the appropriate Y-level. For this we should first equip wooden pickaxe. We have sufficient planks required to create a wooden pickaxe. After mining cobblestone, we should craft a furnace using the obtained cobblestones.', 'workflow': [{'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3}, 'platform': ''}}]}, {'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '8', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'furnace': 1}, 'materials': {'cobblestone': 8}, 'platform': ''}}]}]}
+Stage2: Interface & Update Inventory
+action is craft,and  args is {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3}, 'platform': ''}
+wooden_pickaxe,1
+Crafting my inventory is {'planks': 4.0, 'crafting table': 1.0, 'dirt': 9.0, 'coal': 3.0}
+action_crafting-----
+action is equip,and  args is {'obj': 'wooden pickaxe'}
+Action Preparation Failure: {'feedback': "You do not have 1 wooden pickaxe to complete the 'equip' action.", 'success': False, 'suggestion': 'Craft 1 wooden pickaxe on a crafting table as the platform first.'}
+Craft 1 wooden pickaxe on a crafting table as the platform first.
+every_task_max_retries : 
+My inventory: {'planks': 4.0, 'crafting table': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+Plan are finished
+Create Workflow Result: { 
+    "explanation": "The previous workflow failed due to the lack of a wooden pickaxe for the 'equip' action. Let's craft a wooden pickaxe first.", 
+    "workflow": [ 
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"wooden pickaxe": 1}, "materials": {"planks": 3, "stick": 2}, "platform": "crafting table"} } ] },
+        {"times": "1", "actions": [ {"name": "equip", "args": {"obj": "wooden pickaxe"} } ] },
+        {"times": "1", "actions": [ {"name": "dig_down", "args": {"y_level": 60, "tool": "wooden pickaxe"} } ] },
+        {"times": "8", "actions": [ {"name": "find", "args": {"obj": "cobblestone"} },  
+                                    {"name": "move_to", "args": {"obj": "cobblestone"} },
+                                    {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"} } 
+                                  ]
+        },
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"furnace": 1}, "materials": {"cobblestone": 8}, "platform": "crafting table"} } ] }
+    ]
+}
+GET  {'explanation': "The previous workflow failed due to the lack of a wooden pickaxe for the 'equip' action. Let's craft a wooden pickaxe first.", 'workflow': [{'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3, 'stick': 2}, 'platform': 'crafting table'}}]}, {'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '8', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'furnace': 1}, 'materials': {'cobblestone': 8}, 'platform': 'crafting table'}}]}]}
+Stage2: Interface & Update Inventory
+action is craft,and  args is {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3, 'stick': 2}, 'platform': 'crafting table'}
+wooden_pickaxe,1
+Crafting my inventory is {'planks': 4.0, 'crafting table': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Action Preparation Failure: {'feedback': "You do not have stick to complete the 'craft' action. You need 2 stick but you do not have stick in your inventory.", 'success': False, 'suggestion': 'Mine or Craft enough stick first.'}
+Mine or Craft enough stick first.
+every_task_max_retries : 
+My inventory: {'planks': 4.0, 'crafting table': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+Plan are finished
+Create Workflow Result: { 
+    "explanation": "We currently lack the materials necessary to craft a stone pickaxe. However, you want to create a furnace which only requires cobblestone. Before proceeding to crafting the furnace, we need to acquire enough cobblestone.", 
+    "workflow": [ 
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"wooden pickaxe": 1}, "materials": {"planks": 3, "stick": 2 }, "platform": "crafting table"} } ] },
+        {"times": "1", "actions": [ {"name": "equip", "args": {"obj": "wooden pickaxe"} } ] },
+        {"times": "1", "actions": [ {"name": "dig_down", "args": {"y_level": 60, "tool": "wooden pickaxe"} } ] },
+        {"times": "8", "actions": [ {"name": "find", "args": {"obj": "cobblestone"} },  
+                                    {"name": "move_to", "args": {"obj": "cobblestone"} },
+                                    {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"} } 
+                                  ]
+        },
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"furnace": 1}, "materials": {"cobblestone": 8}, "platform": null} } ] }
+    ]
+}
+GET  {'explanation': 'We currently lack the materials necessary to craft a stone pickaxe. However, you want to create a furnace which only requires cobblestone. Before proceeding to crafting the furnace, we need to acquire enough cobblestone.', 'workflow': [{'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3, 'stick': 2}, 'platform': 'crafting table'}}]}, {'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '8', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'furnace': 1}, 'materials': {'cobblestone': 8}, 'platform': None}}]}]}
+Stage2: Interface & Update Inventory
+action is craft,and  args is {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3, 'stick': 2}, 'platform': 'crafting table'}
+wooden_pickaxe,1
+Crafting my inventory is {'planks': 4.0, 'crafting table': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Action Preparation Failure: {'feedback': "You do not have stick to complete the 'craft' action. You need 2 stick but you do not have stick in your inventory.", 'success': False, 'suggestion': 'Mine or Craft enough stick first.'}
+Mine or Craft enough stick first.
+every_task_max_retries : 
+My inventory: {'planks': 4.0, 'crafting table': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+Plan are finished
+Create Workflow Result: { 
+    "explanation": "You do not have stick to complete the 'craft' action. You need 2 stick but you do not have stick in your inventory. Mine or Craft enough stick first.", 
+    "workflow": [ 
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"stick": 2}, "materials": {"planks": 2}, "platform": "crafting table"} } ] },
+        {"times": "1", "actions": [ {"name": "equip", "args": {"obj": "wooden pickaxe"} } ] },
+        {"times": "1", "actions": [ {"name": "dig_down", "args": {"y_level": 60, "tool": "wooden pickaxe"} } ] },
+        {"times": "3", "actions": [ {"name": "find", "args": {"obj": "cobblestone"} },  
+                                    {"name": "move_to", "args": {"obj": "cobblestone"} },
+                                    {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"} } 
+                                  ]
+        },
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"stone pickaxe": 1}, "materials": {"cobblestone": 3, "stick": 2 }, "platform": "crafting table"} } ] }
+    ]
+}
+GET  {'explanation': "You do not have stick to complete the 'craft' action. You need 2 stick but you do not have stick in your inventory. Mine or Craft enough stick first.", 'workflow': [{'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stick': 2}, 'materials': {'planks': 2}, 'platform': 'crafting table'}}]}, {'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]}
+Stage2: Interface & Update Inventory
+action is craft,and  args is {'obj': {'stick': 2}, 'materials': {'planks': 2}, 'platform': 'crafting table'}
+stick,2
+Crafting my inventory is {'planks': 4.0, 'crafting table': 1.0, 'dirt': 9.0, 'coal': 3.0}
+action_crafting-----
+perpendicular delta is 0.4898529052734375
+horizontal delta is 0.5101470947265625
+moving to middle, present location is [-157.51015   63.       129.51015]
+dirt
+air
+action_craft: front floordirt
+ block in front of body is air 
+ and block in front of head is air
+ begin crafting stick
+trying to mine
+perpendicular delta is 0.4898529052734375
+horizontal delta is 0.5101470947265625
+moving to middle, present location is [-157.51015   63.       129.51015]
+{'stick': 4.0, 'planks': 2.0, 'dirt': 9.0, 'coal': 3.0}
+False
+action is equip,and  args is {'obj': 'wooden pickaxe'}
+Action Preparation Failure: {'feedback': "You do not have 1 wooden pickaxe to complete the 'equip' action.", 'success': False, 'suggestion': 'Craft 1 wooden pickaxe on a crafting table as the platform first.'}
+Craft 1 wooden pickaxe on a crafting table as the platform first.
+every_task_max_retries : 
+My inventory: {'stick': 4.0, 'planks': 2.0, 'crafting table': 1.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+Plan are finished
+Create Workflow Result: { 
+    "explanation": "You do not have 1 wooden pickaxe to equip. You should craft 1 wooden pickaxe on a crafting table as the platform first.", 
+    "workflow": [ 
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"wooden pickaxe": 1}, "materials": {"planks": 2, "stick": 2 } , "platform": "crafting table"} } ] },
+        {"times": "1", "actions": [ {"name": "equip", "args": {"obj": "wooden pickaxe"} } ] },
+        {"times": "1", "actions": [ {"name": "dig_down", "args": {"y_level": 60, "tool": "wooden pickaxe"} } ] },
+        {"times": "8", "actions": [ {"name": "find", "args": {"obj": "cobblestone"} },  
+                                    {"name": "move_to", "args": {"obj": "cobblestone"} },
+                                    {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"} } 
+                                  ]
+        },
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"furnace": 1}, "materials": {"cobblestone": 8}, "platform": "crafting table"} } ] }
+    ]
+}
+GET  {'explanation': 'You do not have 1 wooden pickaxe to equip. You should craft 1 wooden pickaxe on a crafting table as the platform first.', 'workflow': [{'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 2, 'stick': 2}, 'platform': 'crafting table'}}]}, {'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '8', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'furnace': 1}, 'materials': {'cobblestone': 8}, 'platform': 'crafting table'}}]}]}
+Stage2: Interface & Update Inventory
+action is craft,and  args is {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 2, 'stick': 2}, 'platform': 'crafting table'}
+wooden_pickaxe,1
+Crafting my inventory is {'stick': 4.0, 'planks': 2.0, 'crafting table': 1.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+action_crafting-----
+perpendicular delta is 0.3000030517578125
+present x is -157.54849243164062 and it should be larger than -157.55
+moving forward, present position is -157.54849243164062
+horizontal delta is 0.5101470947265625
+moving to middle, present location is [-157.5485    63.       129.51015]
+dirt
+air
+action_craft: front floordirt
+ block in front of body is air 
+ and block in front of head is air
+ begin crafting wooden_pickaxe
+trying to mine
+horizontal delta is 0.5101470947265625
+moving to middle, present location is [-157.48985   63.       129.51015]
+{'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+False
+action is equip,and  args is {'obj': 'wooden pickaxe'}
+Action Preparation Failure: {'feedback': "You do not have 1 wooden pickaxe to complete the 'equip' action.", 'success': False, 'suggestion': 'Craft 1 wooden pickaxe on a crafting table as the platform first.'}
+Craft 1 wooden pickaxe on a crafting table as the platform first.
+every_task_max_retries : 
+My inventory: {'crafting table': 1.0, 'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+Plan are finished
+Create Workflow Result: { 
+    "explanation": "You do not have 1 wooden pickaxe to complete the 'equip' action.. Craft 1 wooden pickaxe on a crafting table as the platform first..", 
+    "workflow": [ 
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"wooden pickaxe": 1}, "materials": {"planks": 2, "stick": 1}, "platform": "crafting table"} } ] },
+        {"times": "1", "actions": [ {"name": "equip", "args": {"obj": "wooden pickaxe"} } ] },
+        {"times": "1", "actions": [ {"name": "dig_down", "args": {"y_level": 60, "tool": "wooden pickaxe"} } ] },
+        {"times": "8", "actions": [ {"name": "find", "args": {"obj": "cobblestone"} },  
+                                    {"name": "move_to", "args": {"obj": "cobblestone"} },
+                                    {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"} } 
+                                  ]
+        },
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"furnace": 1}, "materials": {"cobblestone": 8}, "platform": "crafting table"} } ]}
+    ]
+}
+GET  {'explanation': "You do not have 1 wooden pickaxe to complete the 'equip' action.. Craft 1 wooden pickaxe on a crafting table as the platform first..", 'workflow': [{'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 2, 'stick': 1}, 'platform': 'crafting table'}}]}, {'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '8', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'furnace': 1}, 'materials': {'cobblestone': 8}, 'platform': 'crafting table'}}]}]}
+Stage2: Interface & Update Inventory
+action is craft,and  args is {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 2, 'stick': 1}, 'platform': 'crafting table'}
+wooden_pickaxe,1
+Crafting my inventory is {'crafting table': 1.0, 'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+action_crafting-----
+perpendicular delta is 0.3000030517578125
+present x is -157.54849243164062 and it should be larger than -157.55
+moving forward, present position is -157.54849243164062
+horizontal delta is 0.5101470947265625
+moving to middle, present location is [-157.5485    63.       129.51015]
+dirt
+air
+action_craft: front floordirt
+ block in front of body is air 
+ and block in front of head is air
+ begin crafting wooden_pickaxe
+trying to mine
+horizontal delta is 0.5101470947265625
+moving to middle, present location is [-157.48985   63.       129.51015]
+{'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+False
+action is equip,and  args is {'obj': 'wooden pickaxe'}
+Action Preparation Failure: {'feedback': "You do not have 1 wooden pickaxe to complete the 'equip' action.", 'success': False, 'suggestion': 'Craft 1 wooden pickaxe on a crafting table as the platform first.'}
+Craft 1 wooden pickaxe on a crafting table as the platform first.
+every_task_max_retries : 
+My inventory: {'crafting table': 1.0, 'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+Plan are finished
+Create Workflow Result: { 
+    "explanation": "The required tool wooden pickaxe is missing from inventory.", 
+    "workflow": [ 
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"wooden pickaxe": 1}, "materials": {"planks": 2, "stick": 2}, "platform": "crafting table"}}] },
+        {"times": "1", "actions": [ {"name": "equip", "args": {"obj": "wooden pickaxe"} } ] },
+        {"times": "1", "actions": [ {"name": "dig_down", "args": {"y_level": 60, "tool": "wooden pickaxe"} } ] },
+        {"times": "8", "actions": [ {"name": "find", "args": {"obj": "cobblestone"} },  
+                                    {"name": "move_to", "args": {"obj": "cobblestone"} },
+                                    {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"} } 
+                                  ]
+        },
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"furnace":1}, "materials": {"cobblestone": 8}, "platform": ""}}] }
+    ]
+}
+GET  {'explanation': 'The required tool wooden pickaxe is missing from inventory.', 'workflow': [{'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 2, 'stick': 2}, 'platform': 'crafting table'}}]}, {'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '8', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'furnace': 1}, 'materials': {'cobblestone': 8}, 'platform': ''}}]}]}
+Stage2: Interface & Update Inventory
+action is craft,and  args is {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 2, 'stick': 2}, 'platform': 'crafting table'}
+wooden_pickaxe,1
+Crafting my inventory is {'crafting table': 1.0, 'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+action_crafting-----
+perpendicular delta is 0.3000030517578125
+present x is -157.54849243164062 and it should be larger than -157.55
+moving forward, present position is -157.54849243164062
+horizontal delta is 0.5101470947265625
+moving to middle, present location is [-157.5485    63.       129.51015]
+dirt
+air
+action_craft: front floordirt
+ block in front of body is air 
+ and block in front of head is air
+ begin crafting wooden_pickaxe
+trying to mine
+horizontal delta is 0.5101470947265625
+moving to middle, present location is [-157.48985   63.       129.51015]
+{'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+False
+action is equip,and  args is {'obj': 'wooden pickaxe'}
+Action Preparation Failure: {'feedback': "You do not have 1 wooden pickaxe to complete the 'equip' action.", 'success': False, 'suggestion': 'Craft 1 wooden pickaxe on a crafting table as the platform first.'}
+Craft 1 wooden pickaxe on a crafting table as the platform first.
+every_task_max_retries : 
+My inventory: {'crafting table': 1.0, 'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+Plan are finished
+Create Workflow Result: { 
+    "explanation": "There is no wooden pickaxe in the inventory, so we need to craft it first. Wood planks and sticks are needed for this, which are already present in the inventory. After crafting the wooden pickaxe, we need to equip it. Cobblestone is the material needed for the furnace, but it's not in the inventory and hence, it needs to be mined. Thereafter, we can craft the furnace at the crafting table.", 
+    "workflow": [
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"wooden pickaxe": 1}, "materials": {"planks": 2, "stick": 2 }, "platform": "crafting table"} } ] },
+        {"times": "1", "actions": [ {"name": "equip", "args": {"obj": "wooden pickaxe"} } ] },
+        {"times": "8", "actions": [ {"name": "find", "args": {"obj": "cobblestone"} },  
+                                    {"name": "move_to", "args": {"obj": "cobblestone"} },
+                                    {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"} } 
+                                  ]
+        },
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"furnace": 1}, "materials": {"cobblestone": 8}, "platform": "crafting table"} } ] }
+    ]
+}
+GET  {'explanation': "There is no wooden pickaxe in the inventory, so we need to craft it first. Wood planks and sticks are needed for this, which are already present in the inventory. After crafting the wooden pickaxe, we need to equip it. Cobblestone is the material needed for the furnace, but it's not in the inventory and hence, it needs to be mined. Thereafter, we can craft the furnace at the crafting table.", 'workflow': [{'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 2, 'stick': 2}, 'platform': 'crafting table'}}]}, {'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '8', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'furnace': 1}, 'materials': {'cobblestone': 8}, 'platform': 'crafting table'}}]}]}
+Stage2: Interface & Update Inventory
+action is craft,and  args is {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 2, 'stick': 2}, 'platform': 'crafting table'}
+wooden_pickaxe,1
+Crafting my inventory is {'crafting table': 1.0, 'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+action_crafting-----
+perpendicular delta is 0.3000030517578125
+present x is -157.54849243164062 and it should be larger than -157.55
+moving forward, present position is -157.54849243164062
+horizontal delta is 0.5101470947265625
+moving to middle, present location is [-157.5485    63.       129.51015]
+dirt
+air
+action_craft: front floordirt
+ block in front of body is air 
+ and block in front of head is air
+ begin crafting wooden_pickaxe
+trying to mine
+horizontal delta is 0.5101470947265625
+moving to middle, present location is [-157.48985   63.       129.51015]
+{'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+False
+action is equip,and  args is {'obj': 'wooden pickaxe'}
+Action Preparation Failure: {'feedback': "You do not have 1 wooden pickaxe to complete the 'equip' action.", 'success': False, 'suggestion': 'Craft 1 wooden pickaxe on a crafting table as the platform first.'}
+Craft 1 wooden pickaxe on a crafting table as the platform first.
+every_task_max_retries : 
+My inventory: {'crafting table': 1.0, 'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+Plan are finished
+Create Workflow Result: { 
+    "explanation": "The previous workflow failed because there was not enough wooden pickaxe in the inventory. So we need to craft a wooden pickaxe first.", 
+    "workflow": [ 
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"wooden pickaxe": 1}, "materials": {"planks": 3, "stick": 2}, "platform": "crafting table"}} ] },
+        {"times": "1", "actions": [ {"name": "equip", "args": {"obj": "wooden pickaxe"}} ] },
+        {"times": "1", "actions": [ {"name": "dig_down", "args": {"y_level": 60, "tool": "wooden pickaxe"}} ] },
+        {"times": "8", "actions": [ {"name": "find", "args": {"obj": "cobblestone"}},  
+                                    {"name": "move_to", "args": {"obj": "cobblestone"} },
+                                    {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"}} 
+                                  ]
+        },
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"furnace": 1}, "materials": {"cobblestone": 8}, "platform": "crafting table"}} ] }
+    ]
+}
+GET  {'explanation': 'The previous workflow failed because there was not enough wooden pickaxe in the inventory. So we need to craft a wooden pickaxe first.', 'workflow': [{'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3, 'stick': 2}, 'platform': 'crafting table'}}]}, {'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '8', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'furnace': 1}, 'materials': {'cobblestone': 8}, 'platform': 'crafting table'}}]}]}
+Stage2: Interface & Update Inventory
+action is craft,and  args is {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3, 'stick': 2}, 'platform': 'crafting table'}
+wooden_pickaxe,1
+Crafting my inventory is {'crafting table': 1.0, 'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Action Preparation Failure: {'feedback': "You do not have enough planks to complete the 'craft' action. You need 3 planks but you only have 2.0 planks in your inventory.", 'success': False, 'suggestion': 'Mine or Craft enough planks first.'}
+Mine or Craft enough planks first.
+every_task_max_retries : 
+My inventory: {'crafting table': 1.0, 'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+Plan are finished
+Create Workflow Result: { 
+    "explanation": "You do not have sufficient cobblestone for crafting. You need 8 cobblestone but you only have 0 cobblestone in your inventory. Therefore, we need to mine cobblestone first.", 
+    "workflow": [ 
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"wooden pickaxe": 1}, "materials": {"planks": 3, "stick": 2}, "platform": "crafting table"}} ]},
+        {"times": "1", "actions": [ {"name": "equip", "args": {"obj": "wooden pickaxe"}} ]},
+        {"times": "1", "actions": [ {"name": "dig_down", "args": {"y_level": 60, "tool": "wooden pickaxe"}} ]},
+        {"times": "8", "actions": [ {"name": "find", "args": {"obj": "cobblestone"}},  
+                                    {"name": "move_to", "args": {"obj": "cobblestone"}}, 
+                                    {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"}} ]},
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"furnace": 1}, "materials": {"cobblestone": 8}, "platform": "crafting table"}} ]}
+    ]
+}
+GET  {'explanation': 'You do not have sufficient cobblestone for crafting. You need 8 cobblestone but you only have 0 cobblestone in your inventory. Therefore, we need to mine cobblestone first.', 'workflow': [{'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3, 'stick': 2}, 'platform': 'crafting table'}}]}, {'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '8', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'furnace': 1}, 'materials': {'cobblestone': 8}, 'platform': 'crafting table'}}]}]}
+Stage2: Interface & Update Inventory
+action is craft,and  args is {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3, 'stick': 2}, 'platform': 'crafting table'}
+wooden_pickaxe,1
+Crafting my inventory is {'crafting table': 1.0, 'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Action Preparation Failure: {'feedback': "You do not have enough planks to complete the 'craft' action. You need 3 planks but you only have 2.0 planks in your inventory.", 'success': False, 'suggestion': 'Mine or Craft enough planks first.'}
+Mine or Craft enough planks first.
+every_task_max_retries : 
+My inventory: {'crafting table': 1.0, 'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+Plan are finished
+Create Workflow Result: { 
+    "explanation": "The previous workflow failed because there were not enough planks to craft a wooden pickaxe. To avoid this, I will first craft a wooden pickaxe using the available planks and sticks in the inventory. Then, I will dig down to find cobblestone. I will then mine enough cobblestone to craft a furnace.", 
+    "workflow": [ 
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"wooden pickaxe": 1}, "materials": {"planks": 2, "stick": 2 }, "platform": "crafting table"} } ] },
+        {"times": "1", "actions": [ {"name": "equip", "args": {"obj": "wooden pickaxe"}} ]},
+        {"times": "1", "actions": [ {"name": "dig_down", "args": {"y_level": 60, "tool": "wooden pickaxe"} } ] },
+        {"times": "8", "actions": [ {"name": "find", "args": {"obj": "cobblestone"} },  
+                                    {"name": "move_to", "args": {"obj": "cobblestone"} },
+                                    {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"} } 
+                                  ]
+        },
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"furnace": 1}, "materials": {"cobblestone": 8}, "platform": "crafting table"} } ] }
+    ]
+}
+GET  {'explanation': 'The previous workflow failed because there were not enough planks to craft a wooden pickaxe. To avoid this, I will first craft a wooden pickaxe using the available planks and sticks in the inventory. Then, I will dig down to find cobblestone. I will then mine enough cobblestone to craft a furnace.', 'workflow': [{'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 2, 'stick': 2}, 'platform': 'crafting table'}}]}, {'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '8', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'furnace': 1}, 'materials': {'cobblestone': 8}, 'platform': 'crafting table'}}]}]}
+Stage2: Interface & Update Inventory
+action is craft,and  args is {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 2, 'stick': 2}, 'platform': 'crafting table'}
+wooden_pickaxe,1
+Crafting my inventory is {'crafting table': 1.0, 'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+action_crafting-----
+perpendicular delta is 0.3000030517578125
+present x is -157.54849243164062 and it should be larger than -157.55
+moving forward, present position is -157.54849243164062
+horizontal delta is 0.5101470947265625
+moving to middle, present location is [-157.5485    63.       129.51015]
+dirt
+air
+action_craft: front floordirt
+ block in front of body is air 
+ and block in front of head is air
+ begin crafting wooden_pickaxe
+trying to mine
+horizontal delta is 0.5101470947265625
+moving to middle, present location is [-157.48985   63.       129.51015]
+{'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+False
+action is equip,and  args is {'obj': 'wooden pickaxe'}
+Action Preparation Failure: {'feedback': "You do not have 1 wooden pickaxe to complete the 'equip' action.", 'success': False, 'suggestion': 'Craft 1 wooden pickaxe on a crafting table as the platform first.'}
+Craft 1 wooden pickaxe on a crafting table as the platform first.
+every_task_max_retries : 
+My inventory: {'crafting table': 1.0, 'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+Plan are finished
+Create Workflow Result: { 
+    "explanation": "As per your inventory, we don't have enough cobblestone to make a furnace. So first plan will be to create a wooden pickaxe and then get enough cobblestone.", 
+    "workflow": [ 
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"wooden pickaxe": 1}, "materials": {"planks": 2, "stick": 2 }, "platform": "crafting table"}} ] },
+        {"times": "1", "actions": [ {"name": "equip", "args": {"obj": "wooden pickaxe"}} ] },
+        {"times": "1", "actions": [ {"name": "dig_down", "args": {"y_level": 60, "tool": "wooden pickaxe"}} ] },
+        {"times": "8", "actions": [ {"name": "find", "args": {"obj": "cobblestone"}},  
+                                    {"name": "move_to", "args": {"obj": "cobblestone"} },
+                                    {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"}} 
+                                  ]
+        },
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"furnace": 1}, "materials": {"cobblestone": 8}, "platform": null}} ] }
+    ]
+}
+GET  {'explanation': "As per your inventory, we don't have enough cobblestone to make a furnace. So first plan will be to create a wooden pickaxe and then get enough cobblestone.", 'workflow': [{'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 2, 'stick': 2}, 'platform': 'crafting table'}}]}, {'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '8', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'furnace': 1}, 'materials': {'cobblestone': 8}, 'platform': None}}]}]}
+Stage2: Interface & Update Inventory
+action is craft,and  args is {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 2, 'stick': 2}, 'platform': 'crafting table'}
+wooden_pickaxe,1
+Crafting my inventory is {'crafting table': 1.0, 'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+action_crafting-----
+perpendicular delta is 0.3000030517578125
+present x is -157.54849243164062 and it should be larger than -157.55
+moving forward, present position is -157.54849243164062
+horizontal delta is 0.5101470947265625
+moving to middle, present location is [-157.5485    63.       129.51015]
+dirt
+air
+action_craft: front floordirt
+ block in front of body is air 
+ and block in front of head is air
+ begin crafting wooden_pickaxe
+trying to mine
+horizontal delta is 0.5101470947265625
+moving to middle, present location is [-157.48985   63.       129.51015]
+{'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+False
+action is equip,and  args is {'obj': 'wooden pickaxe'}
+Action Preparation Failure: {'feedback': "You do not have 1 wooden pickaxe to complete the 'equip' action.", 'success': False, 'suggestion': 'Craft 1 wooden pickaxe on a crafting table as the platform first.'}
+Craft 1 wooden pickaxe on a crafting table as the platform first.
+every_task_max_retries : 
+My inventory: {'crafting table': 1.0, 'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+Plan are finished
+Create Workflow Result: { 
+    "explanation": "You do not have 1 wooden pickaxe to complete the 'equip' action. Craft 1 wooden pickaxe on a crafting table as the platform first.", 
+    "workflow": [ 
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"wooden pickaxe": 1}, "materials": {"planks": 3, "stick": 2}, "platform": "crafting table"} } ] },
+        {"times": "1", "actions": [ {"name": "equip", "args": {"obj": "wooden pickaxe"} } ] },
+        {"times": "1", "actions": [ {"name": "dig_down", "args": {"y_level": 60, "tool": "wooden pickaxe"} } ] },
+        {"times": "8", "actions": [ {"name": "find", "args": {"obj": "cobblestone"} },  
+                                    {"name": "move_to", "args": {"obj": "cobblestone"} },
+                                    {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"} } 
+                                  ]
+        },
+        {"times": "1", "actions": [{"name": "craft", "args": {"obj": {"furnace": 1}, "materials": {"cobblestone": 8}, "platform": "crafting table"} } ] }
+    ]
+}
+GET  {'explanation': "You do not have 1 wooden pickaxe to complete the 'equip' action. Craft 1 wooden pickaxe on a crafting table as the platform first.", 'workflow': [{'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3, 'stick': 2}, 'platform': 'crafting table'}}]}, {'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '8', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'furnace': 1}, 'materials': {'cobblestone': 8}, 'platform': 'crafting table'}}]}]}
+Stage2: Interface & Update Inventory
+action is craft,and  args is {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3, 'stick': 2}, 'platform': 'crafting table'}
+wooden_pickaxe,1
+Crafting my inventory is {'crafting table': 1.0, 'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Action Preparation Failure: {'feedback': "You do not have enough planks to complete the 'craft' action. You need 3 planks but you only have 2.0 planks in your inventory.", 'success': False, 'suggestion': 'Mine or Craft enough planks first.'}
+Mine or Craft enough planks first.
+every_task_max_retries : 
+My inventory: {'crafting table': 1.0, 'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+Plan are finished
+Create Workflow Result: {
+    "explanation": "You do not have enough cobblestone to complete the 'craft' action. You need 8 cobblestones but you have 0 in your inventory. You need to craft a wooden pickaxe first, then mine enough cobblestone, and finally, craft the furnace.",
+    "workflow": [
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"wooden pickaxe": 1}, "materials": {"planks": 2, "stick": 2}, "platform": "crafting table"} } ]},
+        {"times": "1", "actions": [ {"name": "equip", "args": {"obj": "wooden pickaxe"} } ]},
+        {"times": "1", "actions": [ {"name": "dig_down", "args": {"y_level": 60, "tool": "wooden pickaxe"} } ]},
+        {"times": "8", "actions": [ {"name": "find", "args": {"obj": "cobblestone"} },  
+                                    {"name": "move_to", "args": {"obj": "cobblestone"} },
+                                    {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"} } 
+                                  ]
+        },
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"furnace": 1}, "materials": {"cobblestone": 8}, "platform": ""} } ]}
+    ]
+}
+GET  {'explanation': "You do not have enough cobblestone to complete the 'craft' action. You need 8 cobblestones but you have 0 in your inventory. You need to craft a wooden pickaxe first, then mine enough cobblestone, and finally, craft the furnace.", 'workflow': [{'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 2, 'stick': 2}, 'platform': 'crafting table'}}]}, {'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '8', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'furnace': 1}, 'materials': {'cobblestone': 8}, 'platform': ''}}]}]}
+Stage2: Interface & Update Inventory
+action is craft,and  args is {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 2, 'stick': 2}, 'platform': 'crafting table'}
+wooden_pickaxe,1
+Crafting my inventory is {'crafting table': 1.0, 'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+action_crafting-----
+perpendicular delta is 0.3000030517578125
+present x is -157.54849243164062 and it should be larger than -157.55
+moving forward, present position is -157.54849243164062
+horizontal delta is 0.5101470947265625
+moving to middle, present location is [-157.5485    63.       129.51015]
+dirt
+air
+action_craft: front floordirt
+ block in front of body is air 
+ and block in front of head is air
+ begin crafting wooden_pickaxe
+trying to mine
+horizontal delta is 0.5101470947265625
+moving to middle, present location is [-157.48985   63.       129.51015]
+{'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+False
+action is equip,and  args is {'obj': 'wooden pickaxe'}
+Action Preparation Failure: {'feedback': "You do not have 1 wooden pickaxe to complete the 'equip' action.", 'success': False, 'suggestion': 'Craft 1 wooden pickaxe on a crafting table as the platform first.'}
+Craft 1 wooden pickaxe on a crafting table as the platform first.
+every_task_max_retries : 
+My inventory: {'crafting table': 1.0, 'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+Plan are finished
+Create Workflow Result: { 
+    "explanation": "You do not have 1 wooden pickaxe to complete the 'equip' action. Therefore we have to craft a wooden pickaxe first.", 
+    "workflow": [ 
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"wooden pickaxe": 1}, "materials": {"planks": 3, "stick": 2}, "platform": "crafting table"} } ] },
+        {"times": "1", "actions": [ {"name": "equip", "args": {"obj": "wooden pickaxe"} } ] },
+        {"times": "1", "actions": [ {"name": "dig_down", "args": {"y_level": 60, "tool": "wooden pickaxe"} } ] },
+        {"times": "8", "actions": [ {"name": "find", "args": {"obj": "cobblestone"} },  
+                                    {"name": "move_to", "args": {"obj": "cobblestone"} },
+                                    {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"} } 
+                                  ]
+        },
+        {"times": "1", "actions": [ {"name": "craft", "args": {"obj": {"furnace": 1}, "materials": {"cobblestone": 8}, "platform": "crafting table"} } ] }
+    ]
+}
+GET  {'explanation': "You do not have 1 wooden pickaxe to complete the 'equip' action. Therefore we have to craft a wooden pickaxe first.", 'workflow': [{'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3, 'stick': 2}, 'platform': 'crafting table'}}]}, {'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '8', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'furnace': 1}, 'materials': {'cobblestone': 8}, 'platform': 'crafting table'}}]}]}
+Stage2: Interface & Update Inventory
+action is craft,and  args is {'obj': {'wooden pickaxe': 1}, 'materials': {'planks': 3, 'stick': 2}, 'platform': 'crafting table'}
+wooden_pickaxe,1
+Crafting my inventory is {'crafting table': 1.0, 'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Action Preparation Failure: {'feedback': "You do not have enough planks to complete the 'craft' action. You need 3 planks but you only have 2.0 planks in your inventory.", 'success': False, 'suggestion': 'Mine or Craft enough planks first.'}
+Mine or Craft enough planks first.
+every_task_max_retries : 
+My inventory: {'crafting table': 1.0, 'planks': 2.0, 'stick': 4.0, 'sapling': 1.0, 'dirt': 9.0, 'coal': 3.0}
+Stage1: Workflow Decision
+Got Visual memory
+Workflow Memory retrieving for 2 workflows
+furnace
+search successful memory:[{'task_name': 'stone pickaxe', 'workflow': "[{'times': '1', 'actions': [{'name': 'equip', 'args': {'obj': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'dig_down', 'args': {'y_level': 60, 'tool': 'wooden pickaxe'}}]}, {'times': '3', 'actions': [{'name': 'find', 'args': {'obj': 'cobblestone'}}, {'name': 'move_to', 'args': {'obj': 'cobblestone'}}, {'name': 'mine', 'args': {'obj': 'cobblestone', 'tool': 'wooden pickaxe'}}]}, {'times': '1', 'actions': [{'name': 'craft', 'args': {'obj': {'stone pickaxe': 1}, 'materials': {'cobblestone': 3, 'stick': 2}, 'platform': 'crafting table'}}]}]"}]
+^Z

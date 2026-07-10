@@ -1,0 +1,9 @@
+[
+    {
+        "task": "glass",
+        "quantity": 1,
+        "material": {"sand": 1},
+        "tool": null,
+        "platform": "furnace"
+    }
+]

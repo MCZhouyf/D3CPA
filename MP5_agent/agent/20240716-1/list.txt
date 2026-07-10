@@ -1,0 +1,10 @@
+x coordinate is 244.5, z_index is 0
+have to move left
+present position is -223.5,74.0,244.5
+第1次，approaching, walking left. present position is [-223.5      72.      239.9505], goal position is -219.5,74.0,239.5
+ with observation
+The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()
+
+
+
+2. craft

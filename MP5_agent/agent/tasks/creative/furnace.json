@@ -1,0 +1,9 @@
+[
+    {
+        "task": "furnace",
+        "quantity": 1,
+        "material": {"cobblestone": 8},
+        "tool": null,
+        "platform": "crafting table"
+    }
+]
