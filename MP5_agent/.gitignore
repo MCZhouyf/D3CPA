@@ -167,4 +167,4 @@ planner/memory/
 *.zip
 test*
 !tests_dc3pa/
-!tests_dc3pa/**
+!tests_dc3pa/*.py

@@ -4,6 +4,8 @@
 
 Integrated `D3CPA_stage0_2_overlay_v0.3.0.zip` into `MCZhouyf/D3CPA` at base commit `0935ecf30d1c0fc246fc5ce9b421a6cfa3c63179`.
 
+Integration commit reviewed for this report: `2cfe024` (`Integrate DC3PA stages 0-2 overlay`).
+
 The manuscript PDF was not available in the repository or overlay. I therefore used `docs/PAPER_ALIGNMENT_STAGE0_2.md` as the available paper-alignment contract and do not claim details beyond that document.
 
 Stage 3 has not been implemented. This integration does not add the Hybrid Probability Model, Dual-Chain Evaluation behavior, Evaluation Chain corrections, reliability fusion, adaptive triggers, or paper-level end-to-end reproduction claims.
