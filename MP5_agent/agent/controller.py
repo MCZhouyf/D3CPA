@@ -1,4 +1,5 @@
 from utils import *
+from dc3pa_feature_flags import legacy_task_hacks_enabled
 from structured_actions import *
 from minedojo.sim import InventoryItem
 
@@ -12,7 +13,7 @@ class Controller:
         self.checker = checker
 
     def _is_deep_mining_task(self, task_information):
-        return task_information.get("task") in {"diamond", "redstone"}
+        return legacy_task_hacks_enabled() and task_information.get("task") in {"diamond", "redstone"}
 
     def _deep_mining_target(self, task_information):
         return normalize_inventory_name(task_information.get("task"))

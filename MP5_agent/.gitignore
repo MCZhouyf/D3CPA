@@ -166,3 +166,5 @@ planner/memory/
 *.mp4
 *.zip
 test*
+!tests_dc3pa/
+!tests_dc3pa/**

@@ -1,0 +1,13 @@
+DC3PA Stage 0-2 final validation
+
+................................                                         [100%]
+32 passed in 8.03s
+compileall: PASS
+synthetic integration smoke: PASS
+- overlay cache exclusion
+- guarded patch dry-run/apply/idempotence (8 changes)
+- Stage 0 launcher dry-run and manifest seed/model/task checks
+- Stage 1 workflow validation and legacy round-trip
+- Stage 2 dependency/exemplar memory demo
+
+Important boundary: no MineDojo, Minecraft backend, real LLM, or MineCLIP process was started in this environment.

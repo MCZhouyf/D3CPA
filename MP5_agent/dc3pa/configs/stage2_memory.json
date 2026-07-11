@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "mode": "reasoning_only",
+  "task_file": null,
+  "model_name": null,
+  "seeds": [3],
+  "output_dir": "runs/stage2_memory",
+  "feature_flags": {
+    "legacy_task_hacks": false,
+    "controller_low_level_recovery": true,
+    "legacy_workflow_memory": false,
+    "dc3pa_memory": true
+  },
+  "metadata": {
+    "visual_weight": 0.7,
+    "memory_policy": "successful episodes only"
+  }
+}

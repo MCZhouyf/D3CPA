@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "mode": "mp5_legacy",
+  "task_file": null,
+  "model_name": null,
+  "seeds": [3],
+  "output_dir": "runs/stage0_baseline",
+  "feature_flags": {
+    "legacy_task_hacks": true,
+    "controller_low_level_recovery": true,
+    "legacy_workflow_memory": true,
+    "dc3pa_memory": false
+  },
+  "metadata": {
+    "purpose": "Reproduce and measure the current repository before DC3PA behavior changes"
+  }
+}

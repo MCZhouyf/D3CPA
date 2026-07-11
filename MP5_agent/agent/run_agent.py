@@ -1,5 +1,6 @@
 # -- coding: utf-8 --
 from utils import *
+from dc3pa_feature_flags import legacy_task_hacks_enabled
 from planner import Planner
 from reflexion import Reflexion
 from controller import Controller
@@ -24,7 +25,10 @@ class Evaluator:
             
 
             
-        seed = random.randint(1,1000000000000)
+        seed_override = os.environ.get("DC3PA_WORLD_SEED")
+        seed = int(seed_override) if seed_override is not None else random.randint(1,1000000000000)
+        random.seed(seed)
+        np.random.seed(seed % (2 ** 32))
         vradius = 5
         log_info(seed)
         biome_string = "forest"
@@ -35,7 +39,7 @@ class Evaluator:
         self.env = minedojo.make(
             task_id="harvest", target_names=self.env_target_name,
             image_size=(512, 820), 
-            target_quantities=100, seed=3, 
+            target_quantities=100, seed=int(os.environ.get("DC3PA_SIM_SEED", 3)), 
             specified_biome = biome_string, 
             spawn_rate=1, 
             break_speed_multiplier = 100.0, 
@@ -67,6 +71,8 @@ class Evaluator:
         return task_target_name
 
     def _fixed_workflow_for_task(self, task_information):
+        if not legacy_task_hacks_enabled():
+            return None
         if task_information.get("task") != "redstone":
             return None
 

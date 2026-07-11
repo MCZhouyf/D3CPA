@@ -2,6 +2,7 @@
 import traceback
 import time
 from utils import *
+from dc3pa_feature_flags import legacy_task_hacks_enabled
 from langchain.schema import HumanMessage, SystemMessage
 
 
@@ -54,6 +55,8 @@ class Planner:
         return False
 
     def _inject_prerequisite_steps(self, workflow_dict):
+        if not legacy_task_hacks_enabled():
+            return workflow_dict
         workflow = workflow_dict.get("workflow", [])
         if not workflow:
             return workflow_dict

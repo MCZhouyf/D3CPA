@@ -1,0 +1,396 @@
+{
+  "findings": [
+    {
+      "category": "prerequisite_injection",
+      "evidence": "def _inject_prerequisite_steps(self, workflow_dict):",
+      "line": 57,
+      "path": "MP5_agent/agent/planner.py",
+      "rationale": "Planner-side prerequisite injection overlaps the proposed knowledge evaluator.",
+      "severity": "high"
+    },
+    {
+      "category": "prerequisite_injection",
+      "evidence": "prerequisite_steps = [",
+      "line": 68,
+      "path": "MP5_agent/agent/planner.py",
+      "rationale": "Planner-side prerequisite injection overlaps the proposed knowledge evaluator.",
+      "severity": "high"
+    },
+    {
+      "category": "prerequisite_injection",
+      "evidence": "workflow = workflow[:insert_at] + prerequisite_steps + workflow[insert_at:]",
+      "line": 79,
+      "path": "MP5_agent/agent/planner.py",
+      "rationale": "Planner-side prerequisite injection overlaps the proposed knowledge evaluator.",
+      "severity": "high"
+    },
+    {
+      "category": "prerequisite_injection",
+      "evidence": "return self._inject_prerequisite_steps(workflow_dict)",
+      "line": 98,
+      "path": "MP5_agent/agent/planner.py",
+      "rationale": "Planner-side prerequisite injection overlaps the proposed knowledge evaluator.",
+      "severity": "high"
+    },
+    {
+      "category": "uncontrolled_randomness",
+      "evidence": "seed = int(seed_override) if seed_override is not None else random.randint(1,1000000000000)",
+      "line": 29,
+      "path": "MP5_agent/agent/run_agent.py",
+      "rationale": "Uncontrolled randomness weakens reproducibility.",
+      "severity": "medium"
+    },
+    {
+      "category": "task_specific_branch",
+      "evidence": "log_info(f\"Failed to read task target from {task_path}: {exc}. Falling back to diamond.\")",
+      "line": 64,
+      "path": "MP5_agent/agent/run_agent.py",
+      "rationale": "Task-name-specific logic must be isolated from research-mode comparisons.",
+      "severity": "high"
+    },
+    {
+      "category": "task_specific_branch",
+      "evidence": "return \"diamond\"",
+      "line": 65,
+      "path": "MP5_agent/agent/run_agent.py",
+      "rationale": "Task-name-specific logic must be isolated from research-mode comparisons.",
+      "severity": "high"
+    },
+    {
+      "category": "task_specific_branch",
+      "evidence": "# MineDojo's harvest meta task crashes for redstone here; MP5 still checks redstone itself.",
+      "line": 68,
+      "path": "MP5_agent/agent/run_agent.py",
+      "rationale": "Task-name-specific logic must be isolated from research-mode comparisons.",
+      "severity": "high"
+    },
+    {
+      "category": "task_specific_branch",
+      "evidence": "if task_target_name == \"redstone\":",
+      "line": 69,
+      "path": "MP5_agent/agent/run_agent.py",
+      "rationale": "Task-name-specific logic must be isolated from research-mode comparisons.",
+      "severity": "high"
+    },
+    {
+      "category": "task_specific_branch",
+      "evidence": "return \"diamond\"",
+      "line": 70,
+      "path": "MP5_agent/agent/run_agent.py",
+      "rationale": "Task-name-specific logic must be isolated from research-mode comparisons.",
+      "severity": "high"
+    },
+    {
+      "category": "fixed_workflow",
+      "evidence": "def _fixed_workflow_for_task(self, task_information):",
+      "line": 73,
+      "path": "MP5_agent/agent/run_agent.py",
+      "rationale": "A hand-authored workflow can dominate planner performance.",
+      "severity": "high"
+    },
+    {
+      "category": "task_specific_branch",
+      "evidence": "if task_information.get(\"task\") != \"redstone\":",
+      "line": 76,
+      "path": "MP5_agent/agent/run_agent.py",
+      "rationale": "Task-name-specific logic must be isolated from research-mode comparisons.",
+      "severity": "high"
+    },
+    {
+      "category": "task_specific_branch",
+      "evidence": "{\"name\": \"find\", \"args\": {\"obj\": \"redstone ore\"}},",
+      "line": 116,
+      "path": "MP5_agent/agent/run_agent.py",
+      "rationale": "Task-name-specific logic must be isolated from research-mode comparisons.",
+      "severity": "high"
+    },
+    {
+      "category": "task_specific_branch",
+      "evidence": "{\"name\": \"move_to\", \"args\": {\"obj\": \"redstone ore\"}},",
+      "line": 117,
+      "path": "MP5_agent/agent/run_agent.py",
+      "rationale": "Task-name-specific logic must be isolated from research-mode comparisons.",
+      "severity": "high"
+    },
+    {
+      "category": "task_specific_branch",
+      "evidence": "{\"name\": \"mine\", \"args\": {\"obj\": \"redstone ore\", \"tool\": \"iron pickaxe\"}},",
+      "line": 118,
+      "path": "MP5_agent/agent/run_agent.py",
+      "rationale": "Task-name-specific logic must be isolated from research-mode comparisons.",
+      "severity": "high"
+    },
+    {
+      "category": "environment_state_mutation",
+      "evidence": "self.env.set_inventory([])",
+      "line": 157,
+      "path": "MP5_agent/agent/run_agent.py",
+      "rationale": "Direct inventory mutation can bypass environment dynamics and confound results.",
+      "severity": "critical"
+    },
+    {
+      "category": "environment_state_mutation",
+      "evidence": "#self.env.set_inventory([InventoryItem(slot=9, name=\"dirt\", variant=None, quantity=6),  InventoryItem(slot=3, name=\"furnace\", variant=None, quantity=1),InventoryItem(slot=17, name=\"coal\", variant=None, quantity=3)])",
+      "line": 158,
+      "path": "MP5_agent/agent/run_agent.py",
+      "rationale": "Direct inventory mutation can bypass environment dynamics and confound results.",
+      "severity": "critical"
+    },
+    {
+      "category": "environment_state_mutation",
+      "evidence": "#self.env.set_inventory([InventoryItem(slot=9, name=\"dirt\", variant=None, quantity=6),  InventoryItem(slot=0, name=\"wooden_pickaxe\", variant=None, quantity=1),  InventoryItem(slot=1, name=\"stone_pickaxe\", variant=None, quantity=1),  InventoryItem(slot=3, name=\"carfting table\", variant=None, quantity",
+      "line": 159,
+      "path": "MP5_agent/agent/run_agent.py",
+      "rationale": "Direct inventory mutation can bypass environment dynamics and confound results.",
+      "severity": "critical"
+    },
+    {
+      "category": "fixed_workflow",
+      "evidence": "workflow_dict = self._fixed_workflow_for_task(task_information)",
+      "line": 215,
+      "path": "MP5_agent/agent/run_agent.py",
+      "rationale": "A hand-authored workflow can dominate planner performance.",
+      "severity": "high"
+    },
+    {
+      "category": "task_specific_branch",
+      "evidence": "return legacy_task_hacks_enabled() and task_information.get(\"task\") in {\"diamond\", \"redstone\"}",
+      "line": 16,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Task-name-specific logic must be isolated from research-mode comparisons.",
+      "severity": "high"
+    },
+    {
+      "category": "task_specific_branch",
+      "evidence": "if target in {\"diamond\", \"redstone\"}:",
+      "line": 23,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Task-name-specific logic must be isolated from research-mode comparisons.",
+      "severity": "high"
+    },
+    {
+      "category": "environment_state_mutation",
+      "evidence": "env.set_inventory(inventory_items)",
+      "line": 95,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Direct inventory mutation can bypass environment dynamics and confound results.",
+      "severity": "critical"
+    },
+    {
+      "category": "fallback_behavior",
+      "evidence": "def _fallback_craft_wooden_pickaxe(self, env):",
+      "line": 98,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Fallbacks should be logged and separated from high-level planning gains.",
+      "severity": "medium"
+    },
+    {
+      "category": "fallback_behavior",
+      "evidence": "print(\"Fallback crafting wooden pickaxe after bounded UI craft attempts.\")",
+      "line": 103,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Fallbacks should be logged and separated from high-level planning gains.",
+      "severity": "medium"
+    },
+    {
+      "category": "fallback_behavior",
+      "evidence": "def _fallback_craft_stone_pickaxe(self, env):",
+      "line": 122,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Fallbacks should be logged and separated from high-level planning gains.",
+      "severity": "medium"
+    },
+    {
+      "category": "fallback_behavior",
+      "evidence": "print(\"Fallback crafting stone pickaxe after bounded UI craft attempts.\")",
+      "line": 127,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Fallbacks should be logged and separated from high-level planning gains.",
+      "severity": "medium"
+    },
+    {
+      "category": "fallback_behavior",
+      "evidence": "def _fallback_mine_diamond_resource(self, env, inventory_obj, required_quantity):",
+      "line": 138,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Fallbacks should be logged and separated from high-level planning gains.",
+      "severity": "medium"
+    },
+    {
+      "category": "task_specific_branch",
+      "evidence": "elif inventory_obj in {\"diamond\", \"redstone\"} and self.memory.inventory.get(\"iron pickaxe\", 0) < 1:",
+      "line": 152,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Task-name-specific logic must be isolated from research-mode comparisons.",
+      "severity": "high"
+    },
+    {
+      "category": "fallback_behavior",
+      "evidence": "f\"Fallback mining {inventory_obj} after bounded MineDojo attempts: \"",
+      "line": 156,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Fallbacks should be logged and separated from high-level planning gains.",
+      "severity": "medium"
+    },
+    {
+      "category": "fallback_behavior",
+      "evidence": "def _fallback_craft_diamond_item(self, env, crafted_obj, target_quantity):",
+      "line": 162,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Fallbacks should be logged and separated from high-level planning gains.",
+      "severity": "medium"
+    },
+    {
+      "category": "fallback_behavior",
+      "evidence": "print(\"Fallback smelting iron ingot after bounded furnace attempts.\")",
+      "line": 178,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Fallbacks should be logged and separated from high-level planning gains.",
+      "severity": "medium"
+    },
+    {
+      "category": "fallback_behavior",
+      "evidence": "print(\"Fallback crafting furnace after bounded UI craft attempts.\")",
+      "line": 192,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Fallbacks should be logged and separated from high-level planning gains.",
+      "severity": "medium"
+    },
+    {
+      "category": "fallback_behavior",
+      "evidence": "print(\"Fallback crafting iron pickaxe after bounded UI craft attempts.\")",
+      "line": 205,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Fallbacks should be logged and separated from high-level planning gains.",
+      "severity": "medium"
+    },
+    {
+      "category": "fallback_behavior",
+      "evidence": "return self._fallback_mine_diamond_resource(env, \"coal\", max(1, int(step_times)))",
+      "line": 225,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Fallbacks should be logged and separated from high-level planning gains.",
+      "severity": "medium"
+    },
+    {
+      "category": "fallback_behavior",
+      "evidence": "self._fallback_craft_stone_pickaxe(env)",
+      "line": 228,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Fallbacks should be logged and separated from high-level planning gains.",
+      "severity": "medium"
+    },
+    {
+      "category": "fallback_behavior",
+      "evidence": "return self._fallback_mine_diamond_resource(env, \"iron ore\", max(3, int(step_times)))",
+      "line": 229,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Fallbacks should be logged and separated from high-level planning gains.",
+      "severity": "medium"
+    },
+    {
+      "category": "task_specific_branch",
+      "evidence": "if target in {\"diamond\", \"redstone\"}:",
+      "line": 232,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Task-name-specific logic must be isolated from research-mode comparisons.",
+      "severity": "high"
+    },
+    {
+      "category": "fallback_behavior",
+      "evidence": "return self._fallback_mine_diamond_resource(env, target, max(1, int(step_times)))",
+      "line": 233,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Fallbacks should be logged and separated from high-level planning gains.",
+      "severity": "medium"
+    },
+    {
+      "category": "fallback_behavior",
+      "evidence": "self._fallback_craft_wooden_pickaxe(env)",
+      "line": 466,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Fallbacks should be logged and separated from high-level planning gains.",
+      "severity": "medium"
+    },
+    {
+      "category": "fallback_behavior",
+      "evidence": "f\"Skipping deep mining resource action after bounded resource fallback: {action}; \"",
+      "line": 569,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Fallbacks should be logged and separated from high-level planning gains.",
+      "severity": "medium"
+    },
+    {
+      "category": "fallback_behavior",
+      "evidence": "craft_success = self._fallback_craft_stone_pickaxe(env)",
+      "line": 643,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Fallbacks should be logged and separated from high-level planning gains.",
+      "severity": "medium"
+    },
+    {
+      "category": "fallback_behavior",
+      "evidence": "craft_success = self._fallback_craft_diamond_item(env, crafted_obj, target_quantity)",
+      "line": 647,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Fallbacks should be logged and separated from high-level planning gains.",
+      "severity": "medium"
+    },
+    {
+      "category": "fallback_behavior",
+      "evidence": "self._fallback_craft_stone_pickaxe(env)",
+      "line": 682,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Fallbacks should be logged and separated from high-level planning gains.",
+      "severity": "medium"
+    },
+    {
+      "category": "fallback_behavior",
+      "evidence": "and self._fallback_mine_diamond_resource(env, inventory_obj, times)",
+      "line": 719,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Fallbacks should be logged and separated from high-level planning gains.",
+      "severity": "medium"
+    },
+    {
+      "category": "task_specific_branch",
+      "evidence": "\"diamond\": [\"iron pickaxe\"],",
+      "line": 810,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Task-name-specific logic must be isolated from research-mode comparisons.",
+      "severity": "high"
+    },
+    {
+      "category": "task_specific_branch",
+      "evidence": "\"redstone\": [\"iron pickaxe\"],",
+      "line": 811,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Task-name-specific logic must be isolated from research-mode comparisons.",
+      "severity": "high"
+    },
+    {
+      "category": "task_specific_branch",
+      "evidence": "elif obj in {\"diamond ore\", \"redstone ore\"}:",
+      "line": 862,
+      "path": "MP5_agent/agent/controller.py",
+      "rationale": "Task-name-specific logic must be isolated from research-mode comparisons.",
+      "severity": "high"
+    },
+    {
+      "category": "fallback_behavior",
+      "evidence": "f\"Workflow Memory using JSON-only fallback: \"",
+      "line": 216,
+      "path": "MP5_agent/agent/work_memory.py",
+      "rationale": "Fallbacks should be logged and separated from high-level planning gains.",
+      "severity": "medium"
+    }
+  ],
+  "summary": {
+    "by_severity": {
+      "critical": 4,
+      "high": 22,
+      "medium": 22
+    },
+    "count": 48
+  }
+}

@@ -1,0 +1,5 @@
+# Minimal dependencies for the Stage 0-2 overlay only.
+# Keep the existing MP5/MineDojo environment separate and install these there.
+numpy>=1.24,<3
+Pillow>=9,<13
+pytest>=7,<10
