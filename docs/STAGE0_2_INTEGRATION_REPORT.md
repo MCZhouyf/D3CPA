@@ -5,6 +5,7 @@
 Integrated `D3CPA_stage0_2_overlay_v0.3.0.zip` into `MCZhouyf/D3CPA` at base commit `0935ecf30d1c0fc246fc5ce9b421a6cfa3c63179`.
 
 Integration commit reviewed for this report: `2cfe024` (`Integrate DC3PA stages 0-2 overlay`).
+Artifact cleanup commit reviewed for this report: `76b1afd` (`Clean Stage 0-2 integration artifacts`).
 
 The manuscript PDF was not available in the repository or overlay. I therefore used `docs/PAPER_ALIGNMENT_STAGE0_2.md` as the available paper-alignment contract and do not claim details beyond that document.
 
@@ -46,7 +47,7 @@ Repository-specific adjustment:
 
 ## Commands And Results
 
-- `sha256sum -c D3CPA_stage0_2_overlay_v0.3.0.zip.sha256` from `/root/autodl-tmp`: passed.
+- `sha256sum -c D3CPA_stage0_2_overlay_v0.3.0.zip.sha256` from the overlay archive directory: passed.
 - `python <overlay>/apply_overlay.py --repo-root .`: copied 55 overlay files.
 - `python MP5_agent/scripts_dc3pa/apply_legacy_patches.py --repo-root . --dry-run`: initially failed on the inline MineDojo seed anchor, then passed after the exact-anchor repository adjustment.
 - `python MP5_agent/scripts_dc3pa/apply_legacy_patches.py --repo-root .`: passed and reported no changes needed after manual narrow integration.
