@@ -8,7 +8,8 @@
 - `stage0-2` tag commit: `73afe2a50094ba684e5bc8cd8fd12e474d8d3684`
 - `stage0-2` ancestry check: passed; the tag is an ancestor of this integration branch.
 - Intended integration commit message: `Implement DC3PA stages 3-5 decision regulation`
-- Intended integration commit hash: pending until the local commit is created; the report will be updated in a follow-up report-only commit.
+- Integration commit hash: `c0edbf884d5d69e86d01a6c5c0d380f487b5c87f`
+- Report hash-backfill commit: created after the integration commit; it contains no code changes.
 
 ## Manuscript Availability
 
