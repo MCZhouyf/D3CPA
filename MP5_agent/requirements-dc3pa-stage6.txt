@@ -1,0 +1,5 @@
+# Stage 6 introduces no new mandatory package beyond stages 0-5.
+# Real Minecraft integration still requires the repository's MineDojo/JDK stack.
+# Paper-grade environment reliability requires a real MineCLIP-compatible image
+# encoder and a real text encoder supplied through MultimodalMemory.
+-r requirements-dc3pa-stage3-5.txt

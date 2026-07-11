@@ -1,0 +1,110 @@
+from __future__ import annotations
+
+import json
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any, Dict, Mapping
+
+from ..errors import ContractValidationError
+
+_RUNTIME_MODES = {"mp5_legacy", "reasoning_only", "dc3pa"}
+_UNRESOLVED_POLICIES = {"block", "reasoning_only", "execute"}
+_PLANNER_FAILURE_POLICIES = {"raise", "reasoning_only", "return_failure"}
+_CONTROLLER_EXCEPTION_POLICIES = {"raise", "return_failure"}
+_MEMORY_FAILURE_POLICIES = {"raise", "trace"}
+
+
+def _strict_bool(value: Any, label: str) -> bool:
+    if not isinstance(value, bool):
+        raise ContractValidationError(f"{label} must be a bool")
+    return value
+
+
+def _positive_int(value: Any, label: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ContractValidationError(f"{label} must be a positive integer")
+    return value
+
+
+@dataclass(frozen=True)
+class Stage6RuntimeConfig:
+    """Closed-loop Stage-6 runtime policy.
+
+    The default behavior is deliberately fail-closed for an unresolved DC3PA plan:
+    it is not sent to the Controller. A reasoning-only fallback must be explicitly
+    selected. ``execute`` is retained only as an auditable research/debug option.
+    """
+
+    mode: str = "dc3pa"
+    max_execution_attempts: int = 30
+    unresolved_plan_policy: str = "block"
+    planner_failure_policy: str = "reasoning_only"
+    controller_exception_policy: str = "return_failure"
+    goal_check_exception_policy: str = "return_failure"
+    memory_failure_policy: str = "trace"
+    require_goal_check: bool = True
+    record_legacy_workflow_memory: bool = True
+    record_multimodal_memory: bool = True
+    capture_initial_scene: bool = True
+    capture_final_scene: bool = True
+
+    def validate(self) -> None:
+        if self.mode not in _RUNTIME_MODES:
+            raise ContractValidationError(
+                f"mode must be one of {sorted(_RUNTIME_MODES)}, got {self.mode!r}"
+            )
+        _positive_int(self.max_execution_attempts, "max_execution_attempts")
+        if self.unresolved_plan_policy not in _UNRESOLVED_POLICIES:
+            raise ContractValidationError(
+                "unresolved_plan_policy must be 'block', 'reasoning_only', or 'execute'"
+            )
+        if self.planner_failure_policy not in _PLANNER_FAILURE_POLICIES:
+            raise ContractValidationError(
+                "planner_failure_policy must be 'raise', 'reasoning_only', or 'return_failure'"
+            )
+        if self.controller_exception_policy not in _CONTROLLER_EXCEPTION_POLICIES:
+            raise ContractValidationError(
+                "controller_exception_policy must be 'raise' or 'return_failure'"
+            )
+        if self.goal_check_exception_policy not in _CONTROLLER_EXCEPTION_POLICIES:
+            raise ContractValidationError(
+                "goal_check_exception_policy must be 'raise' or 'return_failure'"
+            )
+        if self.memory_failure_policy not in _MEMORY_FAILURE_POLICIES:
+            raise ContractValidationError(
+                "memory_failure_policy must be 'raise' or 'trace'"
+            )
+        for label in (
+            "require_goal_check",
+            "record_legacy_workflow_memory",
+            "record_multimodal_memory",
+            "capture_initial_scene",
+            "capture_final_scene",
+        ):
+            _strict_bool(getattr(self, label), label)
+
+    @classmethod
+    def from_mapping(cls, data: Mapping[str, Any]) -> "Stage6RuntimeConfig":
+        allowed = set(cls.__dataclass_fields__)
+        unknown = set(data) - allowed
+        if unknown:
+            raise ContractValidationError(
+                f"Unknown Stage6RuntimeConfig fields: {sorted(unknown)}"
+            )
+        config = cls(**dict(data))
+        config.validate()
+        return config
+
+    @classmethod
+    def from_json_file(cls, path: str | Path) -> "Stage6RuntimeConfig":
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        if not isinstance(payload, Mapping):
+            raise ContractValidationError("Stage-6 config JSON must be an object")
+        runtime_payload = payload.get("runtime", payload)
+        if not isinstance(runtime_payload, Mapping):
+            raise ContractValidationError("runtime config must be an object")
+        return cls.from_mapping(runtime_payload)
+
+    def to_dict(self) -> Dict[str, Any]:
+        self.validate()
+        return asdict(self)

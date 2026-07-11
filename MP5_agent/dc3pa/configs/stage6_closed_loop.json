@@ -1,0 +1,42 @@
+{
+  "runtime": {
+    "mode": "dc3pa",
+    "max_execution_attempts": 30,
+    "unresolved_plan_policy": "block",
+    "planner_failure_policy": "reasoning_only",
+    "controller_exception_policy": "return_failure",
+    "goal_check_exception_policy": "return_failure",
+    "memory_failure_policy": "trace",
+    "require_goal_check": true,
+    "record_legacy_workflow_memory": true,
+    "record_multimodal_memory": true,
+    "capture_initial_scene": true,
+    "capture_final_scene": true
+  },
+  "hybrid_probability": {
+    "visual_similarity_weight": 0.7,
+    "learned_weight_cap": 0.4,
+    "memory_weight_growth": 0.02,
+    "require_environment_text_relevance": true,
+    "model_failure_mode": "unavailable",
+    "task_name_filter_environment": false
+  },
+  "dual_chain": {
+    "confidence_threshold": 0.8,
+    "max_revision_rounds": 2,
+    "evaluate_when_unavailable": true
+  },
+  "adaptive_trigger": {
+    "threshold": 0.8,
+    "initial_interval": 3,
+    "window_size": 3,
+    "minimum_interval": 1,
+    "maximum_interval": 64,
+    "increase_step": 1,
+    "decrease_step": 1
+  },
+  "notes": {
+    "memory_weight_growth": "Engineering default; the manuscript does not specify a distinct numeric value.",
+    "full_environment_score": "Paper-grade runs require real image and text encoders. Development encoders must not be reported as MineCLIP results."
+  }
+}
