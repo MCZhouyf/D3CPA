@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "adaptive_trigger": {
+    "threshold": 0.8,
+    "initial_interval": 3,
+    "window_size": 3,
+    "minimum_interval": 1,
+    "maximum_interval": 64,
+    "increase_step": 1,
+    "decrease_step": 1
+  },
+  "dual_chain": {
+    "confidence_threshold": 0.8,
+    "max_revision_rounds": 2,
+    "evaluate_when_unavailable": true
+  }
+}

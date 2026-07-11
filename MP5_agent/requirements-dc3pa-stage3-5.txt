@@ -1,0 +1,3 @@
+# Stage 3-5 adds no mandatory third-party runtime dependency.
+# Install after the Stage 0-2 requirements in the existing MP5 environment.
+-r requirements-dc3pa-stage0-2.txt

@@ -1,0 +1,44 @@
+DC3PA Stage 3-5 final validation
+Date: 2026-07-11
+Artifact version: 0.6.0
+Observed GitHub base tag: stage0-2 -> 73afe2a50094ba684e5bc8cd8fd12e474d8d3684
+
+Validation environment
+- Base simulation: the delivered Stage 0-2 overlay, merged with this Stage 3-5 overlay.
+- No MineDojo, Minecraft/JDK backend, network LLM, real MineCLIP, or provider credentials were used.
+- The actual GitHub checkout must be revalidated by Codex before commit.
+
+Results
+1. Guarded installer preflight on clean Stage 0-2 base:
+   PASS - 42 files scheduled, no writes in dry-run.
+2. Guarded installer application:
+   PASS - 42 files changed.
+3. Installer idempotence:
+   PASS - second dry-run reported 0 files to change.
+4. Base-drift rejection:
+   PASS - altered dc3pa/__init__.py was rejected before any new file was written.
+5. Offline tests after guarded installation:
+   PASS - 83 passed in 8.16s.
+6. Python bytecode compilation:
+   PASS - dc3pa, scripts_dc3pa, tests_dc3pa.
+7. Offline demos:
+   PASS - Stage 3 HPM demo.
+   PASS - Stage 4 dual-chain repair/revalidation demo.
+   PASS - Stage 5 adaptive-trigger transition demo.
+   PASS - all three outputs parsed as JSON.
+8. Configuration JSON parsing:
+   PASS - Stage 0, 2, 3, 4 and 5 config files.
+9. Text hygiene:
+   PASS - no tabs or trailing whitespace in packaged text files.
+10. Secret/absolute-path scan:
+    PASS - no token-like secrets, private-key markers, /mnt/data or /home/oai paths.
+
+Important limitations
+- This validates module behavior and simulated integration only.
+- It does not validate the Minecraft runner, Controller execution, real model calls,
+  MineCLIP inference, task success rates, replanning counts, planning time, or ALFWorld.
+- memory_weight_growth=0.02 is an explicit engineering default because the manuscript
+  does not report an unambiguous distinct numeric growth coefficient.
+- The Evaluation Chain is called on low/unavailable/hard-conflict windows in the approved
+  staged repository design; offline tests do not resolve alternative interpretations of
+  unconditional detailed evaluation at each fixed M.

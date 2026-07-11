@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "hybrid_probability": {
+    "visual_similarity_weight": 0.7,
+    "learned_weight_cap": 0.4,
+    "memory_weight_growth": 0.02,
+    "require_environment_text_relevance": true,
+    "model_failure_mode": "unavailable",
+    "task_name_filter_environment": false
+  },
+  "notes": {
+    "memory_weight_growth": "Engineering default. The manuscript does not report a distinct numeric growth coefficient."
+  }
+}
