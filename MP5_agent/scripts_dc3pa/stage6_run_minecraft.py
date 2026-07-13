@@ -36,6 +36,10 @@ from dc3pa.memory import (  # noqa: E402
     RGBHistogramEncoder,
 )
 from dc3pa.memory.modes import MemoryMode  # noqa: E402
+from dc3pa.memory.snapshot import (  # noqa: E402
+    MemorySnapshotManifest,
+    resolve_snapshot_database,
+)
 from dc3pa.observability.trace import JsonlTraceWriter  # noqa: E402
 from dc3pa.reliability import (  # noqa: E402
     AdaptiveTriggerConfig,
@@ -351,11 +355,22 @@ def main(argv: Optional[list[str]] = None) -> int:
             refresh_environment=args.mode != "mp5_legacy",
             initial_observation=initial_observation,
         )
-        args.memory_root.mkdir(parents=True, exist_ok=True)
         if args.mode == "mp5_legacy":
             runtime_config = replace(runtime_config, record_multimodal_memory=False)
 
         memory_mode = MemoryMode.parse(runtime_config.memory_mode)
+        if memory_mode.requires_frozen_snapshot:
+            if not args.memory_root.is_dir():
+                raise FileNotFoundError(
+                    f"readonly memory root does not exist: {args.memory_root}"
+                )
+            manifest = MemorySnapshotManifest.from_json(
+                runtime_config.memory_snapshot_manifest
+            )
+            resolve_snapshot_database(manifest, memory_root=args.memory_root)
+        elif memory_mode.memory_enabled:
+            args.memory_root.mkdir(parents=True, exist_ok=True)
+
         memory_context = (
             contextlib.nullcontext(None)
             if not memory_mode.memory_enabled
