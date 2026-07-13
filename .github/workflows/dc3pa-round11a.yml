@@ -49,6 +49,17 @@ jobs:
       - name: Frozen snapshot smoke
         run: python scripts_dc3pa/round11a_snapshot_smoke.py
 
+      - name: Full hosted infrastructure gate
+        run: >-
+          python scripts_dc3pa/run_round11a_gate.py
+          --full
+          --junit artifacts/round11a-full.xml
+
+      - name: Round 2 knowledge V2 gate
+        run: >-
+          python scripts_dc3pa/run_round2_gate.py
+          --junit artifacts/round2.xml
+
       - name: Print reports on failure
         if: failure()
         run: |
