@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Dict, List, Sequence
 
@@ -30,7 +31,8 @@ class PlanEditor:
             raise ContractValidationError("Input plan contains duplicate step IDs")
 
         if report.replacement_steps:
-            new_steps = list(report.replacement_steps)
+            new_steps: List[PlanStep] = []
+            self._append_patch_steps(new_steps, report.replacement_steps, set())
             earliest = 0
             changed_ids = tuple(step.step_id for step in new_steps)
             edit_ids: tuple[str, ...] = tuple()
@@ -64,6 +66,32 @@ class PlanEditor:
             applied_edit_ids=edit_ids,
         )
 
+    def _step_with_fresh_id(self, step: PlanStep, reserved_ids: set[str]) -> PlanStep:
+        while True:
+            candidate = PlanStep(
+                actions=list(step.actions),
+                times=step.times,
+                expected_outputs=deepcopy(step.expected_outputs),
+                metadata=deepcopy(step.metadata),
+            )
+            if candidate.step_id not in reserved_ids:
+                return candidate
+
+    def _append_patch_steps(
+        self,
+        output: List[PlanStep],
+        steps: Sequence[PlanStep],
+        reserved_ids: set[str],
+    ) -> tuple[str, ...]:
+        appended_ids: List[str] = []
+        for step in steps:
+            if step.step_id in reserved_ids:
+                step = self._step_with_fresh_id(step, reserved_ids)
+            reserved_ids.add(step.step_id)
+            output.append(step)
+            appended_ids.append(step.step_id)
+        return tuple(appended_ids)
+
     def _apply_edits(
         self, original_steps: Sequence[PlanStep], edits: Sequence[PlanEdit]
     ) -> tuple[List[PlanStep], int, tuple[str, ...], tuple[str, ...]]:
@@ -96,23 +124,42 @@ class PlanEditor:
                         f"Conflicting terminal edits for {edit.target_step_id!r}"
                     )
                 terminal[edit.target_step_id] = edit
-            changed_ids.append(edit.target_step_id)
-            changed_ids.extend(step.step_id for step in edit.steps)
             applied_ids.append(edit.edit_id)
 
+        retained_original_ids = {
+            step.step_id for step in original_steps if step.step_id not in terminal
+        }
+        reserved_ids = set(retained_original_ids)
         output: List[PlanStep] = []
         for step in original_steps:
-            output.extend(before.get(step.step_id, []))
+            changed_ids.extend(
+                self._append_patch_steps(
+                    output,
+                    before.get(step.step_id, []),
+                    reserved_ids,
+                )
+            )
             terminal_edit = terminal.get(step.step_id)
             if terminal_edit is None:
                 output.append(step)
             elif terminal_edit.operation == "replace":
-                output.extend(terminal_edit.steps)
+                changed_ids.append(step.step_id)
+                changed_ids.extend(
+                    self._append_patch_steps(output, terminal_edit.steps, reserved_ids)
+                )
+            elif terminal_edit.operation == "delete":
+                changed_ids.append(step.step_id)
             elif terminal_edit.operation != "delete":
                 raise ContractValidationError(
                     f"Unexpected terminal operation {terminal_edit.operation!r}"
                 )
-            output.extend(after.get(step.step_id, []))
+            changed_ids.extend(
+                self._append_patch_steps(
+                    output,
+                    after.get(step.step_id, []),
+                    reserved_ids,
+                )
+            )
         if earliest == len(original_steps):
             raise ContractValidationError("No edits were supplied")
         return output, earliest, tuple(changed_ids), tuple(applied_ids)

@@ -198,6 +198,22 @@ class Stage6ClosedLoopRunner:
             self.reasoning_chain.plan(task, state, planning_context), task
         )
 
+    @staticmethod
+    def _is_non_retryable_planning_error(error: Exception) -> bool:
+        error_type = type(error).__name__.lower()
+        if error_type in {"authenticationerror", "permissionerror"}:
+            return True
+        message = str(error).lower()
+        markers = (
+            "quota",
+            "insufficient",
+            "forbidden",
+            "unauthorized",
+            "invalid api key",
+            "incorrect api key",
+        )
+        return any(marker in message for marker in markers)
+
     def _plan(
         self,
         *,
@@ -241,6 +257,11 @@ class Stage6ClosedLoopRunner:
                     plan=None,
                     blocked_reason=f"dc3pa_planning_failed:{type(exc).__name__}",
                 )
+            if self._is_non_retryable_planning_error(exc):
+                return _PlanningDecision(
+                    plan=None,
+                    blocked_reason=f"dc3pa_planning_failed:{type(exc).__name__}",
+                )
             try:
                 fallback = self._fallback_reasoning_plan(
                     task, snapshot.state, planning_context
@@ -277,6 +298,14 @@ class Stage6ClosedLoopRunner:
         self._validate_plan_task(final_plan, task)
         unresolved = tuple(getattr(outcome, "unresolved", ()) or ())
         if unresolved:
+            blocking_unresolved = tuple(
+                item
+                for item in unresolved
+                if not (
+                    isinstance(item, Mapping)
+                    and item.get("hard_conflict") is False
+                )
+            )
             self._emit(
                 events,
                 "dc3pa_plan_unresolved",
@@ -285,8 +314,21 @@ class Stage6ClosedLoopRunner:
                     "plan_id": final_plan.plan_id,
                     "plan_version": final_plan.version,
                     "unresolved": unresolved,
+                    "blocking_unresolved": blocking_unresolved,
                 },
             )
+            if not blocking_unresolved:
+                self._emit(
+                    events,
+                    "non_blocking_dc3pa_unresolved",
+                    attempt,
+                    {
+                        "plan_id": final_plan.plan_id,
+                        "plan_version": final_plan.version,
+                        "unresolved_count": len(unresolved),
+                    },
+                )
+                return _PlanningDecision(plan=final_plan, outcome=outcome)
             if self.config.unresolved_plan_policy == "block":
                 return _PlanningDecision(
                     plan=None,

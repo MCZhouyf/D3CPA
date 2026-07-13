@@ -114,6 +114,29 @@ def test_unresolved_dc3pa_plan_is_blocked_by_default_without_execution_or_memory
     assert result.failure_reason == "unresolved_dc3pa_plan"
 
 
+def test_non_blocking_unresolved_metadata_allows_controller_execution():
+    plan = simple_plan()
+    runtime = build_runtime(
+        mode="dc3pa",
+        cognitive=FakeCognitivePlanner(
+            plan,
+            unresolved=(
+                {
+                    "reason": "request_replan",
+                    "hard_conflict": False,
+                    "summary": "superseded provider formatting issue",
+                },
+            ),
+        ),
+    )
+    result = runtime.run_task({"task": "log"})
+    assert result.success
+    assert result.controller_execution_count == 1
+    event_names = [event.event_type for event in result.events]
+    assert "dc3pa_plan_unresolved" in event_names
+    assert "non_blocking_dc3pa_unresolved" in event_names
+
+
 def test_unresolved_plan_can_explicitly_fallback_to_reasoning_only():
     plan = simple_plan()
     reasoning = StaticPlanSource(plan)
@@ -143,6 +166,26 @@ def test_dc3pa_exception_falls_back_but_is_not_reported_as_validated_plan():
     event_names = [event.event_type for event in result.events]
     assert "dc3pa_planning_failed" in event_names
     assert "reasoning_fallback_used" in event_names
+
+
+def test_non_retryable_planning_error_does_not_call_reasoning_fallback():
+    plan = simple_plan()
+    reasoning = StaticPlanSource(plan)
+    runtime = build_runtime(
+        mode="dc3pa",
+        reasoning=reasoning,
+        cognitive=RaisingCognitivePlanner(
+            PermissionError("token quota is not enough")
+        ),
+    )
+    result = runtime.run_task({"task": "log"})
+    assert not result.success
+    assert result.controller_execution_count == 0
+    assert result.failure_reason == "dc3pa_planning_failed:PermissionError"
+    assert reasoning.calls == []
+    event_names = [event.event_type for event in result.events]
+    assert "dc3pa_planning_failed" in event_names
+    assert "reasoning_fallback_used" not in event_names
 
 
 def test_planner_failure_can_return_clean_failure_without_controller_call():

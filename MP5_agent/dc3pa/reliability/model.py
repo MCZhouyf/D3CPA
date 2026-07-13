@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict, Mapping, Optional, Protocol, runtime_che
 
 from ..contracts import AgentState, Plan
 from .contracts import ConfidenceRequest, DimensionScore, ReliabilityContext
+from .projection import project_inventory
 
 _CODE_FENCE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.IGNORECASE | re.DOTALL)
 _PERCENT = re.compile(r"^\s*([0-9]+(?:\.[0-9]+)?)\s*%\s*$")
@@ -116,9 +117,28 @@ class VerbalConfidenceStrategy:
         state: AgentState,
         context: Optional[ReliabilityContext] = None,
     ) -> DimensionScore:
+        projected_state = state
+        try:
+            projected_inventory = project_inventory(plan, state).before(step_index)
+            projected_state = AgentState(
+                task=state.task,
+                inventory=projected_inventory,
+                position=state.position,
+                health=state.health,
+                observation_ref=state.observation_ref,
+                voxel_summary=state.voxel_summary,
+                metadata={
+                    **dict(state.metadata),
+                    "dc3pa_original_inventory": dict(state.inventory),
+                    "dc3pa_projected_inventory": projected_inventory,
+                    "dc3pa_projection_step_index": step_index,
+                },
+            )
+        except Exception:
+            projected_inventory = None
         request = ConfidenceRequest(
             plan=plan,
-            state=state,
+            state=projected_state,
             step_index=step_index,
             context=context or ReliabilityContext(),
         )
@@ -146,7 +166,10 @@ class VerbalConfidenceStrategy:
                 evidence={
                     "provider_type": type(self.provider).__name__,
                     "cache_hit": False,
-                    "metadata": metadata,
+                    "metadata": {
+                        **metadata,
+                        "projected_inventory_used": projected_inventory is not None,
+                    },
                 },
             )
         except Exception as exc:

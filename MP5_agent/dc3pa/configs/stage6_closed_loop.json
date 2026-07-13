@@ -23,7 +23,7 @@
   },
   "dual_chain": {
     "confidence_threshold": 0.8,
-    "max_revision_rounds": 2,
+    "max_revision_rounds": 4,
     "evaluate_when_unavailable": true
   },
   "adaptive_trigger": {

@@ -62,7 +62,7 @@ def test_plan_editor_rejects_stale_unknown_and_empty_patches():
         PlanEditor().apply(plan, emptying)
 
 
-def test_plan_editor_rejects_duplicate_step_ids_after_patch():
+def test_plan_editor_rewrites_duplicate_ids_from_patch_steps():
     plan = simple_plan(2)
     duplicate = find_step("duplicate", step_id=plan.steps[0].step_id)
     report = EvaluationReport(
@@ -71,8 +71,49 @@ def test_plan_editor_rejects_duplicate_step_ids_after_patch():
         summary="bad",
         edits=(PlanEdit("insert_before", plan.steps[1].step_id, (duplicate,)),),
     )
+    application = PlanEditor().apply(plan, report)
+    revised_ids = [step.step_id for step in application.revised_plan.steps]
+    assert len(revised_ids) == len(set(revised_ids))
+    assert revised_ids[0] == plan.steps[0].step_id
+    assert revised_ids[1] != plan.steps[0].step_id
+    assert application.revised_plan.steps[1].actions == duplicate.actions
+
+
+def test_plan_editor_allows_replacement_to_reuse_target_step_id():
+    plan = simple_plan(2)
+    replacement = find_step("replacement", step_id=plan.steps[1].step_id)
+    report = EvaluationReport(
+        plan_id=plan.plan_id,
+        plan_version=plan.version,
+        summary="reuse replaced step id",
+        edits=(PlanEdit("replace", plan.steps[1].step_id, (replacement,)),),
+    )
+    application = PlanEditor().apply(plan, report)
+    assert [step.step_id for step in application.revised_plan.steps] == [
+        plan.steps[0].step_id,
+        plan.steps[1].step_id,
+    ]
+    assert application.revised_plan.steps[1].actions == replacement.actions
+
+
+def test_plan_editor_rejects_duplicate_step_ids_in_input_plan():
+    duplicate_id = "same-step-id"
+    plan = simple_plan(1)
+    duplicate_plan = type(plan)(
+        task=plan.task,
+        steps=[
+            find_step("first", step_id=duplicate_id),
+            find_step("second", step_id=duplicate_id),
+        ],
+    )
+    report = EvaluationReport(
+        plan_id=duplicate_plan.plan_id,
+        plan_version=duplicate_plan.version,
+        summary="input plan is already invalid",
+        edits=(PlanEdit("delete", duplicate_plan.steps[0].step_id),),
+    )
     with pytest.raises(ContractValidationError):
-        PlanEditor().apply(plan, report)
+        PlanEditor().apply(duplicate_plan, report)
 
 
 def test_structured_evaluation_chain_parses_fenced_json_and_checks_staleness():

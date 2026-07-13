@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -12,6 +13,7 @@ from dc3pa.integration import (
     Stage6RuntimeConfig,
     sanitize_for_trace,
 )
+from dc3pa.reliability import DualChainConfig
 
 
 def test_stage6_config_strict_validation(tmp_path):
@@ -28,6 +30,17 @@ def test_stage6_config_strict_validation(tmp_path):
     path = tmp_path / "config.json"
     path.write_text(json.dumps({"runtime": {"mode": "reasoning_only"}}))
     assert Stage6RuntimeConfig.from_json_file(path).mode == "reasoning_only"
+
+
+def test_stage6_closed_loop_config_allows_material_repair_rounds():
+    root = Path(__file__).resolve().parents[1]
+    payload = json.loads(
+        (root / "dc3pa" / "configs" / "stage6_closed_loop.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    config = DualChainConfig.from_mapping(payload["dual_chain"])
+    assert config.max_revision_rounds >= 4
 
 
 def test_inventory_rejects_bool_nan_and_negative():

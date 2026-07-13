@@ -64,6 +64,8 @@ def update_find_obj_name(obj_name):
         return "diamond ore"
     elif normalized == "redstone":
         return "redstone ore"
+    elif normalized == "gold":
+        return "gold ore"
     else:
         return obj_name
         
@@ -106,6 +108,8 @@ def update_inventory_obj_name(obj_name):
         return "diamond"
     elif normalized == "redstone ore":
         return "redstone"
+    elif normalized == "gold ore":
+        return "gold"
     else:
         return normalized
 

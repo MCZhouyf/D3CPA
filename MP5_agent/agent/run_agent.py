@@ -13,6 +13,38 @@ import numpy as np
 import traceback
 
 
+MINE_DOJO_EXTRA_SPAWN_ITEMS = {
+    "diamond_ore",
+    "gold_ore",
+    "iron_ore",
+    "coal_ore",
+    "pig",
+    "cow",
+    "bat",
+    "cat",
+    "chicken",
+    "horse",
+    "sheep",
+    "zombie",
+}
+
+MINE_DOJO_TARGET_TO_SPAWN_ITEM = {
+    "cobblestone": "stone",
+    "diamond": "diamond_ore",
+    "gold ore": "gold_ore",
+    "iron ore": "iron_ore",
+    "coal ore": "coal_ore",
+    "pig": "pig",
+    "cow": "cow",
+    "bat": "bat",
+    "cat": "cat",
+    "chicken": "chicken",
+    "horse": "horse",
+    "sheep": "sheep",
+    "zombie": "zombie",
+}
+
+
 class Evaluator:
     def __init__(self):
         self.mllm_url = args.mllm_url
@@ -41,9 +73,7 @@ class Evaluator:
             image_size=(512, 820), 
             target_quantities=100, seed=int(os.environ.get("DC3PA_SIM_SEED", 3)), 
             specified_biome = biome_string, 
-            spawn_rate=1, 
             break_speed_multiplier = 100.0, 
-            spawn_range_low=(-10, -10, -10), spawn_range_high=(10, 10, 10), 
             start_at_night = False, world_seed = seed, use_voxel = True, 
             voxel_size=dict(xmin=-vradius, ymin=-vradius, zmin=-vradius, xmax=vradius, ymax=vradius, zmax=vradius), # doesn't really matter
             use_lidar=True,
@@ -51,7 +81,8 @@ class Evaluator:
                     (np.pi * pitch / 180, np.pi * yaw / 180, 10) # ALERT: lidar range is now 10
                     for pitch in np.arange(-60, 60, 5)
                     for yaw in np.arange(-60, 60, 5)
-            ]
+            ],
+            **self._extra_spawn_kwargs(self.env_target_name),
             )
 
     def _load_task_target_name(self, task_path):
@@ -69,6 +100,20 @@ class Evaluator:
         if task_target_name == "redstone":
             return "diamond"
         return task_target_name
+
+    def _extra_spawn_kwargs(self, env_target_name):
+        spawn_item = MINE_DOJO_TARGET_TO_SPAWN_ITEM.get(env_target_name, env_target_name)
+        if spawn_item not in MINE_DOJO_EXTRA_SPAWN_ITEMS:
+            log_info(
+                f"Skipping MineDojo extra spawn for target={env_target_name}, "
+                f"spawn_item={spawn_item}; unsupported by current MineDojo version."
+            )
+            return {}
+        return {
+            "spawn_rate": 1,
+            "spawn_range_low": (-10, -10, -10),
+            "spawn_range_high": (10, 10, 10),
+        }
 
     def _fixed_workflow_for_task(self, task_information):
         if not legacy_task_hacks_enabled():

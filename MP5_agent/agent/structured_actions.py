@@ -286,9 +286,15 @@ def nearby(env,object):
     return new_tuple
 
 
-def interaction_ready(target_block):
+def interaction_ready(target_block, object_name=None):
     if target_block is None:
         return False
+    if object_name == "wood":
+        return (
+            target_block["forward_offset"] <= 1
+            and abs(target_block["side_offset"]) <= 1
+            and abs(target_block["vertical_offset"]) <= 1
+        )
     return (
         target_block["forward_offset"] <= 1
         and abs(target_block["side_offset"]) == 0
@@ -1873,7 +1879,7 @@ def approach(env,memory,object,underground):# tbd: scanning blocknames not enoug
             f"target offsets are forward={forward_offset}, side={side_offset}, vertical={vertical_offset}"
         )
 
-        if interaction_ready(target_block):
+        if interaction_ready(target_block, object):
             print(f"APPROACH ended:). present position is {events['location_stats']['pos']}")
             return True
 
@@ -1925,7 +1931,7 @@ def approach(env,memory,object,underground):# tbd: scanning blocknames not enoug
             go_down_to_y_level(env, object_y + 1)
             continue
 
-        if interaction_ready(target_block):
+        if interaction_ready(target_block, object):
             break
         if abs(side_offset) == 1:
             if side_offset > 0:
@@ -1977,6 +1983,10 @@ def approach(env,memory,object,underground):# tbd: scanning blocknames not enoug
         for idx in indices:
             if events['rays']['block_distance'][idx]<3:
                 return True
+    if object == "wood":
+        target_block = select_target_block(events, object)
+        if interaction_ready(target_block, object):
+            return True
     return False
 
 # def move_forward(env):

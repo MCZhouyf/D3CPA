@@ -11,6 +11,7 @@ from ..evaluation import (
     PlanEditor,
     PlanEvaluationChain,
 )
+from ..evaluation.material_repair import MaterialRepairResult, repair_material_deficits
 from ..observability.trace import JsonlTraceWriter
 from ..reliability import (
     AdaptiveTriggerConfig,
@@ -114,6 +115,48 @@ class CognitiveControlPlanner:
         if self.trace_writer is not None:
             self.trace_writer.write(event_type, payload)
 
+    def _repair_material_deficits(
+        self,
+        plan: Plan,
+        state: AgentState,
+        *,
+        preserve_revision: bool = False,
+    ) -> tuple[Plan, Optional[MaterialRepairResult]]:
+        repair = repair_material_deficits(plan, state)
+        if repair.inserted_step_count <= 0:
+            return plan, None
+        repaired_plan = repair.plan
+        if preserve_revision:
+            repaired_plan = Plan(
+                task=plan.task,
+                steps=repair.plan.steps,
+                plan_id=plan.plan_id,
+                version=plan.version,
+                source=plan.source,
+                parent_plan_id=plan.parent_plan_id,
+                metadata={
+                    **dict(plan.metadata),
+                    "material_repair_inserted_targets": repair.inserted_targets,
+                },
+            )
+            repair = MaterialRepairResult(
+                plan=repaired_plan,
+                inserted_step_count=repair.inserted_step_count,
+                inserted_targets=repair.inserted_targets,
+            )
+        self._trace(
+            "material_deficits_repaired",
+            {
+                "original_plan_id": plan.plan_id,
+                "original_plan_version": plan.version,
+                "repaired_plan_id": repair.plan.plan_id,
+                "repaired_plan_version": repair.plan.version,
+                "inserted_step_count": repair.inserted_step_count,
+                "inserted_targets": list(repair.inserted_targets),
+            },
+        )
+        return repaired_plan, repair
+
     def create_plan(
         self,
         task: str,
@@ -167,7 +210,9 @@ class CognitiveControlPlanner:
         trigger_history: List[TriggerObservation] = []
         report_history: List[EvaluationReport] = []
         patch_history: List[PatchApplication] = []
+        material_repairs: List[MaterialRepairResult] = []
         unresolved: List[Dict[str, Any]] = []
+        current_plan_had_hard_unresolved = False
 
         self._trace("reasoning_plan_created", {"plan": plan.to_dict()})
         while True:
@@ -235,8 +280,10 @@ class CognitiveControlPlanner:
                         "plan_id": plan.plan_id,
                         "window": window.to_dict(),
                         "reason": "max_revision_rounds_reached",
+                        "hard_conflict": hard_conflict,
                     }
                 )
+                current_plan_had_hard_unresolved = current_plan_had_hard_unresolved or hard_conflict
                 self._trace("evaluation_skipped", unresolved[-1])
                 continue
 
@@ -258,8 +305,10 @@ class CognitiveControlPlanner:
                             "window": window.to_dict(),
                             "reason": "accepted_despite_hard_conflict",
                             "summary": report.summary,
+                            "hard_conflict": True,
                         }
                     )
+                    current_plan_had_hard_unresolved = True
                     self._trace("evaluation_conflict_unresolved", unresolved[-1])
                 else:
                     self._trace(
@@ -273,19 +322,50 @@ class CognitiveControlPlanner:
                     )
                 continue
             if report.request_replan:
+                if hard_conflict:
+                    repaired_plan, material_repair = self._repair_material_deficits(
+                        plan,
+                        state,
+                    )
+                    if material_repair is not None:
+                        material_repairs.append(material_repair)
+                        plan = repaired_plan
+                        current_plan_had_hard_unresolved = False
+                        restart_index = min(window.start_index, len(plan.steps) - 1)
+                        self._trace(
+                            "plan_revised",
+                            {
+                                "report": report.to_dict(),
+                                "revised_plan": plan.to_dict(),
+                                "restart_index": restart_index,
+                                "repair_source": "local_material_repair",
+                            },
+                        )
+                        session.restart_after_revision(restart_index, len(plan.steps))
+                        continue
                 unresolved.append(
                     {
                         "plan_id": plan.plan_id,
                         "window": window.to_dict(),
                         "reason": "request_replan",
                         "summary": report.summary,
+                        "hard_conflict": hard_conflict,
                     }
                 )
+                current_plan_had_hard_unresolved = current_plan_had_hard_unresolved or hard_conflict
                 continue
 
             application = self.plan_editor.apply(plan, report)
             patch_history.append(application)
             plan = application.revised_plan
+            plan, material_repair = self._repair_material_deficits(
+                plan,
+                state,
+                preserve_revision=True,
+            )
+            if material_repair is not None:
+                material_repairs.append(material_repair)
+            current_plan_had_hard_unresolved = False
             restart_index = min(
                 application.earliest_changed_index,
                 len(plan.steps) - 1,
@@ -300,6 +380,12 @@ class CognitiveControlPlanner:
             )
             session.restart_after_revision(restart_index, len(plan.steps))
 
+        if not current_plan_had_hard_unresolved:
+            unresolved = [
+                item
+                for item in unresolved
+                if item.get("hard_conflict") or item.get("plan_id") == plan.plan_id
+            ]
         outcome = PlanningOutcome(
             initial_plan=initial,
             final_plan=plan,

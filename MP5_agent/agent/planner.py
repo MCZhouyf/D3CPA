@@ -32,6 +32,24 @@ class Planner:
         self.memory = memory
         assert  self.memory is not None, "Please input memory"
 
+    def _is_non_retryable_llm_error(self, error):
+        non_retryable_types = (
+            getattr(openai.error, "AuthenticationError", ()),
+            getattr(openai.error, "PermissionError", ()),
+        )
+        if isinstance(error, non_retryable_types):
+            return True
+        message = str(error).lower()
+        non_retryable_markers = (
+            "quota",
+            "insufficient",
+            "forbidden",
+            "unauthorized",
+            "invalid api key",
+            "incorrect api key",
+        )
+        return any(marker in message for marker in non_retryable_markers)
+
     def _workflow_mentions_mine(self, workflow, obj_name, tool_name=None):
         for step in workflow:
             for action in step.get("actions", []):
@@ -99,6 +117,9 @@ class Planner:
         except Exception as e:
             log_info(f"Error arises in Plan Workflow part: {e} Trying again!\n\n")
             log_info(traceback.format_exc())
+            if self._is_non_retryable_llm_error(e):
+                log_info("Planner LLM error is not retryable; failing fast.")
+                raise
             self.memory.reset_current_environment_information()
             wait_seconds = min(2 ** (5 - max_retries), 12)
             log_info(f"Planner retry backoff: sleeping {wait_seconds} seconds before retry.")

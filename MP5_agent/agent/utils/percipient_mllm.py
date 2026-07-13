@@ -1,4 +1,5 @@
 import base64
+import os
 import requests
 
 from .common_utils import load_prompt
@@ -11,6 +12,7 @@ class ChatOpenAIVision:
         self.method = method            # active | caption
         self.model_name = model_name    # gpt-4-vision-preview
         self.openai_key = openai_key
+        self.api_base = os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1").rstrip("/")
 
     @staticmethod
     def encode_image(image_path):
@@ -63,7 +65,11 @@ class ChatOpenAIVision:
                 ]
             }
         )
-        response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+        response = requests.post(
+            f"{self.api_base}/chat/completions",
+            headers=headers,
+            json=payload,
+        )
 
         return response.json()['choices'][0]['message']['content']
 
@@ -81,4 +87,3 @@ class MineLLM:
             response = requests.post(self.answer_mllm_url, files=file, data=data)
             answer = fix_and_parse_json(response.text)['answer'].strip()
             return answer
-

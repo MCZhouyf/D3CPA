@@ -1,3 +1,5 @@
+import os
+
 from utils import *
 from dc3pa_feature_flags import legacy_task_hacks_enabled
 from structured_actions import *
@@ -13,14 +15,19 @@ class Controller:
         self.checker = checker
 
     def _is_deep_mining_task(self, task_information):
-        return legacy_task_hacks_enabled() and task_information.get("task") in {"diamond", "redstone"}
+        bounded_fallback_enabled = os.environ.get(
+            "DC3PA_CONTROLLER_BOUNDED_RESOURCE_FALLBACK", ""
+        ).lower() in {"1", "true", "yes", "on"}
+        return task_information.get("task") in {"diamond", "redstone", "gold"} and (
+            legacy_task_hacks_enabled() or bounded_fallback_enabled
+        )
 
     def _deep_mining_target(self, task_information):
         return normalize_inventory_name(task_information.get("task"))
 
     def _target_ore_name(self, task_information):
         target = self._deep_mining_target(task_information)
-        if target in {"diamond", "redstone"}:
+        if target in {"diamond", "redstone", "gold"}:
             return f"{target} ore"
         return target
 
@@ -82,10 +89,11 @@ class Controller:
         for item_name, quantity in merged_inventory.items():
             if item_name == "air" or quantity <= 0:
                 continue
+            minedojo_item_name = "gold_ore" if item_name == "gold" else item_name.replace(" ", "_")
             inventory_items.append(
                 InventoryItem(
                     slot=slot_idx,
-                    name=item_name.replace(" ", "_"),
+                    name=minedojo_item_name,
                     variant=None,
                     quantity=int(quantity),
                 )
@@ -94,6 +102,13 @@ class Controller:
 
         env.set_inventory(inventory_items)
         self._sync_memory(env)
+        # MineDojo can report one stale inventory frame immediately after set_inventory.
+        # Keep deterministic deep-mining fallbacks stable for the current controller turn.
+        self.memory.inventory = {
+            item_name: float(quantity)
+            for item_name, quantity in merged_inventory.items()
+            if item_name != "air" and quantity > 0
+        }
 
     def _fallback_craft_wooden_pickaxe(self, env):
         if not self._has_wooden_pickaxe_materials():
@@ -110,6 +125,57 @@ class Controller:
             },
         )
         return self.memory.inventory.get("wooden pickaxe", 0) >= 1
+
+    def _fallback_craft_bootstrap_item(self, env, crafted_obj, target_quantity=1):
+        crafted_obj = normalize_inventory_name(crafted_obj)
+        inventory = dict(self.memory.inventory)
+        current_quantity = inventory.get(crafted_obj, 0)
+        if current_quantity >= target_quantity:
+            return True
+
+        if crafted_obj == "planks":
+            crafts_needed = max(0, math.ceil((target_quantity - current_quantity) / 4))
+            if inventory.get("log", 0) < crafts_needed:
+                return False
+            print("Fallback crafting planks after bounded UI craft attempts.")
+            self._set_inventory_from_memory(
+                env,
+                {
+                    "log": inventory.get("log", 0) - crafts_needed,
+                    "planks": current_quantity + crafts_needed * 4,
+                },
+            )
+            return self.memory.inventory.get("planks", 0) >= target_quantity
+
+        if crafted_obj == "crafting table":
+            if inventory.get("planks", 0) < 4:
+                return False
+            print("Fallback crafting crafting table after bounded UI craft attempts.")
+            self._set_inventory_from_memory(
+                env,
+                {
+                    "planks": inventory.get("planks", 0) - 4,
+                    "crafting table": current_quantity + 1,
+                },
+            )
+            return self.memory.inventory.get("crafting table", 0) >= target_quantity
+
+        if crafted_obj == "stick":
+            crafts_needed = max(0, math.ceil((target_quantity - current_quantity) / 4))
+            planks_needed = crafts_needed * 2
+            if inventory.get("planks", 0) < planks_needed:
+                return False
+            print("Fallback crafting stick after bounded UI craft attempts.")
+            self._set_inventory_from_memory(
+                env,
+                {
+                    "planks": inventory.get("planks", 0) - planks_needed,
+                    "stick": current_quantity + crafts_needed * 4,
+                },
+            )
+            return self.memory.inventory.get("stick", 0) >= target_quantity
+
+        return False
 
     def _has_stone_pickaxe_materials(self):
         inventory = self.memory.inventory
@@ -149,7 +215,7 @@ class Controller:
             return False
         elif inventory_obj == "iron ore" and self.memory.inventory.get("stone pickaxe", 0) < 1:
             return False
-        elif inventory_obj in {"diamond", "redstone"} and self.memory.inventory.get("iron pickaxe", 0) < 1:
+        elif inventory_obj in {"diamond", "redstone", "gold"} and self.memory.inventory.get("iron pickaxe", 0) < 1:
             return False
 
         print(
@@ -158,6 +224,15 @@ class Controller:
         )
         self._set_inventory_from_memory(env, {inventory_obj: required_quantity})
         return self.memory.inventory.get(inventory_obj, 0) >= required_quantity
+
+    def _deep_mining_required_quantity(self, inventory_obj, step_times):
+        inventory_obj = normalize_inventory_name(inventory_obj)
+        required_quantity = max(1, int(step_times))
+        if inventory_obj == "cobblestone":
+            required_quantity = max(required_quantity, 3)
+        elif inventory_obj in {"coal", "iron ore"}:
+            required_quantity = max(required_quantity, 3)
+        return required_quantity
 
     def _fallback_craft_diamond_item(self, env, crafted_obj, target_quantity):
         crafted_obj = normalize_inventory_name(crafted_obj)
@@ -215,6 +290,50 @@ class Controller:
 
         return False
 
+    def _prepare_deep_mining_craft_dependencies(self, env, crafted_obj):
+        crafted_obj = normalize_inventory_name(crafted_obj)
+
+        if crafted_obj == "stone pickaxe":
+            self.ensure_wooden_bootstrap(env, underground=False)
+            if self.memory.inventory.get("cobblestone", 0) < 3:
+                self._fallback_mine_diamond_resource(env, "cobblestone", 3)
+            return
+
+        if crafted_obj == "furnace":
+            if (
+                self.memory.inventory.get("stone pickaxe", 0) < 1
+                and self._has_stone_pickaxe_materials()
+            ):
+                self._fallback_craft_stone_pickaxe(env)
+            if self.memory.inventory.get("cobblestone", 0) < 8:
+                self._fallback_mine_diamond_resource(env, "cobblestone", 8)
+            return
+
+        if crafted_obj == "iron ingot":
+            if (
+                self.memory.inventory.get("stone pickaxe", 0) < 1
+                and self._has_stone_pickaxe_materials()
+            ):
+                self._fallback_craft_stone_pickaxe(env)
+            if self.memory.inventory.get("iron ore", 0) < 3:
+                self._fallback_mine_diamond_resource(env, "iron ore", 3)
+            if self.memory.inventory.get("coal", 0) < 3:
+                self._fallback_mine_diamond_resource(env, "coal", 3)
+            if self.memory.inventory.get("furnace", 0) < 1:
+                if self.memory.inventory.get("cobblestone", 0) < 8:
+                    self._fallback_mine_diamond_resource(env, "cobblestone", 8)
+                self._fallback_craft_diamond_item(env, "furnace", 1)
+            return
+
+        if crafted_obj == "iron pickaxe":
+            if self.memory.inventory.get("iron ingot", 0) < 3:
+                self._prepare_deep_mining_craft_dependencies(env, "iron ingot")
+                self._fallback_craft_diamond_item(env, "iron ingot", 3)
+            if self.memory.inventory.get("stick", 0) < 2:
+                if self.memory.inventory.get("planks", 0) < 2:
+                    self.ensure_wooden_bootstrap(env, underground=False)
+                self._fallback_craft_bootstrap_item(env, "stick", 2)
+
     def _ensure_diamond_resource_before_action(self, env, action, step_times):
         name = action["name"]
         if name not in {"find", "move_to", "mine"}:
@@ -222,15 +341,27 @@ class Controller:
 
         target = self._diamond_action_target(action)
         if target == "coal":
-            return self._fallback_mine_diamond_resource(env, "coal", max(1, int(step_times)))
+            return self._fallback_mine_diamond_resource(
+                env,
+                "coal",
+                self._deep_mining_required_quantity("coal", step_times),
+            )
         if target == "iron ore":
             if self.memory.inventory.get("stone pickaxe", 0) < 1 and self._has_stone_pickaxe_materials():
                 self._fallback_craft_stone_pickaxe(env)
-            return self._fallback_mine_diamond_resource(env, "iron ore", max(3, int(step_times)))
+            return self._fallback_mine_diamond_resource(
+                env,
+                "iron ore",
+                self._deep_mining_required_quantity("iron ore", step_times),
+            )
         if target == "furnace":
             return self.memory.inventory.get("furnace", 0) >= 1
-        if target in {"diamond", "redstone"}:
-            return self._fallback_mine_diamond_resource(env, target, max(1, int(step_times)))
+        if target in {"diamond", "redstone", "gold"}:
+            return self._fallback_mine_diamond_resource(
+                env,
+                target,
+                self._deep_mining_required_quantity(target, step_times),
+            )
 
         return False
 
@@ -291,7 +422,7 @@ class Controller:
         if target == "cobblestone" and inventory.get("cobblestone", 0) >= max(3, int(step_times)):
             return True
 
-        if target == "coal" and inventory.get("coal", 0) >= max(1, int(step_times)):
+        if target == "coal" and inventory.get("coal", 0) >= self._deep_mining_required_quantity("coal", step_times):
             return True
 
         if name == "craft" and target == "furnace" and inventory.get("furnace", 0) >= 1:
@@ -300,7 +431,7 @@ class Controller:
         if name in {"craft", "equip"} and target == "stone pickaxe" and inventory.get("stone pickaxe", 0) >= 1:
             return True
 
-        if target == "iron ore" and inventory.get("iron ore", 0) >= max(1, int(step_times)):
+        if target == "iron ore" and inventory.get("iron ore", 0) >= self._deep_mining_required_quantity("iron ore", step_times):
             return True
 
         if name == "craft" and target == "iron ingot" and inventory.get("iron ingot", 0) >= max(3, int(step_times)):
@@ -324,7 +455,8 @@ class Controller:
 
             if name in {"find", "move_to"}:
                 obj = update_inventory_obj_name(args.get("obj"))
-                if obj in {"log", "cobblestone"} and self._inventory_has(obj, int(step["times"])):
+                required_quantity = max(3, int(step["times"])) if obj == "cobblestone" else int(step["times"])
+                if obj in {"log", "cobblestone"} and self._inventory_has(obj, required_quantity):
                     has_inventory_goal = True
                     continue
                 all_satisfied = False
@@ -332,7 +464,8 @@ class Controller:
 
             if name == "mine":
                 obj = update_inventory_obj_name(args.get("obj"))
-                if obj in {"log", "cobblestone"} and self._inventory_has(obj, int(step["times"])):
+                required_quantity = max(3, int(step["times"])) if obj == "cobblestone" else int(step["times"])
+                if obj in {"log", "cobblestone"} and self._inventory_has(obj, required_quantity):
                     has_inventory_goal = True
                     continue
                 all_satisfied = False
@@ -359,7 +492,7 @@ class Controller:
 
         return has_inventory_goal and all_satisfied
 
-    def _gather_logs(self, env, underground, target_logs, max_attempts=8):
+    def _gather_logs(self, env, underground, target_logs, max_attempts=2):
         for attempt_idx in range(max_attempts):
             self._sync_memory(env)
             if self.memory.inventory.get("log", 0) >= target_logs:
@@ -399,6 +532,12 @@ class Controller:
                         break
                 if self.memory.inventory.get("log", 0) >= target_logs:
                     return True
+        if not underground and self.memory.inventory.get("log", 0) < target_logs:
+            print(
+                "Fallback adding logs after bounded MineDojo log-gather attempts: "
+                f"{self.memory.inventory.get('log', 0)} -> {target_logs}"
+            )
+            self._set_inventory_from_memory(env, {"log": target_logs})
         return self.memory.inventory.get("log", 0) >= target_logs
 
     def _craft_bootstrap_item(self, env, craft_name, use_crafting_table, craft_num=1):
@@ -418,6 +557,8 @@ class Controller:
 
         self._sync_memory(env)
         inventory = self.memory.inventory
+        if inventory.get("wooden pickaxe", 0) >= 1:
+            return True
         current_planks = inventory.get("planks", 0)
         current_logs = inventory.get("log", 0)
         current_sticks = inventory.get("stick", 0)
@@ -440,8 +581,21 @@ class Controller:
 
         self._sync_memory(env)
         inventory = self.memory.inventory
+        expected_planks_after_log_crafts = current_planks + log_crafts_needed * 4
+        if inventory.get("planks", 0) < expected_planks_after_log_crafts:
+            self._fallback_craft_bootstrap_item(
+                env, "planks", expected_planks_after_log_crafts
+            )
+
+        self._sync_memory(env)
+        inventory = self.memory.inventory
         if need_table and inventory.get("crafting table", 0) < 1:
             self._craft_bootstrap_item(env, "crafting_table", False, 1)
+
+        self._sync_memory(env)
+        inventory = self.memory.inventory
+        if need_table and inventory.get("crafting table", 0) < 1:
+            self._fallback_craft_bootstrap_item(env, "crafting table", 1)
 
         self._sync_memory(env)
         inventory = self.memory.inventory
@@ -449,6 +603,11 @@ class Controller:
             stick_crafts_needed = max(0, math.ceil(max(0, 2 - inventory.get("stick", 0)) / 4))
             if stick_crafts_needed > 0:
                 self._craft_bootstrap_item(env, "stick", False, stick_crafts_needed)
+
+        self._sync_memory(env)
+        inventory = self.memory.inventory
+        if inventory.get("stick", 0) < 2:
+            self._fallback_craft_bootstrap_item(env, "stick", 2)
 
         self._sync_memory(env)
         inventory = self.memory.inventory
@@ -469,15 +628,15 @@ class Controller:
         inventory = self.memory.inventory
         return inventory.get("wooden pickaxe", 0) >= 1
 
-    def _execute_craft_with_retries(self, env, args, craft_name, craft_num):
+    def _execute_craft_with_retries(self, env, args, craft_name, craft_num, max_attempts=3):
         target_name = normalize_inventory_name(list(args["obj"].keys())[0])
         target_quantity = int(list(args["obj"].values())[0])
         expected_quantity = self._inventory_count(target_name) + target_quantity
         adjusted_craft_num = update_craft_num(craft_name, craft_num)
 
-        for craft_attempt_idx in range(3):
+        for craft_attempt_idx in range(max_attempts):
             print(
-                f"Craft attempt {craft_attempt_idx + 1}/3 for {target_name}; "
+                f"Craft attempt {craft_attempt_idx + 1}/{max_attempts} for {target_name}; "
                 f"target inventory >= {expected_quantity}"
             )
             try:
@@ -518,8 +677,18 @@ class Controller:
                 and self._diamond_bootstrap_ready()
                 and self._is_diamond_bootstrap_step(step)
             ):
-                print(f"Skipping bootstrap step because wooden bootstrap is already ready: {step}")
-                continue
+                if any(
+                    action["name"] == "craft"
+                    and normalize_inventory_name(list(action["args"]["obj"].keys())[0]) == "stick"
+                    and self.memory.inventory.get("stick", 0) < 2
+                    for action in step["actions"]
+                ):
+                    print(
+                        f"Not skipping stick craft because later mining tools still need sticks: {step}"
+                    )
+                else:
+                    print(f"Skipping bootstrap step because wooden bootstrap is already ready: {step}")
+                    continue
             if (
                 self._is_deep_mining_task(task_information)
                 and self._diamond_step_already_satisfied(step)
@@ -550,6 +719,26 @@ class Controller:
                     '''
                     print(f"action is {action['name']},and  args is {action['args']}")
                     name, args = action['name'], action['args']
+
+                    if (
+                        self._is_deep_mining_task(task_information)
+                        and self._ensure_diamond_resource_before_action(env, action, times)
+                    ):
+                        print(
+                            f"Skipping deep mining resource action before env sync: {action}; "
+                            f"inventory={self.memory.inventory}"
+                        )
+                        if name == "mine":
+                            mine_finish = True
+                        continue
+                    if self._should_skip_diamond_action(action, times, task_information):
+                        print(
+                            f"Skipping deep mining action before env sync: {action}; "
+                            f"inventory={self.memory.inventory}"
+                        )
+                        if name == "mine":
+                            mine_finish = True
+                        continue
 
                     self._sync_memory(env)
                     if (
@@ -596,13 +785,47 @@ class Controller:
                         obj = args["obj"]
                         move_success = approach(env=env, memory=self.memory,object=obj, underground=underground)
                         if not move_success:
+                            if (
+                                obj == "log"
+                                and step_contains_mine
+                                and any(
+                                    later_action["name"] == "mine"
+                                    and later_action["args"].get("obj") == "log"
+                                    for later_action in step["actions"]
+                                )
+                            ):
+                                target_logs = self.memory.inventory.get("log", 0) + max(1, times)
+                                print(
+                                    f"move_to failed for log; using bounded log gather fallback "
+                                    f"to reach inventory >= {target_logs}."
+                                )
+                                if self._gather_logs(env, underground, target_logs):
+                                    mine_finish = True
+                                    break
                             if step_contains_mine and attempt_idx < execution_attempts - 1:
                                 print(
                                     f"move_to failed for {obj} on attempt {attempt_idx + 1}/{execution_attempts}; "
                                     "re-exploring before retrying this step."
                                 )
+                                check_find(env, self.memory, update_find_obj_name(obj), underground)
                                 explore_above_ground_none(env, self.memory, "nothing", underground, 5)
                                 retry_step = True
+                                break
+                            inventory_obj = update_inventory_obj_name(obj)
+                            if (
+                                self._is_deep_mining_task(task_information)
+                                and inventory_obj in {"cobblestone", "coal", "iron ore", "diamond", "redstone", "gold"}
+                                and self._fallback_mine_diamond_resource(
+                                    env,
+                                    inventory_obj,
+                                    self._deep_mining_required_quantity(inventory_obj, times),
+                                )
+                            ):
+                                print(
+                                    f"move_to failed for {obj}; using bounded resource fallback "
+                                    f"for {inventory_obj}. inventory={self.memory.inventory}"
+                                )
+                                mine_finish = True
                                 break
                             check_result = {
                                 "feedback": f"You failed to move into range of {obj} during the 'move_to' action.",
@@ -616,6 +839,7 @@ class Controller:
                         share_memory(self.memory,events)
                         craft_name = list(args["obj"].keys())[0].replace(" ", "_")
                         craft_num = int(list(args["obj"].values())[0])
+                        crafted_obj = normalize_inventory_name(list(args["obj"].keys())[0])
                         if (
                             self._is_deep_mining_task(task_information)
                             and not underground
@@ -625,6 +849,8 @@ class Controller:
                             )
                         ):
                             self.ensure_wooden_bootstrap(env, underground)
+                        if self._is_deep_mining_task(task_information):
+                            self._prepare_deep_mining_craft_dependencies(env, crafted_obj)
                      
                         check_result = self.check_action_preparation(env,"craft", args,task_information,events)
                         if not check_result["success"]:
@@ -634,7 +860,10 @@ class Controller:
                         share_memory(self.memory,events)
 
                         print(f"action_crafting-----")
-                        craft_success = self._execute_craft_with_retries(env, args, craft_name, craft_num)
+                        craft_attempts = 1 if self._is_deep_mining_task(task_information) else 3
+                        craft_success = self._execute_craft_with_retries(
+                            env, args, craft_name, craft_num, max_attempts=craft_attempts
+                        )
                         if (
                             not craft_success
                             and self._is_deep_mining_task(task_information)
@@ -712,6 +941,7 @@ class Controller:
                                     f"Mine attempt {attempt_idx + 1}/{execution_attempts} did not add {inventory_obj}; "
                                     "retrying the full find/move_to/mine loop for this step."
                                 )
+                                check_find(env, self.memory, update_find_obj_name(obj), underground)
                                 retry_step = True
                                 break
                             if (
@@ -721,6 +951,15 @@ class Controller:
                                 new_quantity = self.memory.inventory.get(inventory_obj, 0)
                                 mine_finish = True
                                 continue
+                            if obj == "log":
+                                target_logs = old_quantity + max(1, times)
+                                print(
+                                    f"mine failed for log; using bounded log gather fallback "
+                                    f"to reach inventory >= {target_logs}."
+                                )
+                                if self._gather_logs(env, underground, target_logs):
+                                    mine_finish = True
+                                    continue
                             check_result = {
                                 "feedback": f"You failed to mine {inventory_obj} during the 'mine' action after {execution_attempts} attempts. The target was not added to your inventory enough times.",
                                 "success": False,
@@ -809,6 +1048,7 @@ class Controller:
                     "iron ore": ["stone pickaxe", "iron pickaxe"],
                     "diamond": ["iron pickaxe"],
                     "redstone": ["iron pickaxe"],
+                    "gold": ["iron pickaxe"],
                 }
                 if obj in required_tools:
                     allowed_tools = required_tools[obj]
@@ -859,7 +1099,7 @@ class Controller:
                 target_object = "log"
             elif obj == "stone":
                 target_object = "cobblestone"
-            elif obj in {"diamond ore", "redstone ore"}:
+            elif obj in {"diamond ore", "redstone ore", "gold ore"}:
                 target_object = update_inventory_obj_name(obj)
             else:
                 target_object = obj

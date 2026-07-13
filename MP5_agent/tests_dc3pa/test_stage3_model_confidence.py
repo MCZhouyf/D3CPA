@@ -1,6 +1,6 @@
 import pytest
 
-from dc3pa.contracts import AgentState
+from dc3pa.contracts import Action, AgentState, Plan, PlanStep
 from dc3pa.reliability import (
     CallableConfidenceProvider,
     VerbalConfidenceStrategy,
@@ -76,3 +76,37 @@ def test_transient_provider_failure_is_not_cached():
     assert first.probability is None
     assert second.probability == pytest.approx(0.9)
     assert len(calls) == 2
+
+
+def test_verbal_confidence_uses_projected_inventory_for_later_steps():
+    seen = []
+
+    def provider(request):
+        seen.append(dict(request.state.inventory))
+        return {"confidence": 0.9, "reason": "projected state is feasible"}
+
+    plan = Plan(
+        task="cobblestone",
+        steps=[
+            PlanStep(actions=[Action("mine", {"obj": "log", "tool": None})]),
+            PlanStep(
+                actions=[
+                    Action(
+                        "craft",
+                        {
+                            "obj": {"planks": 4},
+                            "materials": {"log": 1},
+                            "platform": None,
+                        },
+                    )
+                ]
+            ),
+        ],
+    )
+    strategy = VerbalConfidenceStrategy(CallableConfidenceProvider(provider))
+
+    score = strategy.score(plan, 1, AgentState(task=plan.task))
+
+    assert score.probability == pytest.approx(0.9)
+    assert seen == [{"log": 1.0}]
+    assert score.evidence["metadata"]["projected_inventory_used"] is True

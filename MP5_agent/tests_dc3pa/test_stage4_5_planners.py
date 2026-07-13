@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from dc3pa.contracts import AgentState
+from dc3pa.contracts import Action, AgentState, Plan, PlanStep
 from dc3pa.evaluation import EvaluationReport, PlanEdit
 from dc3pa.observability import JsonlTraceWriter
 from dc3pa.planner import AdaptiveCognitiveControlPlanner, HighFrequencyDualChainPlanner
@@ -72,6 +72,53 @@ def test_no_patch_is_recorded_as_unresolved_without_mutating_plan():
     assert outcome.final_plan is initial
     assert outcome.revision_count == 0
     assert outcome.unresolved[0]["reason"] == "request_replan"
+    assert outcome.unresolved[0]["hard_conflict"] is False
+
+
+def test_non_conflict_unresolved_from_superseded_plan_does_not_block_final_plan():
+    initial = simple_plan(2, task="superseded")
+    inserted = find_step("fix")
+    calls = []
+
+    def evaluator(request):
+        calls.append(request.plan.version)
+        if len(calls) == 1:
+            return EvaluationReport.unresolved(request.plan, "provider format issue")
+        return EvaluationReport(
+            plan_id=request.plan.plan_id,
+            plan_version=request.plan.version,
+            summary="insert fix",
+            edits=(
+                PlanEdit(
+                    "insert_before",
+                    request.plan.steps[1].step_id,
+                    (inserted,),
+                ),
+            ),
+        )
+
+    planner = AdaptiveCognitiveControlPlanner(
+        StaticReasoningChain(initial),
+        FunctionReliabilityModel(
+            lambda plan, index: (0.7, False)
+            if plan.version == 1
+            else (0.95, False)
+        ),
+        FunctionEvaluationChain(evaluator),
+        trigger_config=AdaptiveTriggerConfig(
+            threshold=0.8,
+            initial_interval=1,
+            window_size=1,
+            maximum_interval=1,
+        ),
+        dual_chain_config=DualChainConfig(confidence_threshold=0.8, max_revision_rounds=2),
+    )
+
+    outcome = planner.plan_with_outcome(initial.task, AgentState(task=initial.task))
+
+    assert calls[:2] == [1, 1]
+    assert outcome.revision_count == 1
+    assert outcome.unresolved == ()
 
 
 def test_adaptive_planner_uses_variable_windows_and_requests_evaluation():
@@ -281,3 +328,112 @@ def test_hard_conflict_cannot_be_silently_accepted_by_evaluator():
     )
     outcome = planner.plan_with_outcome(initial.task, AgentState(task=initial.task))
     assert outcome.unresolved[0]["reason"] == "accepted_despite_hard_conflict"
+
+
+def test_material_repair_runs_after_evaluation_patch_without_extra_revision():
+    initial = Plan(
+        task="cobblestone",
+        steps=[
+            PlanStep(actions=[Action("equip", {"obj": "wooden pickaxe"})]),
+        ],
+    )
+    craft_pickaxe = PlanStep(
+        actions=[
+            Action(
+                "craft",
+                {
+                    "obj": {"wooden pickaxe": 1},
+                    "materials": {"planks": 3, "stick": 2},
+                    "platform": "crafting table",
+                },
+            )
+        ]
+    )
+
+    def evaluator(request):
+        return EvaluationReport(
+            plan_id=request.plan.plan_id,
+            plan_version=request.plan.version,
+            summary="insert missing wooden pickaxe craft",
+            edits=(
+                PlanEdit(
+                    "insert_before",
+                    request.plan.steps[0].step_id,
+                    (craft_pickaxe,),
+                ),
+            ),
+        )
+
+    def scores(plan, index):
+        if plan.version == 1:
+            return (0.0, True)
+        return (0.95, False)
+
+    planner = HighFrequencyDualChainPlanner(
+        StaticReasoningChain(initial),
+        FunctionReliabilityModel(scores),
+        FunctionEvaluationChain(evaluator),
+        config=DualChainConfig(confidence_threshold=0.8, max_revision_rounds=1),
+    )
+    outcome = planner.plan_with_outcome(
+        initial.task,
+        AgentState(task=initial.task, inventory={}),
+    )
+
+    assert outcome.revision_count == 1
+    assert outcome.final_plan.version == 2
+    targets = [
+        step.metadata.get("target")
+        for step in outcome.final_plan.steps
+        if step.metadata.get("dc3pa_auto_material_repair")
+    ]
+    assert "log" in targets
+    assert "crafting table" in targets
+    assert "stick" in targets
+    assert outcome.unresolved == ()
+
+
+def test_material_repair_handles_hard_conflict_when_evaluator_requests_replan():
+    initial = Plan(
+        task="cobblestone",
+        steps=[
+            PlanStep(
+                actions=[
+                    Action(
+                        "craft",
+                        {
+                            "obj": {"wooden pickaxe": 1},
+                            "materials": {"planks": 3, "stick": 2},
+                            "platform": "crafting table",
+                        },
+                    )
+                ]
+            ),
+        ],
+    )
+
+    def scores(plan, index):
+        if plan.version == 1:
+            return (0.0, True)
+        return (0.95, False)
+
+    planner = HighFrequencyDualChainPlanner(
+        StaticReasoningChain(initial),
+        FunctionReliabilityModel(scores),
+        FunctionEvaluationChain(
+            lambda request: EvaluationReport.unresolved(
+                request.plan,
+                "provider returned an unusable patch",
+            )
+        ),
+        config=DualChainConfig(confidence_threshold=0.8, max_revision_rounds=1),
+    )
+    outcome = planner.plan_with_outcome(
+        initial.task,
+        AgentState(task=initial.task, inventory={}),
+    )
+
+    assert outcome.revision_count == 0
+    assert outcome.final_plan.version == 2
+    assert outcome.final_plan.source == "dc3pa_material_repair"
+    assert outcome.unresolved == ()
