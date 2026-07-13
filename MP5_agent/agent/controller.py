@@ -1,9 +1,29 @@
 import os
+import sys
+from pathlib import Path
 
 from utils import *
 from dc3pa_feature_flags import legacy_task_hacks_enabled
 from structured_actions import *
 from minedojo.sim import InventoryItem
+
+try:
+    from dc3pa.integration.execution_observer import (
+        compact_action_payload,
+        current_rgb_from_events,
+        emit_execution_event,
+        snapshot_inventory,
+    )
+except ModuleNotFoundError:
+    mp5_root = Path(__file__).resolve().parents[1]
+    if str(mp5_root) not in sys.path:
+        sys.path.insert(0, str(mp5_root))
+    from dc3pa.integration.execution_observer import (
+        compact_action_payload,
+        current_rgb_from_events,
+        emit_execution_event,
+        snapshot_inventory,
+    )
 
 class Controller:
     def __init__(
@@ -662,6 +682,82 @@ class Controller:
 
     def check_and_execute_workflow(self, env, workflow_dict, task_information, underground):
         events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); 
+        workflow = workflow_dict['workflow']
+
+        def step_metadata(step, step_index):
+            return {
+                "plan_id": step.get("_dc3pa_plan_id", ""),
+                "plan_version": step.get("_dc3pa_plan_version", 0),
+                "step_id": step.get("_dc3pa_step_id", f"step-{step_index}"),
+                "step_index": step.get("_dc3pa_step_index", step_index),
+            }
+
+        def emit_step_started(step, step_index):
+            emit_execution_event(
+                self,
+                "step_started",
+                **step_metadata(step, step_index),
+                status="",
+                times=step.get("times"),
+                action_count=len(step.get("actions", [])),
+            )
+
+        def emit_step_finished(step, step_index, status, result=None):
+            emit_execution_event(
+                self,
+                "step_finished",
+                **step_metadata(step, step_index),
+                status=status,
+                result=result or {},
+            )
+
+        def emit_action_started(step, step_index, action_index, action, current_events):
+            emit_execution_event(
+                self,
+                "action_started",
+                **step_metadata(step, step_index),
+                action_index=action_index,
+                status="",
+                action=compact_action_payload(action),
+                rgb=current_rgb_from_events(current_events),
+                inventory=snapshot_inventory(self.memory),
+                times=step.get("times"),
+            )
+
+        def emit_action_finished(step, step_index, action_index, action, status, result=None):
+            emit_execution_event(
+                self,
+                "action_finished",
+                **step_metadata(step, step_index),
+                action_index=action_index,
+                status=status,
+                action=compact_action_payload(action),
+                result=result or {},
+                inventory=snapshot_inventory(self.memory),
+            )
+
+        def emit_censored_steps(after_index):
+            for censored_index, censored_step in enumerate(workflow[after_index + 1:], start=after_index + 1):
+                emit_step_finished(
+                    censored_step,
+                    censored_index,
+                    "censored",
+                    {"reason": "prior_step_failed"},
+                )
+
+        def finish_failure(step, step_index, action_index, action, result, current_underground):
+            emit_action_finished(step, step_index, action_index, action, "failure", result)
+            emit_step_finished(step, step_index, "failure", result)
+            emit_censored_steps(step_index)
+            return result, current_underground
+
+        emit_execution_event(
+            self,
+            "workflow_started",
+            status="",
+            task=task_information.get("task"),
+            step_count=len(workflow),
+        )
 
         if self._is_deep_mining_task(task_information) and not underground:
             self._sync_memory(env)
@@ -669,8 +765,9 @@ class Controller:
                 print(f"Running {task_information.get('task')} bootstrap before workflow execution")
                 self.ensure_wooden_bootstrap(env, underground)
        
-        for step in workflow_dict['workflow']:
-            self._sync_memory(env)
+        for step_index, step in enumerate(workflow):
+            events = self._sync_memory(env)
+            emit_step_started(step, step_index)
             if (
                 self._is_deep_mining_task(task_information)
                 and not underground
@@ -688,12 +785,14 @@ class Controller:
                     )
                 else:
                     print(f"Skipping bootstrap step because wooden bootstrap is already ready: {step}")
+                    emit_step_finished(step, step_index, "skipped_satisfied")
                     continue
             if (
                 self._is_deep_mining_task(task_information)
                 and self._diamond_step_already_satisfied(step)
             ):
                 print(f"Skipping already satisfied deep mining step: {step}; inventory={self.memory.inventory}")
+                emit_step_finished(step, step_index, "skipped_satisfied")
                 continue
 
             #share_memory(self.memory,events)
@@ -707,7 +806,7 @@ class Controller:
                     break
                 retry_step = False
 
-                for action in step['actions']:
+                for action_index, action in enumerate(step['actions']):
                     '''
                     if self.check_done(task_information, self.memory):
                         check_dict = {
@@ -719,6 +818,7 @@ class Controller:
                     '''
                     print(f"action is {action['name']},and  args is {action['args']}")
                     name, args = action['name'], action['args']
+                    emit_action_started(step, step_index, action_index, action, events)
 
                     if (
                         self._is_deep_mining_task(task_information)
@@ -730,6 +830,7 @@ class Controller:
                         )
                         if name == "mine":
                             mine_finish = True
+                        emit_action_finished(step, step_index, action_index, action, "skipped_satisfied")
                         continue
                     if self._should_skip_diamond_action(action, times, task_information):
                         print(
@@ -738,9 +839,10 @@ class Controller:
                         )
                         if name == "mine":
                             mine_finish = True
+                        emit_action_finished(step, step_index, action_index, action, "skipped_satisfied")
                         continue
 
-                    self._sync_memory(env)
+                    events = self._sync_memory(env)
                     if (
                         self._is_deep_mining_task(task_information)
                         and not underground
@@ -758,6 +860,7 @@ class Controller:
                             f"Skipping deep mining resource action after bounded resource fallback: {action}; "
                             f"inventory={self.memory.inventory}"
                         )
+                        emit_action_finished(step, step_index, action_index, action, "skipped_satisfied")
                         continue
 
                     if self._should_skip_diamond_action(action, times, task_information):
@@ -765,22 +868,25 @@ class Controller:
                             f"Skipping deep mining action already covered by inventory: {action}; "
                             f"inventory={self.memory.inventory}"
                         )
+                        emit_action_finished(step, step_index, action_index, action, "skipped_satisfied")
                         continue
 
                     if name == "find":
                         check_result = self.check_action_preparation(env,"find", args,task_information,events)
                         if check_result["success"]:
+                            emit_action_finished(step, step_index, action_index, action, "success", check_result)
                             continue
                         
                         obj = args["obj"]
                         find_obj = update_find_obj_name(obj)
                         print(f"find_obj is {find_obj}")
                         explore_above_ground(env=env,args=args, object=find_obj, performer=self, memory=self.memory, task_information=task_information, underground=underground)
+                        emit_action_finished(step, step_index, action_index, action, "success")
                     
                     elif name == "move_to":
                         check_result = self.check_action_preparation(env,"move_to",  args,task_information,events)
                         if not check_result["success"]:
-                            return check_result, underground
+                            return finish_failure(step, step_index, action_index, action, check_result, underground)
 
                         obj = args["obj"]
                         move_success = approach(env=env, memory=self.memory,object=obj, underground=underground)
@@ -801,6 +907,7 @@ class Controller:
                                 )
                                 if self._gather_logs(env, underground, target_logs):
                                     mine_finish = True
+                                    emit_action_finished(step, step_index, action_index, action, "skipped_satisfied")
                                     break
                             if step_contains_mine and attempt_idx < execution_attempts - 1:
                                 print(
@@ -810,6 +917,14 @@ class Controller:
                                 check_find(env, self.memory, update_find_obj_name(obj), underground)
                                 explore_above_ground_none(env, self.memory, "nothing", underground, 5)
                                 retry_step = True
+                                emit_action_finished(
+                                    step,
+                                    step_index,
+                                    action_index,
+                                    action,
+                                    "failure",
+                                    {"retry_step": True},
+                                )
                                 break
                             inventory_obj = update_inventory_obj_name(obj)
                             if (
@@ -826,13 +941,15 @@ class Controller:
                                     f"for {inventory_obj}. inventory={self.memory.inventory}"
                                 )
                                 mine_finish = True
+                                emit_action_finished(step, step_index, action_index, action, "skipped_satisfied")
                                 break
                             check_result = {
                                 "feedback": f"You failed to move into range of {obj} during the 'move_to' action.",
                                 "success": False,
                                 "suggestion": f"Find another reachable {obj} and try again."
                             }
-                            return check_result, underground
+                            return finish_failure(step, step_index, action_index, action, check_result, underground)
+                        emit_action_finished(step, step_index, action_index, action, "success", check_result)
 
                     elif name == "craft":
                         events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); 
@@ -854,7 +971,7 @@ class Controller:
                      
                         check_result = self.check_action_preparation(env,"craft", args,task_information,events)
                         if not check_result["success"]:
-                            return check_result, underground
+                            return finish_failure(step, step_index, action_index, action, check_result, underground)
                         
                         events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); 
                         share_memory(self.memory,events)
@@ -880,6 +997,7 @@ class Controller:
                                 f"Craft did not reach requested inventory for {crafted_obj}, "
                                 "continuing deep mining workflow so reflection can adjust within finite attempts."
                             )
+                        emit_action_finished(step, step_index, action_index, action, "success", check_result)
 
                     elif name == "mine":
                         events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); 
@@ -919,7 +1037,7 @@ class Controller:
 
                         check_result = self.check_action_preparation(env,"mine",  args,task_information,events)
                         if not check_result["success"]:
-                            return check_result, underground
+                            return finish_failure(step, step_index, action_index, action, check_result, underground)
 
                         obj = args["obj"]
                         #print(f"mine----old_inventory_obj is {self.memory.inventory}")
@@ -943,6 +1061,14 @@ class Controller:
                                 )
                                 check_find(env, self.memory, update_find_obj_name(obj), underground)
                                 retry_step = True
+                                emit_action_finished(
+                                    step,
+                                    step_index,
+                                    action_index,
+                                    action,
+                                    "failure",
+                                    {"retry_step": True},
+                                )
                                 break
                             if (
                                 self._is_deep_mining_task(task_information)
@@ -950,6 +1076,7 @@ class Controller:
                             ):
                                 new_quantity = self.memory.inventory.get(inventory_obj, 0)
                                 mine_finish = True
+                                emit_action_finished(step, step_index, action_index, action, "skipped_satisfied")
                                 continue
                             if obj == "log":
                                 target_logs = old_quantity + max(1, times)
@@ -959,21 +1086,24 @@ class Controller:
                                 )
                                 if self._gather_logs(env, underground, target_logs):
                                     mine_finish = True
+                                    emit_action_finished(step, step_index, action_index, action, "skipped_satisfied")
                                     continue
                             check_result = {
                                 "feedback": f"You failed to mine {inventory_obj} during the 'mine' action after {execution_attempts} attempts. The target was not added to your inventory enough times.",
                                 "success": False,
                                 "suggestion": f"Find and mine enough {inventory_obj} first."
                             }
-                            return check_result, underground
+                            return finish_failure(step, step_index, action_index, action, check_result, underground)
                         #print(f"mine----update_inventory is{self.memory.inventory}")
                         if inventory_obj in self.memory.inventory.keys() and int(self.memory.inventory[inventory_obj]) >= times:
                             mine_finish = True
+                        emit_action_finished(step, step_index, action_index, action, "success", check_result)
 
                     elif name == "fight":
                         check_result = self.check_action_preparation(env,"fight", args,task_information,events)
                         if not check_result["success"]:
-                            return check_result, underground
+                            return finish_failure(step, step_index, action_index, action, check_result, underground)
+                        emit_action_finished(step, step_index, action_index, action, "success", check_result)
                     
                     elif name == "equip":
                         events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); 
@@ -992,7 +1122,8 @@ class Controller:
                             print("wooden pickaxe is already available for equip")
                         check_result = self.check_action_preparation(env,"equip",args,task_information,events)
                         if not check_result["success"]:
-                            return check_result, underground
+                            return finish_failure(step, step_index, action_index, action, check_result, underground)
+                        emit_action_finished(step, step_index, action_index, action, "success", check_result)
 
 
                     elif name == "dig_down":
@@ -1000,11 +1131,12 @@ class Controller:
                         share_memory(self.memory,events)
                         check_result = self.check_action_preparation(env,"dig_down",  args,task_information,events)
                         if not check_result["success"]:
-                            return check_result, underground
+                            return finish_failure(step, step_index, action_index, action, check_result, underground)
 
                         underground = True
                         tool = "" if args["tool"] is None else args["tool"]
                         go_down_to_y_level(env,args["y_level"],equipment = tool)
+                        emit_action_finished(step, step_index, action_index, action, "success", check_result)
 
 
                     elif name == "dig_up":
@@ -1012,18 +1144,21 @@ class Controller:
                         share_memory(self.memory,events)
                         check_result = self.check_action_preparation(env,"dig_up",  args,task_information,events)
                         if not check_result["success"]:
-                            return check_result, underground
+                            return finish_failure(step, step_index, action_index, action, check_result, underground)
 
                         underground = False
+                        emit_action_finished(step, step_index, action_index, action, "success", check_result)
                     
                     elif name == "apply":
                         events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); 
                         share_memory(self.memory,events)
                         check_result = self.check_action_preparation(env,"apply",  args,task_information,events)
                         if not check_result["success"]:
-                            return check_result, underground
+                            return finish_failure(step, step_index, action_index, action, check_result, underground)
+                        emit_action_finished(step, step_index, action_index, action, "success", check_result)
                 if retry_step:
                     continue
+            emit_step_finished(step, step_index, "success")
         
         check_result = {
                         "feedback": f"",

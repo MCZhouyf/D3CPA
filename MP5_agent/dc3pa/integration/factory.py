@@ -14,6 +14,7 @@ from ..reliability import (
     build_hybrid_probability_model,
 )
 from .controller import LegacyControllerAdapter
+from .execution_observer import InMemoryExecutionObserver
 from .legacy import (
     LegacyGoalChecker,
     LegacyMP5ReasoningChain,
@@ -126,13 +127,20 @@ def build_stage6_runtime(
             trace_writer=trace_writer,
         )
 
+    execution_observer = (
+        InMemoryExecutionObserver() if runtime_config.telemetry_enabled else None
+    )
+
     runtime = Stage6ClosedLoopRunner(
         env=env,
         config=runtime_config,
         reasoning_chain=reasoning_chain,
         legacy_plan_source=legacy_plan_source,
         cognitive_planner=cognitive_planner,
-        controller=LegacyControllerAdapter(legacy_controller),
+        controller=LegacyControllerAdapter(
+            legacy_controller,
+            observer=execution_observer,
+        ),
         state_provider=state_provider,
         goal_checker=LegacyGoalChecker(legacy_controller, legacy_memory),
         reflexion=(
