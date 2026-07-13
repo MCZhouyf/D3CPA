@@ -17,6 +17,7 @@ from .encoders import ImageEncoder, TextEncoder, as_float_vector
 from .exemplar_store import ExemplarMatch, SceneExemplar, SceneExemplarStore
 from .extractor import DependencyExtractor
 from .schema import connect_memory_db
+from .snapshot import ReadOnlyMemoryError
 
 
 @dataclass(frozen=True)
@@ -49,13 +50,17 @@ class MultimodalMemory:
         image_encoder: Optional[ImageEncoder] = None,
         text_encoder: Optional[TextEncoder] = None,
         dependency_extractor: Optional[DependencyExtractor] = None,
+        readonly: bool = False,
     ):
         self.root_dir = Path(root_dir)
-        self.root_dir.mkdir(parents=True, exist_ok=True)
+        self.readonly = bool(readonly)
+        if not self.readonly:
+            self.root_dir.mkdir(parents=True, exist_ok=True)
         self.images_dir = self.root_dir / "images"
-        self.images_dir.mkdir(parents=True, exist_ok=True)
+        if not self.readonly:
+            self.images_dir.mkdir(parents=True, exist_ok=True)
         self.db_path = self.root_dir / "memory.sqlite3"
-        self.connection = connect_memory_db(self.db_path)
+        self.connection = connect_memory_db(self.db_path, readonly=self.readonly)
         self.dependencies = DependencyGraphStore(self.db_path, connection=self.connection)
         self.exemplars = SceneExemplarStore(self.db_path, connection=self.connection)
         self.image_encoder = image_encoder
@@ -97,6 +102,8 @@ class MultimodalMemory:
 
     def record_success(self, episode: SuccessfulEpisode) -> Dict[str, Any]:
         """Atomically add graph evidence and scene exemplars from a successful task."""
+        if self.readonly:
+            raise ReadOnlyMemoryError("MultimodalMemory is opened readonly")
 
         created_image_paths: List[Path] = []
         try:

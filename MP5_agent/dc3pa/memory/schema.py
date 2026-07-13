@@ -3,6 +3,8 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+from .snapshot import open_sqlite_readonly
+
 SCHEMA_VERSION = 1
 
 _SCHEMA = """
@@ -63,8 +65,12 @@ CREATE INDEX IF NOT EXISTS idx_exemplar_task
 """
 
 
-def connect_memory_db(path: str | Path) -> sqlite3.Connection:
+def connect_memory_db(path: str | Path, *, readonly: bool = False) -> sqlite3.Connection:
     path = Path(path)
+    if readonly:
+        connection = open_sqlite_readonly(path)
+        connection.row_factory = sqlite3.Row
+        return connection
     path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(str(path))
     connection.row_factory = sqlite3.Row

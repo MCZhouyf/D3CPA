@@ -1,12 +1,21 @@
 from __future__ import annotations
 
+import sys
 import time
+import uuid
 from dataclasses import dataclass
-from typing import Any, Dict, Mapping, Optional, Protocol, runtime_checkable
+from typing import Any, Dict, Mapping, Optional, Protocol, Tuple, runtime_checkable
 
 from ..contracts import AgentState, Plan
 from ..integration.controller import ControllerAdapter, ExecutionResult
+from ..memory.acquisition import (
+    AcquisitionStore,
+    LocalSceneCandidate,
+    SuccessfulTrajectoryRecord,
+)
+from ..memory.modes import MemoryMode
 from ..memory.multimodal_memory import SceneObservation, SuccessfulEpisode
+from ..memory.snapshot import MemorySnapshotManifest, SnapshotGuard
 from ..observability.trace import JsonlTraceWriter
 from ..reliability import ReliabilityContext
 from .events import AttemptRecord, RuntimeEvent, TaskRunResult, sanitize_for_trace
@@ -98,6 +107,7 @@ class Stage6ClosedLoopRunner:
         reflexion: Optional[ReflexionProvider] = None,
         legacy_memory_sink: Optional[LegacyMemorySink] = None,
         multimodal_memory_sink: Optional[MultimodalMemorySink] = None,
+        acquisition_store: Optional[AcquisitionStore] = None,
         trace_writer: Optional[JsonlTraceWriter] = None,
     ):
         config.validate()
@@ -116,7 +126,9 @@ class Stage6ClosedLoopRunner:
         self.reflexion = reflexion
         self.legacy_memory_sink = legacy_memory_sink
         self.multimodal_memory_sink = multimodal_memory_sink
+        self.acquisition_store = acquisition_store
         self.trace_writer = trace_writer
+        self.memory_mode = MemoryMode.parse(config.memory_mode)
 
     def _emit(
         self,
@@ -381,11 +393,21 @@ class Stage6ClosedLoopRunner:
         task: str,
         task_information: Mapping[str, Any],
         plan: Plan,
+        execution_telemetry: Tuple[Any, ...],
         initial_scene: Optional[SceneObservation],
         final_scene: Optional[SceneObservation],
         attempt: int,
         events: list[RuntimeEvent],
     ) -> bool:
+        if self.memory_mode is not MemoryMode.ACQUIRE:
+            self._emit(
+                events,
+                "memory_recording_skipped",
+                attempt,
+                {"task": task, "memory_mode": self.memory_mode.value},
+            )
+            return False
+
         requested_any = False
         recorded_any = False
         failures: list[Exception] = []
@@ -441,6 +463,93 @@ class Stage6ClosedLoopRunner:
             raise failures[0]
         return recorded_any if requested_any else False
 
+    def _record_acquisition_success(
+        self,
+        *,
+        task: str,
+        task_information: Mapping[str, Any],
+        plan: Plan,
+        execution_telemetry: Tuple[Any, ...],
+        attempt: int,
+        events: list[RuntimeEvent],
+    ) -> bool:
+        if self.acquisition_store is None:
+            return False
+
+        episode_id = (
+            f"{task}-{attempt}-{int(time.time() * 1000)}-{uuid.uuid4().hex[:8]}"
+        )
+        action_starts: Dict[tuple[int, int], Any] = {}
+        candidates: list[LocalSceneCandidate] = []
+        telemetry_payload = []
+        for event in execution_telemetry:
+            if hasattr(event, "to_dict"):
+                telemetry_payload.append(event.to_dict(include_payload=False))
+            if getattr(event, "event_type", "") == "action_started":
+                action_starts[(int(event.step_index), int(event.action_index))] = event
+                continue
+            if (
+                getattr(event, "event_type", "") != "action_finished"
+                or getattr(event, "status", "") != "success"
+            ):
+                continue
+            started = action_starts.get((int(event.step_index), int(event.action_index)))
+            if started is None:
+                continue
+            rgb = getattr(started, "payload", {}).get("rgb")
+            if rgb is None:
+                continue
+            image_path = self.acquisition_store.write_rgb_array(
+                episode_id=episode_id,
+                step_id=str(event.step_id or f"step-{event.step_index}"),
+                action_index=int(event.action_index),
+                rgb=rgb,
+            )
+            candidates.append(
+                LocalSceneCandidate(
+                    episode_id=episode_id,
+                    task_name=task,
+                    plan_id=str(event.plan_id),
+                    plan_version=int(event.plan_version),
+                    step_id=str(event.step_id),
+                    step_index=int(event.step_index),
+                    action_index=int(event.action_index),
+                    local_subgoal=str(
+                        getattr(started, "payload", {}).get(
+                            "local_subgoal", f"step {event.step_index}"
+                        )
+                    ),
+                    action=dict(getattr(started, "payload", {}).get("action", {})),
+                    image_path=image_path,
+                    pre_inventory=dict(
+                        getattr(started, "payload", {}).get("inventory", {})
+                    ),
+                )
+            )
+
+        record = SuccessfulTrajectoryRecord(
+            episode_id=episode_id,
+            task_name=task,
+            seed=str(task_information.get("seed", "")),
+            plan=plan.to_dict(),
+            telemetry=tuple(telemetry_payload),
+            scene_candidates=tuple(candidates),
+            metadata={"stage": 6, "mode": self.config.mode, "attempt": attempt},
+        )
+        path = self.acquisition_store.commit_success(record)
+        self._emit(
+            events,
+            "acquisition_record_committed",
+            attempt,
+            {
+                "task": task,
+                "episode_id": episode_id,
+                "scene_candidate_count": len(candidates),
+                "path": str(path),
+            },
+        )
+        return True
+
     def _reflect(
         self,
         *,
@@ -482,6 +591,28 @@ class Stage6ClosedLoopRunner:
             return ""
 
     def run_task(
+        self,
+        task_information: Mapping[str, Any],
+        *,
+        underground: bool = False,
+    ) -> TaskRunResult:
+        if not isinstance(task_information, Mapping):
+            raise TypeError("task_information must be a mapping")
+
+        guard = None
+        if self.memory_mode.requires_frozen_snapshot:
+            manifest = MemorySnapshotManifest.from_json(
+                self.config.memory_snapshot_manifest
+            )
+            guard = SnapshotGuard(manifest)
+            guard.__enter__()
+        try:
+            return self._run_task_guarded(task_information, underground=underground)
+        finally:
+            if guard is not None:
+                guard.__exit__(*sys.exc_info())
+
+    def _run_task_guarded(
         self,
         task_information: Mapping[str, Any],
         *,
@@ -692,8 +823,17 @@ class Stage6ClosedLoopRunner:
                     task=task,
                     task_information=task_information,
                     plan=plan,
+                    execution_telemetry=execution.telemetry,
                     initial_scene=initial_snapshot.scene,
                     final_scene=final_scene,
+                    attempt=attempt_index,
+                    events=events,
+                )
+                acquisition_recorded = self._record_acquisition_success(
+                    task=task,
+                    task_information=task_information,
+                    plan=plan,
+                    execution_telemetry=execution.telemetry,
                     attempt=attempt_index,
                     events=events,
                 )
@@ -701,7 +841,11 @@ class Stage6ClosedLoopRunner:
                     events,
                     "task_succeeded",
                     attempt_index,
-                    {"task": task, "memory_recorded": memory_recorded},
+                    {
+                        "task": task,
+                        "memory_recorded": memory_recorded,
+                        "acquisition_recorded": acquisition_recorded,
+                    },
                 )
                 return TaskRunResult(
                     task=task,

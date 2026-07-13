@@ -35,6 +35,7 @@ from dc3pa.memory import (  # noqa: E402
     MultimodalMemory,
     RGBHistogramEncoder,
 )
+from dc3pa.memory.modes import MemoryMode  # noqa: E402
 from dc3pa.observability.trace import JsonlTraceWriter  # noqa: E402
 from dc3pa.reliability import (  # noqa: E402
     AdaptiveTriggerConfig,
@@ -349,11 +350,18 @@ def main(argv: Optional[list[str]] = None) -> int:
         if args.mode == "mp5_legacy":
             runtime_config = replace(runtime_config, record_multimodal_memory=False)
 
-        with MultimodalMemory(
-            args.memory_root,
-            image_encoder=image_encoder,
-            text_encoder=text_encoder,
-        ) as multimodal_memory:
+        memory_mode = MemoryMode.parse(runtime_config.memory_mode)
+        memory_context = (
+            contextlib.nullcontext(None)
+            if not memory_mode.memory_enabled
+            else MultimodalMemory(
+                args.memory_root,
+                image_encoder=image_encoder,
+                text_encoder=text_encoder,
+                readonly=memory_mode.requires_frozen_snapshot,
+            )
+        )
+        with memory_context as multimodal_memory:
             bundle = build_stage6_runtime(
                 env=evaluator.env,
                 runtime_config=runtime_config,
