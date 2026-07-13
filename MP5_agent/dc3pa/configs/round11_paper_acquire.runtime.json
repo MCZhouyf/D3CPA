@@ -1,0 +1,12 @@
+{
+  "runtime": {
+    "memory_mode": "acquire",
+    "telemetry_enabled": true,
+    "acquisition_log_dir": "artifacts/acquisition",
+    "calibration_log_dir": "artifacts/calibration",
+    "record_legacy_workflow_memory": false,
+    "record_multimodal_memory": false,
+    "capture_initial_scene": false,
+    "capture_final_scene": false
+  }
+}

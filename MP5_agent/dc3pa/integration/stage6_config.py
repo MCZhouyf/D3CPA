@@ -32,9 +32,8 @@ def _positive_int(value: Any, label: str) -> int:
 class Stage6RuntimeConfig:
     """Closed-loop Stage-6 runtime policy.
 
-    Defaults preserve commit 5aee44b behavior. Paper evaluation must explicitly
-    select ``memory_mode='evaluate_readonly'`` and disable both legacy and
-    multimodal long-term recording.
+    Defaults preserve commit 4ed2de4 behavior.  Paper acquisition must use a
+    dedicated config that disables the legacy and online multimodal write paths.
     """
 
     mode: str = "dc3pa"
@@ -50,10 +49,10 @@ class Stage6RuntimeConfig:
     capture_initial_scene: bool = True
     capture_final_scene: bool = True
 
-    # Round-1 lifecycle controls. ``acquire`` preserves the legacy write path.
     memory_mode: str = MemoryMode.ACQUIRE.value
     telemetry_enabled: bool = False
     acquisition_log_dir: str = ""
+    calibration_log_dir: str = ""
     memory_snapshot_manifest: str = ""
 
     def validate(self) -> None:
@@ -115,6 +114,14 @@ class Stage6RuntimeConfig:
         if self.acquisition_log_dir and memory_mode is not MemoryMode.ACQUIRE:
             raise ContractValidationError(
                 "acquisition_log_dir is only valid in memory_mode='acquire'"
+            )
+
+        if self.calibration_log_dir and memory_mode not in {
+            MemoryMode.ACQUIRE,
+            MemoryMode.CALIBRATE,
+        }:
+            raise ContractValidationError(
+                "calibration_log_dir is only valid in memory_mode='acquire' or 'calibrate'"
             )
 
     @classmethod

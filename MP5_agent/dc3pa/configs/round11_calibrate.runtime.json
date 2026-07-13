@@ -1,0 +1,12 @@
+{
+  "runtime": {
+    "memory_mode": "calibrate",
+    "telemetry_enabled": true,
+    "calibration_log_dir": "artifacts/calibration",
+    "memory_snapshot_manifest": "artifacts/frozen_memory/snapshot_manifest.json",
+    "record_legacy_workflow_memory": false,
+    "record_multimodal_memory": false,
+    "capture_initial_scene": false,
+    "capture_final_scene": false
+  }
+}

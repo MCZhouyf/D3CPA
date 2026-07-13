@@ -2,23 +2,24 @@ from __future__ import annotations
 
 import sys
 import time
-import uuid
 from dataclasses import dataclass
 from typing import Any, Dict, Mapping, Optional, Protocol, Tuple, runtime_checkable
 
 from ..contracts import AgentState, Plan
 from ..integration.controller import ControllerAdapter, ExecutionResult
-from ..memory.acquisition import (
-    AcquisitionStore,
-    LocalSceneCandidate,
-    SuccessfulTrajectoryRecord,
-)
+from ..memory.acquisition import AcquisitionStore
+from ..memory.calibration_store import CalibrationEpisodeStore
 from ..memory.modes import MemoryMode
 from ..memory.multimodal_memory import SceneObservation, SuccessfulEpisode
 from ..memory.snapshot import MemorySnapshotManifest, SnapshotGuard
 from ..observability.trace import JsonlTraceWriter
 from ..reliability import ReliabilityContext
 from .events import AttemptRecord, RuntimeEvent, TaskRunResult, sanitize_for_trace
+from .round11_persistence import (
+    commit_calibration_episode,
+    commit_successful_acquisition,
+    new_episode_id,
+)
 from .stage6_config import Stage6RuntimeConfig
 from .state import StateProvider, StateSnapshot, task_name_from_information
 
@@ -108,6 +109,7 @@ class Stage6ClosedLoopRunner:
         legacy_memory_sink: Optional[LegacyMemorySink] = None,
         multimodal_memory_sink: Optional[MultimodalMemorySink] = None,
         acquisition_store: Optional[AcquisitionStore] = None,
+        calibration_store: Optional[CalibrationEpisodeStore] = None,
         trace_writer: Optional[JsonlTraceWriter] = None,
     ):
         config.validate()
@@ -127,6 +129,7 @@ class Stage6ClosedLoopRunner:
         self.legacy_memory_sink = legacy_memory_sink
         self.multimodal_memory_sink = multimodal_memory_sink
         self.acquisition_store = acquisition_store
+        self.calibration_store = calibration_store
         self.trace_writer = trace_writer
         self.memory_mode = MemoryMode.parse(config.memory_mode)
 
@@ -470,73 +473,23 @@ class Stage6ClosedLoopRunner:
         task_information: Mapping[str, Any],
         plan: Plan,
         execution_telemetry: Tuple[Any, ...],
+        episode_id: str,
         attempt: int,
         events: list[RuntimeEvent],
     ) -> bool:
         if self.acquisition_store is None:
             return False
 
-        episode_id = (
-            f"{task}-{attempt}-{int(time.time() * 1000)}-{uuid.uuid4().hex[:8]}"
-        )
-        action_starts: Dict[tuple[int, int], Any] = {}
-        candidates: list[LocalSceneCandidate] = []
-        telemetry_payload = []
-        for event in execution_telemetry:
-            if hasattr(event, "to_dict"):
-                telemetry_payload.append(event.to_dict(include_payload=False))
-            if getattr(event, "event_type", "") == "action_started":
-                action_starts[(int(event.step_index), int(event.action_index))] = event
-                continue
-            if (
-                getattr(event, "event_type", "") != "action_finished"
-                or getattr(event, "status", "") != "success"
-            ):
-                continue
-            started = action_starts.get((int(event.step_index), int(event.action_index)))
-            if started is None:
-                continue
-            rgb = getattr(started, "payload", {}).get("rgb")
-            if rgb is None:
-                continue
-            image_path = self.acquisition_store.write_rgb_array(
-                episode_id=episode_id,
-                step_id=str(event.step_id or f"step-{event.step_index}"),
-                action_index=int(event.action_index),
-                rgb=rgb,
-            )
-            candidates.append(
-                LocalSceneCandidate(
-                    episode_id=episode_id,
-                    task_name=task,
-                    plan_id=str(event.plan_id),
-                    plan_version=int(event.plan_version),
-                    step_id=str(event.step_id),
-                    step_index=int(event.step_index),
-                    action_index=int(event.action_index),
-                    local_subgoal=str(
-                        getattr(started, "payload", {}).get(
-                            "local_subgoal", f"step {event.step_index}"
-                        )
-                    ),
-                    action=dict(getattr(started, "payload", {}).get("action", {})),
-                    image_path=image_path,
-                    pre_inventory=dict(
-                        getattr(started, "payload", {}).get("inventory", {})
-                    ),
-                )
-            )
-
-        record = SuccessfulTrajectoryRecord(
+        path, candidate_count = commit_successful_acquisition(
+            store=self.acquisition_store,
             episode_id=episode_id,
-            task_name=task,
-            seed=str(task_information.get("seed", "")),
-            plan=plan.to_dict(),
-            telemetry=tuple(telemetry_payload),
-            scene_candidates=tuple(candidates),
-            metadata={"stage": 6, "mode": self.config.mode, "attempt": attempt},
+            task=task,
+            task_information=task_information,
+            plan=plan,
+            execution_telemetry=execution_telemetry,
+            attempt=attempt,
+            mode=self.config.mode,
         )
-        path = self.acquisition_store.commit_success(record)
         self._emit(
             events,
             "acquisition_record_committed",
@@ -544,7 +497,48 @@ class Stage6ClosedLoopRunner:
             {
                 "task": task,
                 "episode_id": episode_id,
-                "scene_candidate_count": len(candidates),
+                "scene_candidate_count": candidate_count,
+                "path": str(path),
+            },
+        )
+        return True
+
+    def _record_calibration_episode(
+        self,
+        *,
+        task: str,
+        task_information: Mapping[str, Any],
+        plan: Plan,
+        execution_telemetry: Tuple[Any, ...],
+        episode_id: str,
+        success: bool,
+        failure_reason: str,
+        attempt: int,
+        events: list[RuntimeEvent],
+    ) -> bool:
+        if self.calibration_store is None:
+            return False
+
+        path = commit_calibration_episode(
+            store=self.calibration_store,
+            episode_id=episode_id,
+            task=task,
+            task_information=task_information,
+            plan=plan,
+            execution_telemetry=execution_telemetry,
+            success=success,
+            failure_reason=failure_reason,
+            attempt=attempt,
+            mode=self.config.mode,
+        )
+        self._emit(
+            events,
+            "calibration_episode_committed",
+            attempt,
+            {
+                "task": task,
+                "episode_id": episode_id,
+                "success": success,
                 "path": str(path),
             },
         )
@@ -773,8 +767,16 @@ class Stage6ClosedLoopRunner:
                             attempt_index,
                             {"error_type": type(exc).__name__, "error": str(exc)},
                         )
-                else:
-                    goal_success = True
+            else:
+                goal_success = True
+            attempt_failure_reason = (
+                "" if goal_success else (
+                    "goal_not_achieved"
+                    if execution.success
+                    else "controller_reported_failure"
+                )
+            )
+            episode_id = new_episode_id(task, attempt_index)
             self._emit(
                 events,
                 "controller_completed",
@@ -787,6 +789,17 @@ class Stage6ClosedLoopRunner:
                     "suggestion": execution.suggestion,
                     "underground": underground,
                 },
+            )
+            self._record_calibration_episode(
+                task=task,
+                task_information=task_information,
+                plan=plan,
+                execution_telemetry=execution.telemetry,
+                episode_id=episode_id,
+                success=goal_success,
+                failure_reason=attempt_failure_reason,
+                attempt=attempt_index,
+                events=events,
             )
             attempts.append(
                 AttemptRecord(
@@ -834,6 +847,7 @@ class Stage6ClosedLoopRunner:
                     task_information=task_information,
                     plan=plan,
                     execution_telemetry=execution.telemetry,
+                    episode_id=episode_id,
                     attempt=attempt_index,
                     events=events,
                 )

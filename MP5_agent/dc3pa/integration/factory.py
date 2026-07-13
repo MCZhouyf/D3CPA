@@ -5,6 +5,7 @@ from typing import Any, Callable, Mapping, Optional, Sequence
 
 from ..evaluation import StructuredEvaluationChain
 from ..memory.acquisition import AcquisitionStore
+from ..memory.calibration_store import CalibrationEpisodeStore
 from ..memory.modes import MemoryMode
 from ..memory.multimodal_memory import MultimodalMemory
 from ..observability.trace import JsonlTraceWriter
@@ -136,6 +137,12 @@ def build_stage6_runtime(
     acquisition_store = None
     if runtime_config.acquisition_log_dir and memory_mode is MemoryMode.ACQUIRE:
         acquisition_store = AcquisitionStore(runtime_config.acquisition_log_dir)
+    calibration_store = None
+    if runtime_config.calibration_log_dir and memory_mode in {
+        MemoryMode.ACQUIRE,
+        MemoryMode.CALIBRATE,
+    }:
+        calibration_store = CalibrationEpisodeStore(runtime_config.calibration_log_dir)
 
     runtime = Stage6ClosedLoopRunner(
         env=env,
@@ -157,6 +164,7 @@ def build_stage6_runtime(
         legacy_memory_sink=LegacyWorkflowMemorySink(legacy_memory),
         multimodal_memory_sink=multimodal_memory,
         acquisition_store=acquisition_store,
+        calibration_store=calibration_store,
         trace_writer=trace_writer,
     )
     return Stage6RuntimeBundle(

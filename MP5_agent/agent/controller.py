@@ -690,6 +690,7 @@ class Controller:
                 "plan_version": step.get("_dc3pa_plan_version", 0),
                 "step_id": step.get("_dc3pa_step_id", f"step-{step_index}"),
                 "step_index": step.get("_dc3pa_step_index", step_index),
+                "local_subgoal": step.get("_dc3pa_local_subgoal", ""),
             }
 
         def emit_step_started(step, step_index):
@@ -712,15 +713,18 @@ class Controller:
             )
 
         def emit_action_started(step, step_index, action_index, action, current_events):
+            metadata = step_metadata(step, step_index)
+            metadata.pop("local_subgoal", None)
             emit_execution_event(
                 self,
                 "action_started",
-                **step_metadata(step, step_index),
+                **metadata,
                 action_index=action_index,
                 status="",
                 action=compact_action_payload(action),
                 rgb=current_rgb_from_events(current_events),
                 inventory=snapshot_inventory(self.memory),
+                local_subgoal=step.get("_dc3pa_local_subgoal", ""),
                 times=step.get("times"),
             )
 
@@ -818,7 +822,6 @@ class Controller:
                     '''
                     print(f"action is {action['name']},and  args is {action['args']}")
                     name, args = action['name'], action['args']
-                    emit_action_started(step, step_index, action_index, action, events)
 
                     if (
                         self._is_deep_mining_task(task_information)
@@ -870,6 +873,8 @@ class Controller:
                         )
                         emit_action_finished(step, step_index, action_index, action, "skipped_satisfied")
                         continue
+
+                    emit_action_started(step, step_index, action_index, action, events)
 
                     if name == "find":
                         check_result = self.check_action_preparation(env,"find", args,task_information,events)

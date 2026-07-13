@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any, Dict, Mapping, Optional, Protocol, Tuple, runtime_checkable
+from typing import Any, Dict, Optional, Protocol, Tuple, runtime_checkable
 
 from ..contracts import Plan
 from .execution_observer import (
     OBSERVER_ATTRIBUTE,
     ExecutionEvent,
     ExecutionObserver,
-    InMemoryExecutionObserver,
 )
+from .local_subgoal import resolve_local_subgoal
 
 
 @dataclass(frozen=True)
@@ -65,6 +65,10 @@ class LegacyControllerAdapter:
             legacy_step["_dc3pa_step_index"] = index
             legacy_step["_dc3pa_step_id"] = str(
                 getattr(plan_step, "step_id", f"step-{index}")
+            )
+            legacy_step["_dc3pa_local_subgoal"] = resolve_local_subgoal(
+                plan_step if plan_step is not None else legacy_step,
+                fallback_index=index,
             )
         return workflow
 
