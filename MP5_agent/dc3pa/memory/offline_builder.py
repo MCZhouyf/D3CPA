@@ -1,7 +1,8 @@
 """Deterministic offline construction orchestration.
 
-This module deliberately uses small callback protocols so it can wrap the existing
-DC3PA DependencyExtractor and multimodal stores without duplicating their logic.
+This callback-based builder remains useful for tests and custom stores.  The
+production CLI in ``scripts_dc3pa/build_frozen_memory.py`` uses the repository's
+actual MultimodalMemory implementation and writes a schema-v2 snapshot manifest.
 """
 from __future__ import annotations
 
@@ -10,10 +11,14 @@ import json
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Mapping, MutableSet, Optional, Protocol, Sequence, Tuple
+from typing import Any, Dict, Iterable, Mapping, MutableSet, Optional, Protocol, Tuple
 
 from .acquisition import AcquisitionStore
-from .snapshot import MemorySnapshotManifest, create_snapshot_manifest
+from .snapshot import (
+    MemorySnapshotManifest,
+    checkpoint_and_truncate_wal,
+    create_snapshot_manifest,
+)
 
 
 EdgeKey = Tuple[str, str]
@@ -87,8 +92,6 @@ class OfflineMemoryBuilder:
 
         for payload in payloads:
             record = payload["record"]
-            # Count an edge at most once per successful episode, so a repeated
-            # action inside one trajectory cannot artificially satisfy support.
             episode_edges = {
                 (str(source), str(target))
                 for source, target in self.dependency_extractor(record)
@@ -129,9 +132,12 @@ class OfflineMemoryBuilder:
         database_path: str | Path,
         source_commit: str,
         manifest_path: str | Path,
+        snapshot_root: str | Path | None = None,
+        acquisition_manifest_path: str | Path | None = None,
         metadata: Optional[Mapping[str, Any]] = None,
     ) -> Tuple[OfflineBuildStats, MemorySnapshotManifest]:
         stats = self.build()
+        checkpoint_and_truncate_wal(database_path)
         merged_metadata: Dict[str, Any] = dict(metadata or {})
         merged_metadata["offline_build_stats"] = {
             "acquisition_episodes": stats.acquisition_episodes,
@@ -144,6 +150,8 @@ class OfflineMemoryBuilder:
             database_path,
             source_commit=source_commit,
             metadata=merged_metadata,
+            snapshot_root=snapshot_root,
+            acquisition_manifest_path=acquisition_manifest_path,
         )
         manifest.to_json(manifest_path)
         return stats, manifest

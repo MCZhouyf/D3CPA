@@ -767,8 +767,8 @@ class Stage6ClosedLoopRunner:
                             attempt_index,
                             {"error_type": type(exc).__name__, "error": str(exc)},
                         )
-            else:
-                goal_success = True
+                else:
+                    goal_success = True
             attempt_failure_reason = (
                 "" if goal_success else (
                     "goal_not_achieved"

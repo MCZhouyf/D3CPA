@@ -77,6 +77,7 @@ def _successful_telemetry():
             rgb=np.zeros((2, 2, 3), dtype=np.uint8),
             inventory={"log": 0},
             action={"name": "find", "args": {"obj": "log"}},
+            local_subgoal="find log",
         ),
         make_execution_event(
             "action_finished",
