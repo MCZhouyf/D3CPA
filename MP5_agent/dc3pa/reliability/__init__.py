@@ -10,6 +10,13 @@ from .environment import EnvironmentReliabilityStrategy
 from .factory import build_hybrid_probability_model
 from .hybrid import HybridProbabilityModel, ReliabilityStrategy
 from .knowledge import KnowledgeReliabilityStrategy, PrerequisiteCheck
+from .knowledge_v2 import (
+    KNOWLEDGE_IMPLS,
+    HardGatedHybridProbabilityModel,
+    KnowledgeEvidenceV2,
+    KnowledgeReliabilityStrategyV2,
+    KnowledgeShadowStrategy,
+)
 from .model import (
     CallableConfidenceProvider,
     ConfidenceProvider,
@@ -28,10 +35,15 @@ __all__ = [
     "DimensionScore",
     "DualChainConfig",
     "EnvironmentReliabilityStrategy",
+    "HardGatedHybridProbabilityModel",
     "HybridProbabilityConfig",
     "HybridProbabilityModel",
     "InventoryProjection",
+    "KNOWLEDGE_IMPLS",
+    "KnowledgeEvidenceV2",
     "KnowledgeReliabilityStrategy",
+    "KnowledgeReliabilityStrategyV2",
+    "KnowledgeShadowStrategy",
     "LinearMemoryWeightPolicy",
     "PrerequisiteCheck",
     "ReliabilityContext",

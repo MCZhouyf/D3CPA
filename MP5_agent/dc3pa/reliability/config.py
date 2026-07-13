@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import math
 from dataclasses import asdict, dataclass
+from importlib import import_module
 from typing import Any, Dict, Mapping
 
 from ..errors import ContractValidationError
+from .knowledge_v2 import validate_knowledge_impl
 
 
 def _finite_number(value: Any, label: str) -> float:
@@ -41,6 +43,8 @@ class HybridProbabilityConfig:
     require_environment_text_relevance: bool = True
     model_failure_mode: str = "unavailable"
     task_name_filter_environment: bool = False
+    knowledge_impl: str = "legacy_v1"
+    graph_hard_min_support: int = 2
 
     def validate(self) -> None:
         visual = _finite_number(self.visual_similarity_weight, "visual_similarity_weight")
@@ -60,6 +64,11 @@ class HybridProbabilityConfig:
             raise ContractValidationError(
                 "model_failure_mode must be 'unavailable' or 'raise'"
             )
+        try:
+            validate_knowledge_impl(self.knowledge_impl)
+        except ValueError as exc:
+            raise ContractValidationError(str(exc)) from exc
+        _positive_int(self.graph_hard_min_support, "graph_hard_min_support")
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> "HybridProbabilityConfig":
@@ -83,6 +92,7 @@ class DualChainConfig:
     confidence_threshold: float = 0.8
     max_revision_rounds: int = 2
     evaluate_when_unavailable: bool = True
+    constraint_repair_policy: str = "legacy"
 
     def validate(self) -> None:
         threshold = _finite_number(self.confidence_threshold, "confidence_threshold")
@@ -96,6 +106,13 @@ class DualChainConfig:
             raise ContractValidationError("max_revision_rounds must be a non-negative integer")
         if not isinstance(self.evaluate_when_unavailable, bool):
             raise ContractValidationError("evaluate_when_unavailable must be bool")
+        try:
+            validate_policy = import_module(
+                "dc3pa.planner.constraint_repair_policy"
+            ).validate_constraint_repair_policy
+            validate_policy(self.constraint_repair_policy)
+        except ValueError as exc:
+            raise ContractValidationError(str(exc)) from exc
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> "DualChainConfig":
