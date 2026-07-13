@@ -2,10 +2,15 @@ from dataclasses import dataclass
 from pathlib import Path
 import sys
 
+import pytest
+
 from dc3pa.integration.controller import LegacyControllerAdapter
 from dc3pa.integration.execution_observer import (
     InMemoryExecutionObserver,
     emit_execution_event,
+)
+from tests_dc3pa.legacy_controller_test_gate import (
+    require_legacy_controller_test_dependencies,
 )
 
 
@@ -142,7 +147,9 @@ def _make_legacy_controller():
     return Controller(memory=_Memory(), checker=None)
 
 
+@pytest.mark.minedojo
 def test_real_controller_observer_is_noninvasive_and_censors_remaining_steps():
+    require_legacy_controller_test_dependencies()
     plain_env = _FakeEnv()
     observed_env = _FakeEnv()
     plain = LegacyControllerAdapter(_make_legacy_controller()).execute(
