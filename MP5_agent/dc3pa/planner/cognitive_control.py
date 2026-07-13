@@ -19,6 +19,7 @@ from ..reliability import (
     ReliabilityContext,
     ReliabilityResult,
 )
+from .constraint_repair_policy import should_attempt_deterministic_repair
 from ..trigger import (
     AdaptiveTriggerSession,
     FixedIntervalTriggerSession,
@@ -120,6 +121,8 @@ class CognitiveControlPlanner:
         plan: Plan,
         state: AgentState,
         *,
+        phase: str,
+        hard_conflict: bool,
         preserve_revision: bool = False,
     ) -> tuple[Plan, Optional[MaterialRepairResult]]:
         repair = repair_material_deficits(plan, state)
@@ -153,6 +156,10 @@ class CognitiveControlPlanner:
                 "repaired_plan_version": repair.plan.version,
                 "inserted_step_count": repair.inserted_step_count,
                 "inserted_targets": list(repair.inserted_targets),
+                "constraint_repair_policy": self.config.constraint_repair_policy,
+                "repair_phase": phase,
+                "deterministic_repair_attempted": True,
+                "hard_conflict": bool(hard_conflict),
             },
         )
         return repaired_plan, repair
@@ -322,10 +329,17 @@ class CognitiveControlPlanner:
                     )
                 continue
             if report.request_replan:
-                if hard_conflict:
+                repair_allowed = should_attempt_deterministic_repair(
+                    self.config.constraint_repair_policy,
+                    phase="request_replan",
+                    hard_conflict=hard_conflict,
+                )
+                if repair_allowed:
                     repaired_plan, material_repair = self._repair_material_deficits(
                         plan,
                         state,
+                        phase="request_replan",
+                        hard_conflict=hard_conflict,
                     )
                     if material_repair is not None:
                         material_repairs.append(material_repair)
@@ -343,6 +357,18 @@ class CognitiveControlPlanner:
                         )
                         session.restart_after_revision(restart_index, len(plan.steps))
                         continue
+                else:
+                    self._trace(
+                        "material_deficits_repair_skipped",
+                        {
+                            "plan_id": plan.plan_id,
+                            "plan_version": plan.version,
+                            "constraint_repair_policy": self.config.constraint_repair_policy,
+                            "repair_phase": "request_replan",
+                            "deterministic_repair_attempted": False,
+                            "hard_conflict": hard_conflict,
+                        },
+                    )
                 unresolved.append(
                     {
                         "plan_id": plan.plan_id,
@@ -358,13 +384,33 @@ class CognitiveControlPlanner:
             application = self.plan_editor.apply(plan, report)
             patch_history.append(application)
             plan = application.revised_plan
-            plan, material_repair = self._repair_material_deficits(
-                plan,
-                state,
-                preserve_revision=True,
+            repair_allowed = should_attempt_deterministic_repair(
+                self.config.constraint_repair_policy,
+                phase="post_patch",
+                hard_conflict=hard_conflict,
             )
-            if material_repair is not None:
-                material_repairs.append(material_repair)
+            if repair_allowed:
+                plan, material_repair = self._repair_material_deficits(
+                    plan,
+                    state,
+                    phase="post_patch",
+                    hard_conflict=hard_conflict,
+                    preserve_revision=True,
+                )
+                if material_repair is not None:
+                    material_repairs.append(material_repair)
+            else:
+                self._trace(
+                    "material_deficits_repair_skipped",
+                    {
+                        "plan_id": plan.plan_id,
+                        "plan_version": plan.version,
+                        "constraint_repair_policy": self.config.constraint_repair_policy,
+                        "repair_phase": "post_patch",
+                        "deterministic_repair_attempted": False,
+                        "hard_conflict": hard_conflict,
+                    },
+                )
             current_plan_had_hard_unresolved = False
             restart_index = min(
                 application.earliest_changed_index,
