@@ -1,10 +1,45 @@
 from __future__ import annotations
 
 import base64
+import importlib.util
 import os
 from pathlib import Path
+import sys
+import types
 
-from agent.utils.percipient_mllm import ChatOpenAIVision
+
+def _load_vision_module():
+    module_name = "agent.utils.percipient_mllm"
+    if module_name in sys.modules:
+        return sys.modules[module_name]
+
+    root = Path(__file__).resolve().parents[1]
+    agent_pkg = sys.modules.setdefault("agent", types.ModuleType("agent"))
+    agent_pkg.__path__ = [str(root / "agent")]
+    utils_pkg = sys.modules.setdefault("agent.utils", types.ModuleType("agent.utils"))
+    utils_pkg.__path__ = [str(root / "agent" / "utils")]
+    agent_pkg.utils = utils_pkg
+
+    common_utils = types.ModuleType("agent.utils.common_utils")
+    common_utils.load_prompt = lambda name: f"prompt:{name}"
+    sys.modules["agent.utils.common_utils"] = common_utils
+
+    json_utils = types.ModuleType("agent.utils.json_utils")
+    json_utils.fix_and_parse_json = lambda text: {"answer": text}
+    sys.modules["agent.utils.json_utils"] = json_utils
+
+    path = root / "agent" / "utils" / "percipient_mllm.py"
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    utils_pkg.percipient_mllm = module
+    return module
+
+
+_vision_module = _load_vision_module()
+ChatOpenAIVision = _vision_module.ChatOpenAIVision
 
 
 def test_chat_openai_vision_uses_openai_api_base(monkeypatch, tmp_path: Path):

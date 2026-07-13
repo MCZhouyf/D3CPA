@@ -4,6 +4,21 @@ import sys
 from pathlib import Path
 
 import numpy as np
+import pytest
+
+from tests_dc3pa.legacy_controller_test_gate import (
+    missing_legacy_controller_dependencies,
+)
+
+
+pytestmark = pytest.mark.minedojo
+_missing_legacy_deps = missing_legacy_controller_dependencies()
+if _missing_legacy_deps:
+    pytest.skip(
+        "legacy Controller fallback tests require optional runtime modules: "
+        + ", ".join(_missing_legacy_deps),
+        allow_module_level=True,
+    )
 
 
 ROOT = Path(__file__).resolve().parents[1]

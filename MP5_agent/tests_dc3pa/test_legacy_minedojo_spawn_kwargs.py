@@ -5,6 +5,22 @@ import json
 import sys
 from types import SimpleNamespace
 
+import pytest
+
+from tests_dc3pa.legacy_controller_test_gate import (
+    missing_legacy_controller_dependencies,
+)
+
+
+pytestmark = pytest.mark.minedojo
+_missing_legacy_deps = missing_legacy_controller_dependencies()
+if _missing_legacy_deps:
+    pytest.skip(
+        "legacy MineDojo spawn tests require optional runtime modules: "
+        + ", ".join(_missing_legacy_deps),
+        allow_module_level=True,
+    )
+
 
 def _load_run_agent(monkeypatch, tmp_path, task_name):
     task_path = tmp_path / f"{task_name}.json"
