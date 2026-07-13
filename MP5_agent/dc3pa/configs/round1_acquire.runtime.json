@@ -1,0 +1,9 @@
+{
+  "runtime": {
+    "memory_mode": "acquire",
+    "telemetry_enabled": true,
+    "acquisition_log_dir": "artifacts/acquisition",
+    "record_legacy_workflow_memory": true,
+    "record_multimodal_memory": true
+  }
+}

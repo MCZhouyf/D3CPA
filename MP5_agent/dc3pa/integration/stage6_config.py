@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Any, Dict, Mapping
 
 from ..errors import ContractValidationError
+from ..memory.modes import MemoryMode
+
 
 _RUNTIME_MODES = {"mp5_legacy", "reasoning_only", "dc3pa"}
 _UNRESOLVED_POLICIES = {"block", "reasoning_only", "execute"}
@@ -30,9 +32,9 @@ def _positive_int(value: Any, label: str) -> int:
 class Stage6RuntimeConfig:
     """Closed-loop Stage-6 runtime policy.
 
-    The default behavior is deliberately fail-closed for an unresolved DC3PA plan:
-    it is not sent to the Controller. A reasoning-only fallback must be explicitly
-    selected. ``execute`` is retained only as an auditable research/debug option.
+    Defaults preserve commit 5aee44b behavior. Paper evaluation must explicitly
+    select ``memory_mode='evaluate_readonly'`` and disable both legacy and
+    multimodal long-term recording.
     """
 
     mode: str = "dc3pa"
@@ -47,6 +49,12 @@ class Stage6RuntimeConfig:
     record_multimodal_memory: bool = True
     capture_initial_scene: bool = True
     capture_final_scene: bool = True
+
+    # Round-1 lifecycle controls. ``acquire`` preserves the legacy write path.
+    memory_mode: str = MemoryMode.ACQUIRE.value
+    telemetry_enabled: bool = False
+    acquisition_log_dir: str = ""
+    memory_snapshot_manifest: str = ""
 
     def validate(self) -> None:
         if self.mode not in _RUNTIME_MODES:
@@ -74,14 +82,40 @@ class Stage6RuntimeConfig:
             raise ContractValidationError(
                 "memory_failure_policy must be 'raise' or 'trace'"
             )
+
         for label in (
             "require_goal_check",
             "record_legacy_workflow_memory",
             "record_multimodal_memory",
             "capture_initial_scene",
             "capture_final_scene",
+            "telemetry_enabled",
         ):
             _strict_bool(getattr(self, label), label)
+
+        try:
+            memory_mode = MemoryMode.parse(self.memory_mode)
+        except ValueError as exc:
+            raise ContractValidationError(str(exc)) from exc
+
+        if memory_mode is not MemoryMode.ACQUIRE and (
+            self.record_legacy_workflow_memory or self.record_multimodal_memory
+        ):
+            raise ContractValidationError(
+                "calibrate/evaluate_readonly/disabled modes must set both "
+                "record_legacy_workflow_memory=false and "
+                "record_multimodal_memory=false"
+            )
+
+        if memory_mode.requires_frozen_snapshot and not self.memory_snapshot_manifest:
+            raise ContractValidationError(
+                f"memory_mode={memory_mode.value!r} requires memory_snapshot_manifest"
+            )
+
+        if self.acquisition_log_dir and memory_mode is not MemoryMode.ACQUIRE:
+            raise ContractValidationError(
+                "acquisition_log_dir is only valid in memory_mode='acquire'"
+            )
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> "Stage6RuntimeConfig":

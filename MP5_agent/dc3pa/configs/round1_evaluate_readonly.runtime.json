@@ -1,0 +1,9 @@
+{
+  "runtime": {
+    "memory_mode": "evaluate_readonly",
+    "telemetry_enabled": true,
+    "memory_snapshot_manifest": "artifacts/frozen_memory/manifest.json",
+    "record_legacy_workflow_memory": false,
+    "record_multimodal_memory": false
+  }
+}
