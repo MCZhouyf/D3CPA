@@ -329,13 +329,18 @@ def main(argv: Optional[list[str]] = None) -> int:
             openai_key=args.openai_key, memory=memory, model_name=args.gpt_model_name
         )
         trace_writer = JsonlTraceWriter(args.trace)
-        memory.llm = TracedChatModel(
-            memory.llm, trace_writer, "dc3pa_confidence_and_evaluation"
-        )
-        reflexion.llm = TracedChatModel(reflexion.llm, trace_writer, "reflection")
-        planner_instance.llm = TracedChatModel(
-            planner_instance.llm, trace_writer, "planning"
-        )
+        if hasattr(memory, "llm"):
+            memory.llm = TracedChatModel(
+                memory.llm, trace_writer, "dc3pa_confidence_and_evaluation"
+            )
+        if hasattr(reflexion, "llm"):
+            reflexion.llm = TracedChatModel(
+                reflexion.llm, trace_writer, "reflection"
+            )
+        if hasattr(planner_instance, "llm"):
+            planner_instance.llm = TracedChatModel(
+                planner_instance.llm, trace_writer, "planning"
+            )
         controller = legacy_runner.Controller(memory=memory, checker=reflexion)
         state_provider = build_legacy_state_provider(
             env=evaluator.env,
