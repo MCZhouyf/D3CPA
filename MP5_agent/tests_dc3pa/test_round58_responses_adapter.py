@@ -25,6 +25,7 @@ class _Response:
 
     def json(self):
         return {
+            "model": "gpt-5.1-2025-11-13",
             "output": [
                 {
                     "type": "message",
@@ -56,6 +57,19 @@ class _FailureSession:
     def post(self, url, headers, json, timeout):
         self.calls += 1
         raise requests.ConnectionError("network unavailable")
+
+
+class _WrongModelResponse(_Response):
+    def json(self):
+        payload = super().json()
+        payload["model"] = "gpt-5.1"
+        return payload
+
+
+class _WrongModelSession(_Session):
+    def post(self, url, headers, json, timeout):
+        self.calls.append((url, headers, json, timeout))
+        return _WrongModelResponse()
 
 
 def test_adapter_sends_responses_request_without_sampling_or_prompt_logging():
@@ -116,3 +130,18 @@ def test_adapter_exhausts_profile_retries_and_preserves_failure():
     with pytest.raises(RuntimeError, match="after 4 attempts"):
         adapter.predict("hello")
     assert session.calls == 4
+
+
+def test_adapter_fails_closed_if_provider_does_not_confirm_exact_snapshot():
+    session = _WrongModelSession()
+    adapter = OpenAIResponsesChatAdapter(
+        profile=OpenAIResponsesModelProfile(maximum_retries=0),
+        purpose="planning",
+        api_key="test-key",
+        session=session,
+        sleep=lambda _: None,
+    )
+
+    with pytest.raises(RuntimeError, match="after 1 attempts") as exc_info:
+        adapter.predict("hello")
+    assert "exact requested model snapshot" in str(exc_info.value.__cause__)

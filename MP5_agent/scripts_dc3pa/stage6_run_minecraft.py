@@ -68,10 +68,18 @@ from dc3pa.reliability import (  # noqa: E402
 class TracedChatModel:
     """Trace LLM request counts without recording prompts, responses, or credentials."""
 
-    def __init__(self, model: Any, trace_writer: JsonlTraceWriter, purpose: str):
+    def __init__(
+        self,
+        model: Any,
+        trace_writer: JsonlTraceWriter,
+        purpose: str,
+        *,
+        include_error_detail: bool = True,
+    ):
         self._model = model
         self._trace_writer = trace_writer
         self._purpose = purpose
+        self._include_error_detail = include_error_detail
 
     def _resolve_method(self, method_name: str) -> tuple[str, Any]:
         if hasattr(self._model, method_name):
@@ -101,15 +109,15 @@ class TracedChatModel:
         try:
             result = method(*args, **kwargs)
         except Exception as exc:
-            self._trace_writer.write(
-                "llm_call_failed",
-                {
-                    "purpose": self._purpose,
-                    "method": method_name,
-                    "actual_method": actual_method_name,
-                    "error_type": type(exc).__name__,
-                },
-            )
+            payload = {
+                "purpose": self._purpose,
+                "method": method_name,
+                "actual_method": actual_method_name,
+                "error_type": type(exc).__name__,
+            }
+            if self._include_error_detail:
+                payload["error"] = str(exc)
+            self._trace_writer.write("llm_call_failed", payload)
             raise
         self._trace_writer.write(
             "llm_call_completed",
@@ -229,7 +237,12 @@ def _profile_chat_model(
         purpose=purpose,
         usage_observer=_usage_observer(trace_writer, profile, purpose),
     )
-    return TracedChatModel(adapter, trace_writer, purpose)
+    return TracedChatModel(
+        adapter,
+        trace_writer,
+        purpose,
+        include_error_detail=False,
+    )
 
 
 @contextlib.contextmanager

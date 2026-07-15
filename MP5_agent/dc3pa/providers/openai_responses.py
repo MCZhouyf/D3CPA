@@ -193,6 +193,11 @@ class OpenAIResponsesChatAdapter:
                 data = response.json()
                 if not isinstance(data, Mapping):
                     raise ValueError("Responses API JSON must be an object")
+                response_model = data.get("model")
+                if response_model != self.profile.model:
+                    raise ValueError(
+                        "Responses API did not confirm the exact requested model snapshot"
+                    )
                 return data
             except (requests.RequestException, ValueError) as exc:
                 last_error = exc

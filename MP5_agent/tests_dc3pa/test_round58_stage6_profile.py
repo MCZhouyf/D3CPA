@@ -156,6 +156,7 @@ def test_stage6_reference_profile_replaces_roles_and_applies_approved_seed(
     assert rc == 0
     assert fake_module.args.gpt_model_name == "gpt-5.1-2025-11-13"
     assert observed["chat_model"]._model.purpose == "dc3pa_confidence_and_evaluation"
+    assert observed["chat_model"]._include_error_detail is False
     assert fake_module.args.gpt_model_name != "gpt-5.1"
     events = [
         json.loads(line)
