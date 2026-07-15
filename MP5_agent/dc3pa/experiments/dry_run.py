@@ -293,6 +293,21 @@ class DryRunReceipt:
     task_completed: Optional[bool] = None
     errors: tuple[str, ...] = ()
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    requested_seed: str = ""
+    effective_seed: str = ""
+    environment_started: bool = False
+    requested_model: str = ""
+    returned_models: tuple[str, ...] = ()
+    model_profile_id: str = ""
+    reasoning_effort: str = ""
+    expected_provider_call_count: int = 0
+    actual_provider_call_count: int = 0
+    provider_call_count_matches_expected: bool = False
+    dry_run_root_guard_passed: bool = False
+    trace_sha256: str = ""
+    truth_receipt_id: str = ""
+    task: str = ""
+    difficulty: str = ""
 
     def __post_init__(self) -> None:
         if self.status not in DRY_RUN_STATUSES:
@@ -305,6 +320,8 @@ class DryRunReceipt:
             self.censored_excluded_count,
             self.ambiguous_excluded_count,
             self.technical_failure_count,
+            self.expected_provider_call_count,
+            self.actual_provider_call_count,
         )
         if any(value < 0 for value in integer_values):
             raise ValueError("Dry-run counts cannot be negative")
@@ -313,6 +330,7 @@ class DryRunReceipt:
         payload = asdict(self)
         payload["errors"] = list(self.errors)
         payload["metadata"] = dict(self.metadata)
+        payload["returned_models"] = list(self.returned_models)
         return payload
 
 
@@ -502,6 +520,7 @@ def receipt_from_stage6_result(
     launch_validation_passed: bool,
     formal_memory_used: bool,
     exception: Optional[BaseException] = None,
+    truth_evidence: Optional[Mapping[str, Any]] = None,
 ) -> DryRunReceipt:
     entry_ids = {entry.entry_id for entry in campaign.entries}
     if entry_id not in entry_ids:
@@ -527,6 +546,19 @@ def receipt_from_stage6_result(
     errors = list(scan["errors"])
     if exception is not None:
         errors.append(f"{type(exception).__name__}: {exception}")
+    truth = dict(truth_evidence or {})
+    expected_calls = int(truth.get("expected_provider_call_count", 0) or 0)
+    actual_calls = int(truth.get("actual_provider_call_count", 0) or 0)
+    truth_payload = {
+        "campaign_id": campaign.campaign_id,
+        "entry_id": entry_id,
+        "task": str(truth.get("task", "")),
+        "difficulty": str(truth.get("difficulty", "")),
+        "requested_seed": str(truth.get("requested_seed", "")),
+        "effective_seed": str(truth.get("effective_seed", "")),
+        "trace_sha256": str(truth.get("trace_sha256", "")),
+    }
+    truth_receipt_id = hashlib.sha256(_canonical_json(truth_payload)).hexdigest()
     return DryRunReceipt(
         campaign_id=campaign.campaign_id,
         entry_id=entry_id,
@@ -555,11 +587,30 @@ def receipt_from_stage6_result(
         task_completed=result.success if result is not None else None,
         errors=tuple(errors),
         metadata={"dry_run_output_root_marker": DRY_RUN_MARKER},
+        requested_seed=str(truth.get("requested_seed", "")),
+        effective_seed=str(truth.get("effective_seed", "")),
+        environment_started=bool(truth.get("environment_started", False)),
+        requested_model=str(truth.get("requested_model", "")),
+        returned_models=tuple(truth.get("returned_models", ())),
+        model_profile_id=str(truth.get("model_profile_id", "")),
+        reasoning_effort=str(truth.get("reasoning_effort", "")),
+        expected_provider_call_count=expected_calls,
+        actual_provider_call_count=actual_calls,
+        provider_call_count_matches_expected=(expected_calls == actual_calls),
+        dry_run_root_guard_passed=bool(
+            truth.get("dry_run_root_guard_passed", False)
+        ),
+        trace_sha256=str(truth.get("trace_sha256", "")),
+        truth_receipt_id=truth_receipt_id,
+        task=str(truth.get("task", "")),
+        difficulty=str(truth.get("difficulty", "")),
     )
 
 
 def save_receipt(path: str | Path, receipt: DryRunReceipt) -> None:
     output = Path(path)
+    if output.exists():
+        raise FileExistsError(f"Refusing to overwrite dry-run receipt: {output}")
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(
         json.dumps(receipt.to_dict(), indent=2, sort_keys=True) + "\n",

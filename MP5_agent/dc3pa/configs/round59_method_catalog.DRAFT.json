@@ -1,0 +1,66 @@
+{
+  "draft_only": true,
+  "notes": "No method may be scheduled until its readiness artifact exists.",
+  "methods": [
+    {
+      "method_id": "matched_reactive_single_chain",
+      "display_name": "Matched Reactive Single-Chain",
+      "provider_profile_id": "REPLACE",
+      "controller_profile": "REPLACE",
+      "memory_policy": "frozen-read-only-matched",
+      "cognitive_control_mode": "none",
+      "implementation_commit": "REPLACE",
+      "ready": false,
+      "readiness_artifact_id": "",
+      "notes": "Same LLM/controller/budget; no Dual Chain, fusion, or trigger."
+    },
+    {
+      "method_id": "dual_chain_fixed_m1",
+      "display_name": "Dual Chain Fixed M=1",
+      "provider_profile_id": "REPLACE",
+      "controller_profile": "REPLACE",
+      "memory_policy": "frozen-read-only-matched",
+      "cognitive_control_mode": "fixed-every-step",
+      "implementation_commit": "REPLACE",
+      "ready": false,
+      "readiness_artifact_id": "",
+      "notes": "Causal trigger baseline."
+    },
+    {
+      "method_id": "dual_chain_fixed_m3",
+      "display_name": "Dual Chain Fixed M=3",
+      "provider_profile_id": "REPLACE",
+      "controller_profile": "REPLACE",
+      "memory_policy": "frozen-read-only-matched",
+      "cognitive_control_mode": "fixed-every-three",
+      "implementation_commit": "REPLACE",
+      "ready": false,
+      "readiness_artifact_id": "",
+      "notes": "Causal trigger baseline."
+    },
+    {
+      "method_id": "dual_chain_fixed_plan_boundary",
+      "display_name": "Dual Chain Fixed Plan Boundary",
+      "provider_profile_id": "REPLACE",
+      "controller_profile": "REPLACE",
+      "memory_policy": "frozen-read-only-matched",
+      "cognitive_control_mode": "fixed-plan-boundary",
+      "implementation_commit": "REPLACE",
+      "ready": false,
+      "readiness_artifact_id": "",
+      "notes": "Sparse evaluation baseline."
+    },
+    {
+      "method_id": "dc3pa_adaptive_v2",
+      "display_name": "DC3PA Adaptive V2",
+      "provider_profile_id": "REPLACE",
+      "controller_profile": "REPLACE",
+      "memory_policy": "frozen-read-only-matched",
+      "cognitive_control_mode": "hysteresis-ema-adaptive",
+      "implementation_commit": "REPLACE",
+      "ready": false,
+      "readiness_artifact_id": "",
+      "notes": "Must stay unready until Fusion release and Round 6."
+    }
+  ]
+}

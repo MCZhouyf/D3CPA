@@ -25,6 +25,7 @@ class _Response:
 
     def json(self):
         return {
+            "id": "response-secret-identifier",
             "model": "gpt-5.1",
             "output": [
                 {
@@ -115,6 +116,30 @@ def test_adapter_accepts_langchain_messages_invoke_and_call_interfaces():
         {"role": "user", "content": "user"},
     ]
     assert payload["max_output_tokens"] == 4096
+
+
+def test_public_metadata_interface_exposes_only_safe_response_facts():
+    observed = []
+    adapter = OpenAIResponsesChatAdapter(
+        profile=OpenAIResponsesModelProfile(),
+        purpose="planning",
+        api_key="test-key",
+        session=_Session(),
+        metadata_observer=observed.append,
+        sleep=lambda _: None,
+    )
+
+    response = adapter.invoke_with_metadata("sensitive prompt")
+
+    assert response.text == "ok"
+    assert response.metadata.returned_model == "gpt-5.1"
+    assert response.metadata.reasoning_effort == "low"
+    assert response.metadata.response_id_sha256
+    assert response.metadata.request_text_logged is False
+    assert response.metadata.response_text_logged is False
+    assert observed == [response.metadata]
+    assert "sensitive prompt" not in repr(response.metadata)
+    assert "response-secret-identifier" not in repr(response.metadata)
 
 
 def test_adapter_exhausts_profile_retries_and_preserves_failure():
