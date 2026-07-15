@@ -30,6 +30,12 @@ from dc3pa.integration import (  # noqa: E402
     build_legacy_state_provider,
     build_stage6_runtime,
 )
+from dc3pa.experiments.binding import load_binding  # noqa: E402
+from dc3pa.experiments.blueprint import load_blueprint  # noqa: E402
+from dc3pa.experiments.launcher_validation import (  # noqa: E402
+    validate_real_experiment_launch,
+)
+from dc3pa.experiments.phase_state import load_state  # noqa: E402
 from dc3pa.memory import (  # noqa: E402
     HashingTextEncoder,
     MultimodalMemory,
@@ -136,6 +142,18 @@ def _load_plugin(spec: str, config: Mapping[str, Any]) -> Any:
     if callable(value):
         return value(**dict(config))
     return value
+
+
+def _parse_key_values(values: list[str], label: str) -> dict[str, str]:
+    parsed: dict[str, str] = {}
+    for value in values:
+        if "=" not in value:
+            raise ValueError(f"{label} must use KEY=VALUE")
+        key, item = value.split("=", 1)
+        if not key.strip() or not item.strip():
+            raise ValueError(f"{label} key/value cannot be empty")
+        parsed[key.strip()] = item.strip()
+    return parsed
 
 
 @contextlib.contextmanager
@@ -249,6 +267,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Keep task-name-specific legacy rules outside mp5_legacy mode.",
     )
     parser.add_argument("--disable-controller-recovery", action="store_true")
+    parser.add_argument("--real-experiment-blueprint", type=Path)
+    parser.add_argument("--real-experiment-binding", type=Path)
+    parser.add_argument("--real-experiment-phase-state", type=Path)
+    parser.add_argument("--real-experiment-phase", default="")
+    parser.add_argument("--real-experiment-task", default="")
+    parser.add_argument("--real-experiment-seed", default="")
+    parser.add_argument("--real-experiment-run-manifest-id", action="append", default=[])
     return parser
 
 
@@ -294,6 +319,38 @@ def main(argv: Optional[list[str]] = None) -> int:
     trigger_config = AdaptiveTriggerConfig.from_mapping(
         payload.get("adaptive_trigger", {})
     )
+    real_experiment_trace_payload = None
+    if args.real_experiment_blueprint:
+        missing = [
+            name
+            for name, value in (
+                ("--real-experiment-phase", args.real_experiment_phase),
+                ("--real-experiment-task", args.real_experiment_task),
+                ("--real-experiment-seed", args.real_experiment_seed),
+            )
+            if not str(value).strip()
+        ]
+        if missing:
+            parser.error(
+                "--real-experiment-blueprint requires " + ", ".join(missing)
+            )
+        real_experiment_trace_payload = validate_real_experiment_launch(
+            blueprint=load_blueprint(args.real_experiment_blueprint),
+            binding=load_binding(args.real_experiment_binding)
+            if args.real_experiment_binding
+            else None,
+            phase_state=load_state(args.real_experiment_phase_state)
+            if args.real_experiment_phase_state
+            else None,
+            phase=args.real_experiment_phase,
+            task=args.real_experiment_task,
+            seed=args.real_experiment_seed,
+            max_execution_attempts=runtime_config.max_execution_attempts,
+            run_manifest_ids=_parse_key_values(
+                args.real_experiment_run_manifest_id,
+                "--real-experiment-run-manifest-id",
+            ),
+        ).to_trace_payload()
     image_encoder, text_encoder = _build_encoders(args)
     _validate_display_available()
 
@@ -333,6 +390,11 @@ def main(argv: Optional[list[str]] = None) -> int:
             openai_key=args.openai_key, memory=memory, model_name=args.gpt_model_name
         )
         trace_writer = JsonlTraceWriter(args.trace)
+        if real_experiment_trace_payload is not None:
+            trace_writer.write(
+                "real_experiment_launch_validated",
+                real_experiment_trace_payload,
+            )
         if hasattr(memory, "llm"):
             memory.llm = TracedChatModel(
                 memory.llm, trace_writer, "dc3pa_confidence_and_evaluation"

@@ -36,6 +36,7 @@ def test_minecraft_entrypoint_help_has_no_minedojo_import_requirement():
     )
     assert "Stage-6 DC3PA closed loop" in result.stdout
     assert "--require-environment-score" in result.stdout
+    assert "--real-experiment-blueprint" in result.stdout
 
 
 def test_minecraft_entrypoint_rejects_missing_display_before_legacy_import(
@@ -94,9 +95,16 @@ def test_minecraft_entrypoint_rejects_missing_display_before_legacy_import(
 
 def test_minecraft_entrypoint_enters_legacy_agent_cwd_with_absolute_paths(monkeypatch, tmp_path):
     import scripts_dc3pa.stage6_run_minecraft as launcher
+    from tests_dc3pa.round56_helpers import make_blueprint
 
     task_path = tmp_path / "task.json"
     task_path.write_text(json.dumps([{"task": "log", "quantity": 1}]), encoding="utf-8")
+    blueprint = make_blueprint()
+    blueprint_path = tmp_path / "blueprint.json"
+    blueprint_path.write_text(
+        json.dumps(blueprint.to_dict(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     config_path = tmp_path / "config.json"
     config_path.write_text(
         json.dumps(
@@ -211,6 +219,16 @@ def test_minecraft_entrypoint_enters_legacy_agent_cwd_with_absolute_paths(monkey
             str(memory_root),
             "--trace",
             str(trace_path),
+            "--real-experiment-blueprint",
+            str(blueprint_path),
+            "--real-experiment-phase",
+            "dry_run_completed",
+            "--real-experiment-task",
+            "basic-task-0",
+            "--real-experiment-seed",
+            "dev-train",
+            "--real-experiment-run-manifest-id",
+            "stage6=manifest-id",
         ]
     )
 
@@ -218,4 +236,16 @@ def test_minecraft_entrypoint_enters_legacy_agent_cwd_with_absolute_paths(monkey
     assert observed["cwd"] == ROOT / "agent"
     assert Path(observed["task_path"]).is_absolute()
     assert observed["memory_root"].is_absolute()
+    events = [
+        json.loads(line)
+        for line in trace_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    validation = [
+        event
+        for event in events
+        if event["event_type"] == "real_experiment_launch_validated"
+    ]
+    assert validation[0]["payload"]["blueprint_id"] == blueprint.blueprint_id
+    assert validation[0]["payload"]["run_manifest_ids"]["stage6"] == "manifest-id"
     assert Path.cwd() == ROOT
