@@ -161,6 +161,7 @@ class LegacyMP5StateProvider:
             image=image,
             metadata={
                 "underground": bool(underground),
+                "environment_step_index": 0,
                 "task_information": sanitize_for_trace(dict(task_information)),
             },
         )

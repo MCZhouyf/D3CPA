@@ -7,6 +7,14 @@ from .contracts import (
     StrategyWeights,
 )
 from .environment import EnvironmentReliabilityStrategy
+from .environment_v2 import (
+    EnvironmentEvidenceV2,
+    EnvironmentMatchV2,
+    EnvironmentReliabilityStrategyV2,
+    EnvironmentShadowStrategy,
+    validate_environment_impl,
+    validate_environment_scope,
+)
 from .factory import build_hybrid_probability_model
 from .hybrid import HybridProbabilityModel, ReliabilityStrategy
 from .knowledge import KnowledgeReliabilityStrategy, PrerequisiteCheck
@@ -60,7 +68,11 @@ __all__ = [
     "ConfidenceRequest",
     "DimensionScore",
     "DualChainConfig",
+    "EnvironmentEvidenceV2",
+    "EnvironmentMatchV2",
     "EnvironmentReliabilityStrategy",
+    "EnvironmentReliabilityStrategyV2",
+    "EnvironmentShadowStrategy",
     "ExcludedStep",
     "HardGatedHybridProbabilityModel",
     "HybridProbabilityConfig",
@@ -96,4 +108,6 @@ __all__ = [
     "parse_ordinal_confidence",
     "parse_confidence",
     "project_inventory",
+    "validate_environment_impl",
+    "validate_environment_scope",
 ]

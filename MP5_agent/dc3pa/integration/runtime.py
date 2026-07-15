@@ -213,6 +213,7 @@ class Stage6ClosedLoopRunner:
             for key, value in planning_context.items()
             if key not in {"task_context", "image", "image_vector"}
         }
+        metadata.setdefault("environment_step_index", 0)
         return ReliabilityContext(
             task_context=snapshot.reliability_context.task_context,
             image=snapshot.reliability_context.image,

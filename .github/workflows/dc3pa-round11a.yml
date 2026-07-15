@@ -7,6 +7,7 @@ on:
       - round11-infra
       - "round2-*"
       - "round3-*"
+      - "round4-*"
   pull_request:
 
 permissions:
@@ -65,6 +66,11 @@ jobs:
         run: >-
           python scripts_dc3pa/run_round3_gate.py
           --junit artifacts/round3.xml
+
+      - name: Round 4 environment evidence gate
+        run: >-
+          python scripts_dc3pa/run_round4_gate.py
+          --junit artifacts/round4.xml
 
       - name: Print reports on failure
         if: failure()

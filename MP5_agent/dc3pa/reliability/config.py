@@ -6,6 +6,7 @@ from importlib import import_module
 from typing import Any, Dict, Mapping
 
 from ..errors import ContractValidationError
+from .environment_v2 import validate_environment_impl, validate_environment_scope
 from .knowledge_v2 import validate_knowledge_impl
 from .ordinal_levels import validate_model_confidence_impl
 
@@ -50,11 +51,23 @@ class HybridProbabilityConfig:
     model_confidence_model_id: str = ""
     model_confidence_prompt_version: str = "ordinal-v1"
     model_confidence_artifact_path: str = ""
+    environment_impl: str = "legacy_v1"
+    environment_top_k: int = 3
+    environment_text_threshold: float = 0.5
+    environment_match_threshold: float = 0.5
+    environment_scope: str = "legacy_all_steps"
+    environment_allow_legacy_text_fallback: bool = True
 
     def validate(self) -> None:
         visual = _finite_number(self.visual_similarity_weight, "visual_similarity_weight")
         cap = _finite_number(self.learned_weight_cap, "learned_weight_cap")
         growth = _finite_number(self.memory_weight_growth, "memory_weight_growth")
+        text_threshold = _finite_number(
+            self.environment_text_threshold, "environment_text_threshold"
+        )
+        match_threshold = _finite_number(
+            self.environment_match_threshold, "environment_match_threshold"
+        )
         if not 0.0 <= visual <= 1.0:
             raise ContractValidationError("visual_similarity_weight must be in [0, 1]")
         if not 0.0 <= cap <= 0.5:
@@ -65,6 +78,20 @@ class HybridProbabilityConfig:
             raise ContractValidationError("require_environment_text_relevance must be bool")
         if not isinstance(self.task_name_filter_environment, bool):
             raise ContractValidationError("task_name_filter_environment must be bool")
+        _positive_int(self.environment_top_k, "environment_top_k")
+        if not 0.0 <= text_threshold <= 1.0:
+            raise ContractValidationError("environment_text_threshold must be in [0, 1]")
+        if not 0.0 <= match_threshold <= 1.0:
+            raise ContractValidationError("environment_match_threshold must be in [0, 1]")
+        if not isinstance(self.environment_allow_legacy_text_fallback, bool):
+            raise ContractValidationError(
+                "environment_allow_legacy_text_fallback must be bool"
+            )
+        try:
+            validate_environment_impl(self.environment_impl)
+            validate_environment_scope(self.environment_scope)
+        except ValueError as exc:
+            raise ContractValidationError(str(exc)) from exc
         if self.model_failure_mode not in {"unavailable", "raise"}:
             raise ContractValidationError(
                 "model_failure_mode must be 'unavailable' or 'raise'"

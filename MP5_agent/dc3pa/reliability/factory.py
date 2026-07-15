@@ -3,6 +3,11 @@ from __future__ import annotations
 from ..memory.multimodal_memory import MultimodalMemory
 from .config import HybridProbabilityConfig
 from .environment import EnvironmentReliabilityStrategy
+from .environment_v2 import (
+    EnvironmentReliabilityStrategyV2,
+    EnvironmentShadowStrategy,
+    validate_environment_impl,
+)
 from .hybrid import HybridProbabilityModel
 from .knowledge import KnowledgeReliabilityStrategy
 from .knowledge_v2 import (
@@ -77,15 +82,37 @@ def build_hybrid_probability_model(
             cache_enabled=cache_model_confidence,
         )
 
+    legacy_environment = EnvironmentReliabilityStrategy(
+        memory,
+        visual_similarity_weight=config.visual_similarity_weight,
+        require_text_relevance=config.require_environment_text_relevance,
+        task_name_filter=config.task_name_filter_environment,
+    )
+    environment_impl = validate_environment_impl(config.environment_impl)
+    if environment_impl == "legacy_v1":
+        environment = legacy_environment
+    else:
+        candidate_environment = EnvironmentReliabilityStrategyV2(
+            memory,
+            top_k=config.environment_top_k,
+            text_threshold=config.environment_text_threshold,
+            match_threshold=config.environment_match_threshold,
+            scope=config.environment_scope,
+            require_text_relevance=config.require_environment_text_relevance,
+            task_name_filter=config.task_name_filter_environment,
+            allow_legacy_text_fallback=config.environment_allow_legacy_text_fallback,
+        )
+        if environment_impl == "shadow_v2":
+            environment = EnvironmentShadowStrategy(
+                legacy_environment, candidate_environment
+            )
+        else:
+            environment = candidate_environment
+
     return model_class(
         knowledge=knowledge,
         model=model_strategy,
-        environment=EnvironmentReliabilityStrategy(
-            memory,
-            visual_similarity_weight=config.visual_similarity_weight,
-            require_text_relevance=config.require_environment_text_relevance,
-            task_name_filter=config.task_name_filter_environment,
-        ),
+        environment=environment,
         weight_policy=LinearMemoryWeightPolicy(
             learned_weight_cap=config.learned_weight_cap,
             memory_weight_growth=config.memory_weight_growth,
