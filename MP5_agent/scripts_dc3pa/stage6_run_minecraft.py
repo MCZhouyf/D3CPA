@@ -186,6 +186,34 @@ def _load_task_list(task_path: str | Path) -> list[Mapping[str, Any]]:
     raise ValueError("Task file must contain an object or list")
 
 
+def _runtime_target_matches_catalog_task(
+    *, runtime_target: str, catalog_task: str
+) -> bool:
+    """Match an agent target to its approved action-prefixed catalog label."""
+    target = " ".join(runtime_target.strip().lower().split())
+    label = " ".join(catalog_task.strip().lower().split())
+    if target == label:
+        return True
+    action_and_target = label.split(" ", 1)
+    return (
+        len(action_and_target) == 2
+        and action_and_target[0] in {"craft", "mine", "obtain", "smelt"}
+        and action_and_target[1] == target
+    )
+
+
+def _expected_reasoning_only_provider_calls(
+    *, task_count: int, result: Any
+) -> int:
+    """Derive calls from the frozen single-attempt reasoning-only protocol."""
+    if task_count < 0:
+        raise ValueError("task_count cannot be negative")
+    final_failure_reflection = int(
+        result is not None and not bool(getattr(result, "success", False))
+    )
+    return task_count + final_failure_reflection
+
+
 def _resolve_model_profile(
     cli_value: str, payload: Mapping[str, Any]
 ) -> Optional[OpenAIResponsesModelProfile]:
@@ -376,6 +404,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dry-run-entry-id", default="")
     parser.add_argument("--dry-run-output-root", type=Path)
     parser.add_argument("--dry-run-receipt", type=Path)
+    parser.add_argument("--dry-run-max-explore-steps", type=int, default=16)
     return parser
 
 
@@ -454,6 +483,11 @@ def main(argv: Optional[list[str]] = None) -> int:
             acquisition_log_dir="",
         )
         os.environ["MP5_DISABLE_MEMORY"] = "1"
+        if args.dry_run_max_explore_steps <= 0:
+            parser.error("--dry-run-max-explore-steps must be positive")
+        os.environ["DC3PA_MAX_EXPLORE_STEPS"] = str(
+            args.dry_run_max_explore_steps
+        )
     runtime_config.validate()
     hybrid_config = HybridProbabilityConfig.from_mapping(
         payload.get("hybrid_probability", {})
@@ -489,7 +523,10 @@ def main(argv: Optional[list[str]] = None) -> int:
             if len(task_list) != 1:
                 parser.error("dry-run receipt mode requires exactly one task entry")
             requested_task = str(task_list[0].get("task", "")).strip()
-            if requested_task != dry_run_entry.task:
+            if not _runtime_target_matches_catalog_task(
+                runtime_target=requested_task,
+                catalog_task=dry_run_entry.task,
+            ):
                 parser.error(
                     f"task file contains {requested_task!r}, "
                     f"expected dry-run task {dry_run_entry.task!r}"
@@ -571,6 +608,12 @@ def main(argv: Optional[list[str]] = None) -> int:
             from dc3pa.experiments.dry_run import sha256_file
 
             trace_sha256 = sha256_file(args.trace)
+        expected_calls = expected_provider_call_count
+        if model_profile is not None and args.mode == "reasoning_only":
+            expected_calls = _expected_reasoning_only_provider_calls(
+                task_count=expected_provider_call_count,
+                result=result,
+            )
         receipt = receipt_from_stage6_result(
             campaign=dry_run_campaign,
             entry_id=dry_run_entry.entry_id,
@@ -588,7 +631,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                 "returned_models": [item.returned_model for item in provider_metadata],
                 "model_profile_id": model_profile.profile_id if model_profile else "",
                 "reasoning_effort": model_profile.reasoning_effort if model_profile else "",
-                "expected_provider_call_count": expected_provider_call_count,
+                "expected_provider_call_count": expected_calls,
                 "actual_provider_call_count": len(provider_metadata),
                 "dry_run_root_guard_passed": (
                     dry_run_marker_for(args.dry_run_output_root) is not None

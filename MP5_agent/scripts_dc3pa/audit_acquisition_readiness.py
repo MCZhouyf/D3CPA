@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path: sys.path.insert(0, str(ROOT))
 from dc3pa.experiments.model_epoch import load_epoch
+from dc3pa.experiments.final_taskset_release import load_taskset_release
 from dc3pa.experiments.readiness import audit_readiness, load_receipt
 
 def load(path): return json.loads(Path(path).read_text())
@@ -14,10 +15,26 @@ def sha_file(path):
         for chunk in iter(lambda: f.read(1024*1024), b""): h.update(chunk)
     return h.hexdigest()
 
+def marker_evidence_passed(marker, source_commit):
+    passed_count = marker.get(
+        "parsed_passed_count", marker.get("test_count", 0)
+    )
+    return bool(
+        marker.get("passed", False)
+        and marker.get("exit_code") == 0
+        and int(passed_count) > 0
+        and marker.get("source_commit") == source_commit
+        and marker.get("stdout_sha256")
+        and marker.get("stderr_sha256")
+        and marker.get("started_at")
+        and marker.get("finished_at")
+    )
+
 def main():
     p = argparse.ArgumentParser()
     for name in ("blueprint-id","source-commit","migration-report",
                  "approval-binding",
+                 "final-taskset-release",
                  "task-asset-validation",
                  "blueprint-validation","closed-model-epoch",
                  "dry-run-audit","minedojo-marker-report","output-report"):
@@ -25,19 +42,11 @@ def main():
     p.add_argument("--smoke-receipt", action="append", required=True)
     a = p.parse_args()
     marker = load(a.minedojo_marker_report)
-    marker_passed = bool(
-        marker.get("passed", False)
-        and marker.get("exit_code") == 0
-        and int(marker.get("test_count", 0)) > 0
-        and marker.get("source_commit") == a.source_commit
-        and marker.get("stdout_sha256")
-        and marker.get("stderr_sha256")
-        and marker.get("started_at")
-        and marker.get("finished_at")
-    )
+    marker_passed = marker_evidence_passed(marker, a.source_commit)
     result = audit_readiness(
         blueprint_id=a.blueprint_id,
         source_commit=a.source_commit,
+        final_taskset=load_taskset_release(a.final_taskset_release),
         migration_report=load(a.migration_report),
         approval_binding=load(a.approval_binding),
         task_asset_validation=load(a.task_asset_validation),

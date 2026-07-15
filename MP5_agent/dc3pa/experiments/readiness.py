@@ -5,6 +5,7 @@ import hashlib, json
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, Mapping, Sequence
+from .final_taskset_release import FinalTasksetRelease
 from .model_epoch import ModelEpoch
 
 
@@ -53,6 +54,7 @@ class SeedProviderSmokeReceipt:
 class AcquisitionReadinessReport:
     blueprint_id: str
     source_commit: str
+    final_taskset_release_id: str
     migration_report_id: str
     model_epoch_id: str
     dry_run_audit_sha256: str
@@ -89,6 +91,7 @@ class AcquisitionReadinessReport:
 
 
 def audit_readiness(*, blueprint_id: str, source_commit: str,
+                    final_taskset: FinalTasksetRelease,
                     migration_report: Mapping[str, Any],
                     approval_binding: Mapping[str, Any],
                     task_asset_validation: Mapping[str, Any],
@@ -108,9 +111,29 @@ def audit_readiness(*, blueprint_id: str, source_commit: str,
     epoch_ok = model_epoch.status == "closed" and not model_epoch.invariant_errors()
     if not migration_ok:
         reasons.append("semantic migration is not eligible")
+    if not final_taskset.eligible:
+        reasons.append("final taskset release is not eligible")
+    if final_taskset.source_commit != source_commit:
+        reasons.append("final taskset source commit mismatch")
+    if approval_binding.get("final_taskset_release_id") != (
+        final_taskset.release_id
+    ):
+        reasons.append("approval binding final-taskset mismatch")
+    if approval_binding.get("taskset_amendment_id") != (
+        final_taskset.amendment_id
+    ):
+        reasons.append("approval binding taskset-amendment mismatch")
+    if approval_binding.get("task_semantic_smoke_report_id") != (
+        final_taskset.task_semantic_smoke_report_id
+    ):
+        reasons.append("approval binding task-semantic-smoke mismatch")
     if approval_binding.get("blueprint_id") != blueprint_id:
         reasons.append("approval binding Blueprint mismatch")
-    if approval_binding.get("migration_report_id") != migration_report.get("report_id"):
+    approval_migration_id = approval_binding.get(
+        "semantic_migration_report_id",
+        approval_binding.get("migration_report_id"),
+    )
+    if approval_migration_id != migration_report.get("report_id"):
         reasons.append("approval binding migration mismatch")
     if not approval_binding.get("mutable_alias_risk_acknowledged", False):
         reasons.append("mutable-alias risk is not acknowledged")
@@ -126,6 +149,14 @@ def audit_readiness(*, blueprint_id: str, source_commit: str,
         task_asset_validation.get("runtime_task_tree_sha256")
     ):
         reasons.append("approval binding runtime-task tree mismatch")
+    if final_taskset.task_asset_validation_report_id != (
+        task_asset_validation.get("report_id")
+    ):
+        reasons.append("final taskset task-asset report mismatch")
+    if final_taskset.runtime_task_tree_sha256 != (
+        task_asset_validation.get("runtime_task_tree_sha256")
+    ):
+        reasons.append("final taskset runtime-task tree mismatch")
     if task_asset_validation.get("source_commit") != source_commit:
         reasons.append("task-asset validation source commit mismatch")
     if not blueprint_ok:
@@ -187,6 +218,7 @@ def audit_readiness(*, blueprint_id: str, source_commit: str,
     return AcquisitionReadinessReport(
         blueprint_id=blueprint_id,
         source_commit=source_commit,
+        final_taskset_release_id=final_taskset.release_id,
         migration_report_id=str(migration_report.get("report_id", "")),
         model_epoch_id=model_epoch.epoch_id,
         dry_run_audit_sha256=dry_run_audit_sha256,

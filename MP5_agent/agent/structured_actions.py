@@ -1,5 +1,6 @@
 # generate data of different biomes at different times of the day
 from re import T
+import os
 import minedojo
 import random
 import string
@@ -1479,6 +1480,12 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
     global prev_position
     global retry_times
     global dontstop
+    configured_limit = os.environ.get("DC3PA_MAX_EXPLORE_STEPS", "").strip()
+    if configured_limit:
+        configured_steps = int(configured_limit)
+        if configured_steps <= 0:
+            raise ValueError("DC3PA_MAX_EXPLORE_STEPS must be positive")
+        max_try_steps = min(max_try_steps, configured_steps)
     events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
     print(f"exploring once, front floor{events['voxels']['block_name'][vradius+1][vradius-1][vradius]}\n block in front of body is {events['voxels']['block_name'][vradius+1][vradius][vradius]} \n and block in front of head is {events['voxels']['block_name'][vradius+1][vradius+1][vradius]}\n ")
     

@@ -17,6 +17,9 @@ TESTS = [
     "tests_dc3pa/test_round592_command_evidence.py",
     "tests_dc3pa/test_round592_preacquisition_gate.py",
     "tests_dc3pa/test_round592_approval.py",
+    "tests_dc3pa/test_round592_schedule_cli.py",
+    "tests_dc3pa/test_round592_stage6_task_identity.py",
+    "tests_dc3pa/test_round592_readiness_marker.py",
 ]
 
 
