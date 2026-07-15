@@ -1,0 +1,17 @@
+{
+  "draft_only": true,
+  "blueprint_name": "REPLACE_WITH_AUTHOR_APPROVED_NAME",
+  "source_commit": "2b3e5f481389c6d7ad11f88da5545b2c99159711",
+  "collector_mode": "single_chain_reactive",
+  "collector_reads_growing_scene_memory": true,
+  "controller_profile": "REPLACE_WITH_MATCHED_CONTROLLER_PROFILE",
+  "planner_model_id": "REPLACE_WITH_EXACT_MODEL_AND_VERSION",
+  "confidence_model_id": "REPLACE_WITH_EXACT_MODEL_AND_VERSION",
+  "environment_search_space": {
+    "top_k_values": [],
+    "text_threshold_values": [],
+    "match_threshold_values": [],
+    "environment_scope": "current_context_only"
+  },
+  "notes": "DRAFT ONLY."
+}
