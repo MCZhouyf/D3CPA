@@ -14,6 +14,7 @@ on:
       - "round56-*"
       - "round57-*"
       - "round58-*"
+      - "round59-*"
   pull_request:
 
 permissions:
@@ -107,6 +108,11 @@ jobs:
         run: >-
           python scripts_dc3pa/run_round58_gate.py
           --junit artifacts/round58.xml
+
+      - name: Round 5.9 acquisition-readiness gate
+        run: >-
+          python scripts_dc3pa/run_round59_gate.py
+          --junit artifacts/round59.xml
 
       - name: Print reports on failure
         if: failure()

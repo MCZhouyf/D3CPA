@@ -88,6 +88,7 @@ class AcquisitionReadinessReport:
 
 def audit_readiness(*, blueprint_id: str, source_commit: str,
                     migration_report: Mapping[str, Any],
+                    approval_binding: Mapping[str, Any],
                     blueprint_validation: Mapping[str, Any],
                     model_epoch: ModelEpoch,
                     dry_run_audit: Mapping[str, Any],
@@ -103,6 +104,14 @@ def audit_readiness(*, blueprint_id: str, source_commit: str,
     epoch_ok = model_epoch.status == "closed" and not model_epoch.invariant_errors()
     if not migration_ok:
         reasons.append("semantic migration is not eligible")
+    if approval_binding.get("blueprint_id") != blueprint_id:
+        reasons.append("approval binding Blueprint mismatch")
+    if approval_binding.get("migration_report_id") != migration_report.get("report_id"):
+        reasons.append("approval binding migration mismatch")
+    if not approval_binding.get("mutable_alias_risk_acknowledged", False):
+        reasons.append("mutable-alias risk is not acknowledged")
+    if not str(approval_binding.get("binding_id", "")):
+        reasons.append("approval binding ID is missing")
     if not blueprint_ok:
         reasons.append("Blueprint validation is not eligible")
     if not dry_ok:
@@ -113,6 +122,17 @@ def audit_readiness(*, blueprint_id: str, source_commit: str,
         reasons.append("model epoch Blueprint mismatch")
     if model_epoch.source_commit != source_commit:
         reasons.append("model epoch source commit mismatch")
+    if blueprint_validation.get("blueprint_id") != blueprint_id:
+        reasons.append("Blueprint validation identity mismatch")
+    if blueprint_validation.get("source_commit") not in (None, "", source_commit):
+        reasons.append("Blueprint validation source commit mismatch")
+    if blueprint_validation.get("model_profile_id") not in (
+        None, "", model_epoch.model_profile_id
+    ):
+        reasons.append("Blueprint validation profile mismatch")
+    summary = dry_run_audit.get("summary", {})
+    if summary.get("expected_entry_count") != 6 or summary.get("receipt_count") != 6:
+        reasons.append("tiny dry-run audit is not six-entry complete")
     if not minedojo_marker_passed:
         reasons.append("MineDojo marker gate failed")
     if not smoke_receipts:
