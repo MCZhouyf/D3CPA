@@ -9,6 +9,7 @@ on:
       - "round3-*"
       - "round4-*"
       - "round5-*"
+      - "round55-*"
   pull_request:
 
 permissions:
@@ -77,6 +78,11 @@ jobs:
         run: >-
           python scripts_dc3pa/run_round5_gate.py
           --junit artifacts/round5.xml
+
+      - name: Round 5.5 real-calibration gate
+        run: >-
+          python scripts_dc3pa/run_round55_gate.py
+          --junit artifacts/round55.xml
 
       - name: Print reports on failure
         if: failure()
