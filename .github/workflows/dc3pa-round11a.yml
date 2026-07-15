@@ -10,6 +10,7 @@ on:
       - "round4-*"
       - "round5-*"
       - "round55-*"
+      - "round551-*"
   pull_request:
 
 permissions:
@@ -83,6 +84,11 @@ jobs:
         run: >-
           python scripts_dc3pa/run_round55_gate.py
           --junit artifacts/round55.xml
+
+      - name: Round 5.5.1 experiment-safety gate
+        run: >-
+          python scripts_dc3pa/run_round551_gate.py
+          --junit artifacts/round551.xml
 
       - name: Print reports on failure
         if: failure()
