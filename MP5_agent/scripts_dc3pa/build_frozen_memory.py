@@ -40,6 +40,7 @@ from dc3pa.memory.snapshot import (  # noqa: E402
     open_sqlite_readonly,
     sha256_file,
 )
+from dc3pa.reliability.environment_v2 import canonical_action_key  # noqa: E402
 
 
 def _load_plugin(spec: str, config: Mapping[str, Any]) -> Any:
@@ -165,6 +166,7 @@ def build_snapshot(args: argparse.Namespace) -> Dict[str, Any]:
     episodes = 0
     raw_scene_candidates = 0
     retained_scene_candidates = 0
+    structured_action_key_scenes = 0
 
     with MultimodalMemory(
         output_root,
@@ -187,11 +189,21 @@ def build_snapshot(args: argparse.Namespace) -> Dict[str, Any]:
                 retained_scene_candidates += 1
                 local_subgoal = str(candidate.get("local_subgoal", "")).strip()
                 action = dict(candidate.get("action", {}))
+                action_key = str(
+                    candidate.get("metadata", {}).get("action_key")
+                    or canonical_action_key(action)
+                )
+                if action_key:
+                    structured_action_key_scenes += 1
                 scenes.append(
                     SceneObservation(
                         description=local_subgoal,
                         task_context=_canonical_json(
-                            {"local_subgoal": local_subgoal, "action": action}
+                            {
+                                "local_subgoal": local_subgoal,
+                                "action": action,
+                                "action_key": action_key,
+                            }
                         ),
                         inventory=dict(candidate.get("pre_inventory", {})),
                         position=str(candidate.get("metadata", {}).get("position", "unknown")),
@@ -199,6 +211,8 @@ def build_snapshot(args: argparse.Namespace) -> Dict[str, Any]:
                         image=image,
                         metadata={
                             "action": action,
+                            "action_key": action_key,
+                            "local_subgoal": local_subgoal,
                             "step_index": int(candidate.get("step_index", -1)),
                             "action_index": int(candidate.get("action_index", -1)),
                             "source_episode_id": str(record.get("episode_id", "")),
@@ -243,8 +257,23 @@ def build_snapshot(args: argparse.Namespace) -> Dict[str, Any]:
         "deleted_low_support_edges": deleted_edges,
         "retained_dependency_edges": edge_count,
         "stored_scene_exemplars": exemplar_count,
+        "structured_action_key_scenes": structured_action_key_scenes,
+        "structured_action_key_coverage": (
+            structured_action_key_scenes / retained_scene_candidates
+            if retained_scene_candidates
+            else 0.0
+        ),
         "min_dependency_support": args.min_dependency_support,
     }
+    if (
+        args.require_encoders
+        and retained_scene_candidates
+        and stats["structured_action_key_coverage"] < 0.95
+    ):
+        raise ValueError(
+            "paper snapshot structured action-key coverage is below 95%: "
+            f"{stats['structured_action_key_coverage']:.3f}"
+        )
     (output_root / "build_stats.json").write_text(
         json.dumps(stats, ensure_ascii=False, indent=2, sort_keys=True),
         encoding="utf-8",

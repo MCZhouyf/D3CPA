@@ -19,6 +19,7 @@ from ..memory.calibration_store import (
     CalibrationEpisodeRecord,
     CalibrationEpisodeStore,
 )
+from ..reliability.environment_v2 import canonical_action_key
 from .telemetry_serialization import serialize_execution_event
 
 
@@ -74,6 +75,7 @@ def commit_successful_acquisition(
         )
         image_paths[key] = image_path
         local_subgoal = str(payload.get("local_subgoal", "")).strip()
+        action = dict(payload.get("action", {}))
         if not local_subgoal:
             raise ValueError(
                 "action_started telemetry is missing local_subgoal; "
@@ -89,10 +91,14 @@ def commit_successful_acquisition(
                 step_index=step_index,
                 action_index=action_index,
                 local_subgoal=local_subgoal,
-                action=dict(payload.get("action", {})),
+                action=action,
                 image_path=image_path,
                 pre_inventory=dict(payload.get("inventory", {})),
-                metadata={"capture_point": "immediately_before_action"},
+                metadata={
+                    "capture_point": "immediately_before_action",
+                    "action_key": canonical_action_key(action),
+                    "local_subgoal": local_subgoal,
+                },
             )
         )
 

@@ -96,9 +96,18 @@ def test_build_frozen_memory_cli_creates_readonly_snapshot(tmp_path):
     )
     assert result.returncode == 0, result.stderr
     manifest = json.loads((output_root / "snapshot_manifest.json").read_text())
+    stats = json.loads((output_root / "build_stats.json").read_text())
     assert manifest["schema_version"] == 2
     assert manifest["asset_files"]
+    assert stats["structured_action_key_scenes"] == 1
+    assert stats["structured_action_key_coverage"] == 1.0
     with sqlite3.connect(output_root / "memory.sqlite3") as connection:
         assert connection.execute("SELECT COUNT(*) FROM episodes").fetchone()[0] == 1
         assert connection.execute("SELECT COUNT(*) FROM dependency_edges").fetchone()[0] == 3
         assert connection.execute("SELECT COUNT(*) FROM scene_exemplars").fetchone()[0] == 1
+        metadata = json.loads(
+            connection.execute(
+                "SELECT metadata_json FROM scene_exemplars"
+            ).fetchone()[0]
+        )
+        assert metadata["action_key"] == "craft:wooden_pickaxe"
