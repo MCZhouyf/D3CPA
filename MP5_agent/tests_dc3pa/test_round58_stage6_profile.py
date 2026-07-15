@@ -154,10 +154,9 @@ def test_stage6_reference_profile_replaces_roles_and_applies_approved_seed(
     )
 
     assert rc == 0
-    assert fake_module.args.gpt_model_name == "gpt-5.1-2025-11-13"
+    assert fake_module.args.gpt_model_name == "gpt-5.1"
     assert observed["chat_model"]._model.purpose == "dc3pa_confidence_and_evaluation"
     assert observed["chat_model"]._include_error_detail is False
-    assert fake_module.args.gpt_model_name != "gpt-5.1"
     events = [
         json.loads(line)
         for line in trace_path.read_text(encoding="utf-8").splitlines()
@@ -174,7 +173,7 @@ def test_stage6_reference_profile_replaces_roles_and_applies_approved_seed(
     profile_event = next(
         event for event in events if event["event_type"] == "model_profile_activated"
     )
-    assert profile_event["payload"]["model"] == "gpt-5.1-2025-11-13"
+    assert profile_event["payload"]["model"] == "gpt-5.1"
 
 
 def test_stage6_legacy_model_profile_remains_default():

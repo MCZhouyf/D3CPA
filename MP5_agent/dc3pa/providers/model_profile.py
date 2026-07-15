@@ -1,7 +1,8 @@
-"""Pinned GPT-5.1 Responses API profile for DC3PA.
+"""Author-selected GPT-5.1 Responses API profile for DC3PA.
 
-The exact snapshot avoids alias drift. The profile uses the same snapshot and
-reasoning effort for all agentic roles to avoid a model-backbone confound.
+The profile uses the same model identifier and reasoning effort for all agentic
+roles to avoid a model-backbone confound. The selected identifier is a mutable
+provider alias, so every run manifest must record it and the returned model ID.
 """
 
 from __future__ import annotations
@@ -12,8 +13,8 @@ from dataclasses import asdict, dataclass, field, replace
 from typing import Any, Mapping
 
 
-PROFILE_SCHEMA_VERSION = 1
-GPT51_SNAPSHOT = "gpt-5.1-2025-11-13"
+PROFILE_SCHEMA_VERSION = 2
+GPT51_MODEL_ID = "gpt-5.1"
 SUPPORTED_EFFORTS = frozenset({"none", "low", "medium", "high"})
 
 
@@ -27,8 +28,8 @@ def _canonical_json(payload: Any) -> bytes:
 
 @dataclass(frozen=True)
 class OpenAIResponsesModelProfile:
-    profile_name: str = "dc3pa-gpt51-reference-v1"
-    model: str = GPT51_SNAPSHOT
+    profile_name: str = "dc3pa-gpt51-alias-reference-v2"
+    model: str = GPT51_MODEL_ID
     reasoning_effort: str = "low"
     store: bool = False
     request_timeout_seconds: float = 180.0
@@ -48,8 +49,8 @@ class OpenAIResponsesModelProfile:
     def __post_init__(self) -> None:
         if self.schema_version != PROFILE_SCHEMA_VERSION:
             raise ValueError("Unsupported model profile schema")
-        if self.model != GPT51_SNAPSHOT:
-            raise ValueError(f"Model must be exact snapshot {GPT51_SNAPSHOT}")
+        if self.model != GPT51_MODEL_ID:
+            raise ValueError(f"Model must be the author-selected ID {GPT51_MODEL_ID}")
         if self.reasoning_effort not in SUPPORTED_EFFORTS:
             raise ValueError("Unsupported reasoning effort")
         if not isinstance(self.store, bool):

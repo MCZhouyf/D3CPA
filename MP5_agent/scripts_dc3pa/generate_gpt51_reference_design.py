@@ -157,7 +157,7 @@ def main() -> int:
         "",
         f"- Design ID: `{design.design_id}`",
         f"- Source commit: `{args.source_commit}`",
-        f"- Model snapshot: `{design.config.model_snapshot}`",
+        f"- Author-selected model ID: `{design.config.model_id}`",
         f"- Split salt: `{design.config.split_salt}`",
         f"- Final-seed salt: `{design.config.final_seed_salt}`",
         f"- Acquisition-seed salt: `{design.config.acquisition_seed_salt}`",

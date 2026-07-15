@@ -5,7 +5,7 @@ held-out boundary. It requires the authors' existing 50-task catalog; it does
 not invent Minecraft tasks.
 
 Reference choices:
-- exact GPT-5.1 snapshot is configured separately;
+- author-selected GPT-5.1 model identifier is configured separately;
 - five covered and five final-held-out tasks per difficulty;
 - horizon-balanced paired assignment with a frozen hash salt;
 - thirty deterministic final seeds per task;
@@ -42,9 +42,9 @@ from dc3pa.reliability.final_test_exclusion import (
 )
 
 
-REFERENCE_DESIGN_SCHEMA_VERSION = 1
+REFERENCE_DESIGN_SCHEMA_VERSION = 2
 DIFFICULTIES = ("basic", "easy", "medium", "hard", "complex")
-MODEL_SNAPSHOT = "gpt-5.1-2025-11-13"
+MODEL_ID = "gpt-5.1"
 
 DEFAULT_SPLIT_SALT = "dc3pa-ipm-major-revision-task-split-v1"
 DEFAULT_FINAL_SEED_SALT = "dc3pa-ipm-major-revision-final-seeds-v1"
@@ -117,7 +117,7 @@ class TaskCatalogEntry:
 
 @dataclass(frozen=True)
 class ReferenceDesignConfig:
-    design_name: str = "dc3pa-ipm-major-revision-reference-v1"
+    design_name: str = "dc3pa-ipm-major-revision-reference-v2"
     split_salt: str = DEFAULT_SPLIT_SALT
     final_seed_salt: str = DEFAULT_FINAL_SEED_SALT
     acquisition_seed_salt: str = DEFAULT_ACQUISITION_SEED_SALT
@@ -126,7 +126,7 @@ class ReferenceDesignConfig:
     final_seed_count: int = 30
     acquisition_seeds_per_covered_task: int = 4
     development_seeds_per_task: int = 3
-    model_snapshot: str = MODEL_SNAPSHOT
+    model_id: str = MODEL_ID
     source_commit: str = ""
     schema_version: int = REFERENCE_DESIGN_SCHEMA_VERSION
 
@@ -140,14 +140,14 @@ class ReferenceDesignConfig:
             "acquisition_seed_salt",
             "development_seed_salt",
             "role_salt",
-            "model_snapshot",
+            "model_id",
             "source_commit",
         ):
             if not str(getattr(self, name)).strip():
                 raise ValueError(f"{name} is required")
-        if self.model_snapshot != MODEL_SNAPSHOT:
+        if self.model_id != MODEL_ID:
             raise ValueError(
-                f"Reference profile is pinned to {MODEL_SNAPSHOT!r}"
+                f"Reference profile uses author-selected model {MODEL_ID!r}"
             )
         if self.final_seed_count != 30:
             raise ValueError("Paper reference design requires 30 final seeds")
@@ -417,7 +417,7 @@ def _sufficiency_policy() -> dict[str, Any]:
 def _model_profile() -> dict[str, Any]:
     return {
         "provider": "openai_responses",
-        "model": MODEL_SNAPSHOT,
+        "model": MODEL_ID,
         "reasoning_effort": "low",
         "store": False,
         "request_timeout_seconds": 180,
@@ -428,7 +428,8 @@ def _model_profile() -> dict[str, Any]:
             "dc3pa_confidence_and_evaluation": 4096,
             "reflection": 4096,
         },
-        "same_snapshot_and_effort_for_all_agentic_roles": True,
+        "same_model_and_effort_for_all_agentic_roles": True,
+        "mutable_alias_author_approved": True,
         "api_key_environment_variable": "OPENAI_API_KEY",
         "base_url_environment_variable": "OPENAI_BASE_URL",
     }

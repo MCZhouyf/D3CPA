@@ -196,7 +196,7 @@ class OpenAIResponsesChatAdapter:
                 response_model = data.get("model")
                 if response_model != self.profile.model:
                     raise ValueError(
-                        "Responses API did not confirm the exact requested model snapshot"
+                        "Responses API did not confirm the selected model identifier"
                     )
                 return data
             except (requests.RequestException, ValueError) as exc:

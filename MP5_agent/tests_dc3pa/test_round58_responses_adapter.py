@@ -25,7 +25,7 @@ class _Response:
 
     def json(self):
         return {
-            "model": "gpt-5.1-2025-11-13",
+            "model": "gpt-5.1",
             "output": [
                 {
                     "type": "message",
@@ -62,7 +62,7 @@ class _FailureSession:
 class _WrongModelResponse(_Response):
     def json(self):
         payload = super().json()
-        payload["model"] = "gpt-5.1"
+        payload["model"] = "gpt-4-turbo"
         return payload
 
 
@@ -87,7 +87,7 @@ def test_adapter_sends_responses_request_without_sampling_or_prompt_logging():
     assert len(session.calls) == 1
     url, headers, payload, timeout = session.calls[0]
     assert url.endswith("/v1/responses")
-    assert payload["model"] == "gpt-5.1-2025-11-13"
+    assert payload["model"] == "gpt-5.1"
     assert payload["reasoning"] == {"effort": "low"}
     assert payload["store"] is False
     assert payload["max_output_tokens"] == 8192
@@ -132,7 +132,7 @@ def test_adapter_exhausts_profile_retries_and_preserves_failure():
     assert session.calls == 4
 
 
-def test_adapter_fails_closed_if_provider_does_not_confirm_exact_snapshot():
+def test_adapter_fails_closed_if_provider_does_not_confirm_selected_model():
     session = _WrongModelSession()
     adapter = OpenAIResponsesChatAdapter(
         profile=OpenAIResponsesModelProfile(maximum_retries=0),
@@ -144,4 +144,4 @@ def test_adapter_fails_closed_if_provider_does_not_confirm_exact_snapshot():
 
     with pytest.raises(RuntimeError, match="after 1 attempts") as exc_info:
         adapter.predict("hello")
-    assert "exact requested model snapshot" in str(exc_info.value.__cause__)
+    assert "selected model identifier" in str(exc_info.value.__cause__)

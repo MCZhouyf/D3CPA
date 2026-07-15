@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Probe the exact GPT-5.1 snapshot without exposing prompt or response text."""
+"""Probe the selected GPT-5.1 model without exposing prompt or response text."""
 
 from __future__ import annotations
 

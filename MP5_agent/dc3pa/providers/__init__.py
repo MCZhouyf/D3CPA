@@ -1,7 +1,7 @@
 """Optional LLM provider adapters for reproducible paper runs."""
 
 from .model_profile import (
-    GPT51_SNAPSHOT,
+    GPT51_MODEL_ID,
     OpenAIResponsesModelProfile,
 )
 from .openai_responses import (
@@ -14,7 +14,7 @@ from .openai_responses import (
 
 __all__ = [
     "AdapterMessage",
-    "GPT51_SNAPSHOT",
+    "GPT51_MODEL_ID",
     "OpenAIResponsesChatAdapter",
     "OpenAIResponsesModelProfile",
     "ResponseUsage",
