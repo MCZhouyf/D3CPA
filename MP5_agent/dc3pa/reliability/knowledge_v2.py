@@ -12,6 +12,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Protocol
 from ..contracts import Action, AgentState, Plan, normalize_item_name
 from ..memory.dependency_store import DependencyEdge
 from .contracts import DimensionScore, ReliabilityContext
+from .contracts import FusionEvidence
 from .hybrid import HybridProbabilityModel
 from .knowledge import KnowledgeReliabilityStrategy, PrerequisiteCheck
 from .projection import (
@@ -368,4 +369,19 @@ class HardGatedHybridProbabilityModel(HybridProbabilityModel):
         notes = tuple(result.notes) + (
             "Overall reliability forced to zero by the knowledge hard gate",
         )
-        return replace(result, probability=0.0, notes=notes)
+        fusion = result.fusion
+        if fusion is not None:
+            fusion = replace(
+                fusion,
+                probability=0.0,
+                hard_gate_applied=True,
+                reason="Overall reliability forced to zero by the knowledge hard gate",
+            )
+        else:
+            fusion = FusionEvidence(
+                method="memory_weighted_v1",
+                probability=0.0,
+                hard_gate_applied=True,
+                reason="Overall reliability forced to zero by the knowledge hard gate",
+            )
+        return replace(result, probability=0.0, fusion=fusion, notes=notes)

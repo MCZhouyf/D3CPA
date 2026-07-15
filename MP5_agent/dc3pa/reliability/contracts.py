@@ -108,6 +108,65 @@ class StrategyWeights:
 
 
 @dataclass(frozen=True)
+class FusionEvidence:
+    method: str
+    probability: Optional[float]
+    features: Mapping[str, float] = field(default_factory=dict)
+    coefficients: Mapping[str, float] = field(default_factory=dict)
+    intercept: Optional[float] = None
+    artifact_id: str = ""
+    hard_gate_applied: bool = False
+    available: bool = True
+    reason: str = ""
+
+    def __post_init__(self) -> None:
+        method = str(self.method or "").strip()
+        if method not in {
+            "memory_weighted_v1",
+            "monotonic_logistic_shadow",
+            "monotonic_logistic_v2",
+        }:
+            raise ContractValidationError(f"Unknown fusion method {self.method!r}")
+        _validate_probability(self.probability, "fusion.probability")
+        if self.available != (self.probability is not None):
+            raise ContractValidationError(
+                "FusionEvidence.available must match whether probability is present"
+            )
+        for label, values in (
+            ("fusion.features", self.features),
+            ("fusion.coefficients", self.coefficients),
+        ):
+            for name, value in dict(values).items():
+                if isinstance(value, bool):
+                    raise ContractValidationError(f"{label}.{name} cannot be bool")
+                number = float(value)
+                if not math.isfinite(number):
+                    raise ContractValidationError(f"{label}.{name} must be finite")
+                if label == "fusion.features" and not 0.0 <= number <= 1.0:
+                    raise ContractValidationError(
+                        f"{label}.{name} must be in [0, 1]"
+                    )
+        if self.intercept is not None:
+            if isinstance(self.intercept, bool) or not math.isfinite(
+                float(self.intercept)
+            ):
+                raise ContractValidationError("fusion.intercept must be finite")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "method": self.method,
+            "probability": self.probability,
+            "features": dict(self.features),
+            "coefficients": dict(self.coefficients),
+            "intercept": self.intercept,
+            "artifact_id": self.artifact_id,
+            "hard_gate_applied": self.hard_gate_applied,
+            "available": self.available,
+            "reason": self.reason,
+        }
+
+
+@dataclass(frozen=True)
 class ReliabilityResult:
     plan_id: str
     plan_version: int
@@ -115,9 +174,11 @@ class ReliabilityResult:
     step_index: int
     probability: Optional[float]
     scores: Dict[str, DimensionScore]
-    base_weights: StrategyWeights
-    effective_weights: Optional[StrategyWeights]
-    successful_memory_count: int
+    base_weights: Optional[StrategyWeights] = None
+    effective_weights: Optional[StrategyWeights] = None
+    successful_memory_count: Optional[int] = None
+    fusion: Optional[FusionEvidence] = None
+    shadow_fusion: Optional[FusionEvidence] = None
     notes: Sequence[str] = field(default_factory=tuple)
 
     def __post_init__(self) -> None:
@@ -128,16 +189,39 @@ class ReliabilityResult:
             raise ContractValidationError(
                 f"scores must contain exactly {DIMENSIONS}, got {sorted(self.scores)}"
             )
-        if self.probability is None and self.effective_weights is not None:
+        method = self.fusion.method if self.fusion is not None else "memory_weighted_v1"
+        if method == "memory_weighted_v1":
+            if self.base_weights is None:
+                raise ContractValidationError("legacy fusion requires base_weights")
+            if self.probability is None and self.effective_weights is not None:
+                raise ContractValidationError(
+                    "effective_weights must be None when no overall probability is available"
+                )
+            if self.probability is not None and self.effective_weights is None:
+                raise ContractValidationError(
+                    "effective_weights are required when probability is available"
+                )
+            if self.successful_memory_count is None or self.successful_memory_count < 0:
+                raise ContractValidationError(
+                    "legacy fusion requires non-negative successful_memory_count"
+                )
+        elif method == "monotonic_logistic_v2":
+            if self.base_weights is not None or self.effective_weights is not None:
+                raise ContractValidationError(
+                    "logistic fusion must not fabricate legacy weights"
+                )
+            if self.successful_memory_count is not None:
+                raise ContractValidationError(
+                    "logistic fusion must not depend on successful_memory_count"
+                )
+        else:
             raise ContractValidationError(
-                "effective_weights must be None when no overall probability is available"
+                f"ReliabilityResult.fusion cannot use method {method!r}"
             )
-        if self.probability is not None and self.effective_weights is None:
+        if self.fusion is not None and self.fusion.probability != self.probability:
             raise ContractValidationError(
-                "effective_weights are required when probability is available"
+                "fusion.probability must match result probability"
             )
-        if self.successful_memory_count < 0:
-            raise ContractValidationError("successful_memory_count cannot be negative")
 
     @property
     def hard_conflict(self) -> bool:
@@ -155,13 +239,21 @@ class ReliabilityResult:
             "step_index": self.step_index,
             "probability": self.probability,
             "scores": {name: score.to_dict() for name, score in self.scores.items()},
-            "base_weights": self.base_weights.as_dict(),
+            "base_weights": (
+                self.base_weights.as_dict() if self.base_weights is not None else None
+            ),
             "effective_weights": (
                 self.effective_weights.as_dict()
                 if self.effective_weights is not None
                 else None
             ),
             "successful_memory_count": self.successful_memory_count,
+            "fusion": self.fusion.to_dict() if self.fusion is not None else None,
+            "shadow_fusion": (
+                self.shadow_fusion.to_dict()
+                if self.shadow_fusion is not None
+                else None
+            ),
             "hard_conflict": self.hard_conflict,
             "notes": list(self.notes),
         }

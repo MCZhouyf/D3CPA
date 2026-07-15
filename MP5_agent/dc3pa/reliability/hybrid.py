@@ -6,6 +6,7 @@ from ..contracts import AgentState, Plan
 from .contracts import (
     DIMENSIONS,
     DimensionScore,
+    FusionEvidence,
     ReliabilityContext,
     ReliabilityResult,
 )
@@ -104,6 +105,13 @@ class HybridProbabilityModel:
             base_weights=base,
             effective_weights=effective,
             successful_memory_count=count,
+            fusion=FusionEvidence(
+                method="memory_weighted_v1",
+                probability=probability,
+                features={},
+                available=probability is not None,
+                reason="Legacy memory-weighted reliability fusion",
+            ),
             notes=tuple(notes),
         )
 
