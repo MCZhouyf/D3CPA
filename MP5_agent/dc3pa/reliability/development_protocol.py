@@ -14,8 +14,12 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 
-PROTOCOL_SCHEMA_VERSION = 1
+PROTOCOL_SCHEMA_VERSION = 2
 DEVELOPMENT_ROLES = frozenset({"dev_train", "dev_tune", "dev_holdout"})
+DEVELOPMENT_GOAL_STATUSES = frozenset(
+    {"experience_covered", "development_novel_goal"}
+)
+LEGACY_GOAL_STATUSES = frozenset({"held_out_terminal_goal"})
 
 
 def _canonical_json(payload: Any) -> bytes:
@@ -56,10 +60,10 @@ class GroupAssignment:
             raise ValueError(
                 f"role must be one of {sorted(DEVELOPMENT_ROLES)}, got {self.role!r}"
             )
-        if self.goal_status and self.goal_status not in {
-            "experience_covered",
-            "held_out_terminal_goal",
-        }:
+        if (
+            self.goal_status
+            and self.goal_status not in DEVELOPMENT_GOAL_STATUSES | LEGACY_GOAL_STATUSES
+        ):
             raise ValueError("Unknown goal_status")
 
     def to_dict(self) -> dict[str, Any]:
@@ -79,15 +83,17 @@ class DevelopmentProtocolManifest:
     environment_impl: str
     environment_scope: str
     environment_parameters: Mapping[str, Any]
-    activation_policy_sha256: str
     created_from_commit: str
+    activation_policy_id: str = ""
     notes: str = ""
     schema_version: int = PROTOCOL_SCHEMA_VERSION
     protocol_id: str = ""
+    activation_policy_sha256: str = ""
 
     def __post_init__(self) -> None:
-        if self.schema_version != PROTOCOL_SCHEMA_VERSION:
+        if self.schema_version not in {1, PROTOCOL_SCHEMA_VERSION}:
             raise ValueError("Unsupported protocol schema")
+        policy_id = self.semantic_activation_policy_id()
         required = {
             "protocol_name": self.protocol_name,
             "memory_snapshot_sha256": self.memory_snapshot_sha256,
@@ -96,7 +102,7 @@ class DevelopmentProtocolManifest:
             "model_confidence_impl": self.model_confidence_impl,
             "environment_impl": self.environment_impl,
             "environment_scope": self.environment_scope,
-            "activation_policy_sha256": self.activation_policy_sha256,
+            "activation_policy_id": policy_id,
             "created_from_commit": self.created_from_commit,
         }
         missing = [name for name, value in required.items() if not str(value).strip()]
@@ -108,6 +114,13 @@ class DevelopmentProtocolManifest:
         expected = self.compute_protocol_id()
         if self.protocol_id and self.protocol_id != expected:
             raise ValueError("Development protocol hash mismatch")
+
+    def semantic_activation_policy_id(self) -> str:
+        current = str(self.activation_policy_id or "").strip()
+        legacy = str(self.activation_policy_sha256 or "").strip()
+        if current and legacy and current != legacy:
+            raise ValueError("Conflicting activation policy IDs in protocol")
+        return current or legacy
 
     def validate_disjointness(self) -> None:
         by_group: dict[str, str] = {}
@@ -134,6 +147,9 @@ class DevelopmentProtocolManifest:
     def payload_without_id(self) -> dict[str, Any]:
         payload = asdict(self)
         payload.pop("protocol_id", None)
+        payload.pop("activation_policy_sha256", None)
+        payload["schema_version"] = PROTOCOL_SCHEMA_VERSION
+        payload["activation_policy_id"] = self.semantic_activation_policy_id()
         payload["assignments"] = [
             item.to_dict()
             for item in sorted(
@@ -191,4 +207,8 @@ def load_protocol(path: str | Path) -> DevelopmentProtocolManifest:
     payload["assignments"] = tuple(
         GroupAssignment(**item) for item in payload["assignments"]
     )
+    if "activation_policy_id" not in payload and "activation_policy_sha256" in payload:
+        payload["activation_policy_id"] = payload["activation_policy_sha256"]
+    payload["schema_version"] = PROTOCOL_SCHEMA_VERSION
+    payload.pop("activation_policy_sha256", None)
     return DevelopmentProtocolManifest(**payload)

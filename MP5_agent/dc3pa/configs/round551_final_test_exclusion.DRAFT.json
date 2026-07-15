@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "manifest_name": "DRAFT_FINAL_50X30_REPLACE_BEFORE_DATA_COLLECTION",
+  "created_from_commit": "516b4b6b26012a2acf8a591328d85c8625133b26",
+  "notes": "Replace with all final evaluation tasks and seeds; freeze before any development collection.",
+  "tasks": [
+    {
+      "task": "EXAMPLE_ONLY_obtain_log",
+      "difficulty": "basic",
+      "goal_status": "experience_covered",
+      "test_seeds": [
+        "EXAMPLE_TEST_SEED_1"
+      ],
+      "metadata": {}
+    },
+    {
+      "task": "EXAMPLE_ONLY_obtain_diamond",
+      "difficulty": "complex",
+      "goal_status": "final_heldout_terminal_goal",
+      "test_seeds": [
+        "EXAMPLE_TEST_SEED_1"
+      ],
+      "metadata": {}
+    }
+  ],
+  "manifest_id": ""
+}
