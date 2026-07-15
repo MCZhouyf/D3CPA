@@ -1,0 +1,45 @@
+{
+  "minimum_examples_per_role": {
+    "dev_train": 0,
+    "dev_tune": 0,
+    "dev_holdout": 0
+  },
+  "minimum_positive_per_role": {
+    "dev_train": 0,
+    "dev_tune": 0,
+    "dev_holdout": 0
+  },
+  "minimum_negative_per_role": {
+    "dev_train": 0,
+    "dev_tune": 0,
+    "dev_holdout": 0
+  },
+  "minimum_groups_per_role": {
+    "dev_train": 0,
+    "dev_tune": 0,
+    "dev_holdout": 0
+  },
+  "minimum_tasks_per_role": {
+    "dev_train": 0,
+    "dev_tune": 0,
+    "dev_holdout": 0
+  },
+  "required_metadata_strata": {
+    "difficulty": [
+      "basic",
+      "easy",
+      "medium",
+      "hard",
+      "complex"
+    ],
+    "goal_status": [
+      "experience_covered",
+      "held_out_terminal_goal"
+    ],
+    "environment_status": [
+      "matched",
+      "mismatch",
+      "unknown"
+    ]
+  }
+}
