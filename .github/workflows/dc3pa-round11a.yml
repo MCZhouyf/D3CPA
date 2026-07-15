@@ -15,6 +15,7 @@ on:
       - "round57-*"
       - "round58-*"
       - "round59-*"
+      - "round591-*"
   pull_request:
 
 permissions:
