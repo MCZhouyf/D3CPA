@@ -158,6 +158,7 @@ class OpenAIResponsesChatAdapter:
         base_url: Optional[str] = None,
         session: Optional[requests.Session] = None,
         usage_observer: Optional[Callable[[ResponseUsage], None]] = None,
+        metadata_observer: Optional[Callable[[SafeResponseMetadata], None]] = None,
         sleep: Callable[[float], None] = time.sleep,
     ):
         self.profile = profile if profile.profile_id else profile.with_id()
@@ -177,6 +178,7 @@ class OpenAIResponsesChatAdapter:
         self.base_url = (configured_base or "https://api.openai.com/v1").rstrip("/")
         self.session = session or requests.Session()
         self.usage_observer = usage_observer
+        self.metadata_observer = metadata_observer
         self.sleep = sleep
 
     def _request_payload(self, value: Any) -> dict[str, Any]:
@@ -257,6 +259,8 @@ class OpenAIResponsesChatAdapter:
             ),
             usage=usage,
         )
+        if self.metadata_observer is not None:
+            self.metadata_observer(metadata)
         return TextResponseWithMetadata(
             text=extract_output_text(data), metadata=metadata
         )

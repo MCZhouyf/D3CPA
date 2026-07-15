@@ -231,11 +231,13 @@ def _profile_chat_model(
     profile: OpenAIResponsesModelProfile,
     purpose: str,
     trace_writer: JsonlTraceWriter,
+    metadata_observer=None,
 ) -> TracedChatModel:
     adapter = OpenAIResponsesChatAdapter(
         profile=profile,
         purpose=purpose,
         usage_observer=_usage_observer(trace_writer, profile, purpose),
+        metadata_observer=metadata_observer,
     )
     return TracedChatModel(
         adapter,
@@ -373,6 +375,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dry-run-entry-id", default="")
     parser.add_argument("--dry-run-output-root", type=Path)
     parser.add_argument("--dry-run-receipt", type=Path)
+    parser.add_argument("--dry-run-expected-provider-calls", type=int)
+    parser.add_argument(
+        "--dry-run-difficulty",
+        choices=("basic", "easy", "medium", "hard", "complex"),
+        default="",
+    )
     return parser
 
 
@@ -462,6 +470,9 @@ def main(argv: Optional[list[str]] = None) -> int:
     real_experiment_trace_payload = None
     dry_run_campaign = None
     dry_run_entry = None
+    provider_metadata = []
+    effective_environment_seed = None
+    environment_started = False
     if args.real_experiment_blueprint:
         if dry_run_enabled:
             dry_run_campaign = load_campaign(args.dry_run_campaign)
@@ -538,6 +549,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     def write_dry_run_receipt(result=None, exception: Optional[BaseException] = None) -> None:
         if not dry_run_enabled or dry_run_campaign is None or dry_run_entry is None:
             return
+        trace_sha256 = ""
+        if args.trace.exists():
+            from dc3pa.experiments.dry_run import sha256_file
+            trace_sha256 = sha256_file(args.trace)
         receipt = receipt_from_stage6_result(
             campaign=dry_run_campaign,
             entry_id=dry_run_entry.entry_id,
@@ -547,6 +562,21 @@ def main(argv: Optional[list[str]] = None) -> int:
             launch_validation_passed=real_experiment_trace_payload is not None,
             formal_memory_used=False,
             exception=exception,
+            truth_evidence={
+                "requested_seed": args.real_experiment_seed,
+                "effective_seed": effective_environment_seed,
+                "environment_started": environment_started,
+                "requested_model": model_profile.model if model_profile else "",
+                "returned_models": [item.returned_model for item in provider_metadata],
+                "model_profile_id": model_profile.profile_id if model_profile else "",
+                "reasoning_effort": model_profile.reasoning_effort if model_profile else "",
+                "expected_provider_call_count": args.dry_run_expected_provider_calls or 0,
+                "actual_provider_call_count": len(provider_metadata),
+                "dry_run_root_guard_passed": args.dry_run_output_root is not None,
+                "trace_sha256": trace_sha256,
+                "task": dry_run_entry.task,
+                "difficulty": args.dry_run_difficulty,
+            },
         )
         save_receipt(args.dry_run_receipt, receipt)
 
@@ -569,6 +599,10 @@ def main(argv: Optional[list[str]] = None) -> int:
                 answer_model="mllm",
             )
             evaluator = legacy_runner.Evaluator()
+            environment_started = evaluator.env is not None
+            effective_environment_seed = getattr(
+                evaluator, "effective_world_seed", None
+            )
             evaluator.env.reset()
             evaluator.env.set_inventory([])
             initial_result = evaluator.env.step([0, 0, 0, 12, 6, 0, 0, 0])
@@ -629,12 +663,13 @@ def main(argv: Optional[list[str]] = None) -> int:
                     model_profile,
                     "dc3pa_confidence_and_evaluation",
                     trace_writer,
+                    provider_metadata.append,
                 )
                 reflexion.llm = _profile_chat_model(
-                    model_profile, "reflection", trace_writer
+                    model_profile, "reflection", trace_writer, provider_metadata.append
                 )
                 planner_instance.llm = _profile_chat_model(
-                    model_profile, "planning", trace_writer
+                    model_profile, "planning", trace_writer, provider_metadata.append
                 )
             elif hasattr(memory, "llm"):
                 memory.llm = TracedChatModel(

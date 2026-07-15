@@ -1,0 +1,193 @@
+"""Full-environment gate before formal experience acquisition."""
+
+from __future__ import annotations
+import hashlib, json
+from dataclasses import asdict, dataclass, replace
+from pathlib import Path
+from typing import Any, Mapping, Sequence
+from .model_epoch import ModelEpoch
+
+
+def canonical(value: Any) -> bytes:
+    return json.dumps(value, sort_keys=True, ensure_ascii=False,
+                      separators=(",", ":")).encode("utf-8")
+
+
+@dataclass(frozen=True)
+class SeedProviderSmokeReceipt:
+    receipt_id: str
+    task: str
+    difficulty: str
+    requested_seed: str
+    effective_seed: str
+    process_exit_code: int
+    environment_started: bool
+    controller_started: bool
+    requested_model: str
+    returned_models: tuple[str, ...]
+    model_profile_id: str
+    reasoning_effort: str
+    expected_provider_call_count: int
+    actual_provider_call_count: int
+    provider_call_count_matches_expected: bool
+    formal_memory_used: bool
+    technical_failure_count: int
+    dry_run_root_guard_passed: bool
+    trace_sha256: str
+
+    def __post_init__(self):
+        if not self.receipt_id or not self.task or not self.difficulty:
+            raise ValueError("Receipt identity is required")
+        if min(self.expected_provider_call_count,
+               self.actual_provider_call_count,
+               self.technical_failure_count) < 0:
+            raise ValueError("Counts must be nonnegative")
+
+    def to_dict(self):
+        value = asdict(self)
+        value["returned_models"] = list(self.returned_models)
+        return value
+
+
+@dataclass(frozen=True)
+class AcquisitionReadinessReport:
+    blueprint_id: str
+    source_commit: str
+    migration_report_id: str
+    model_epoch_id: str
+    dry_run_audit_sha256: str
+    smoke_receipt_ids: tuple[str, ...]
+    minedojo_marker_passed: bool
+    blueprint_validation_eligible: bool
+    migration_eligible: bool
+    model_epoch_closed_valid: bool
+    dry_run_audit_eligible: bool
+    eligible: bool
+    reasons: tuple[str, ...]
+    schema_version: int = 1
+    readiness_id: str = ""
+
+    def payload(self):
+        value = asdict(self)
+        value.pop("readiness_id", None)
+        value["smoke_receipt_ids"] = list(self.smoke_receipt_ids)
+        value["reasons"] = list(self.reasons)
+        return value
+
+    def compute_id(self):
+        return hashlib.sha256(canonical(self.payload())).hexdigest()
+
+    def with_id(self):
+        return replace(self, readiness_id=self.compute_id())
+
+    def to_dict(self):
+        value = self.payload()
+        value["readiness_id"] = self.readiness_id or self.compute_id()
+        return value
+
+
+def audit_readiness(*, blueprint_id: str, source_commit: str,
+                    migration_report: Mapping[str, Any],
+                    blueprint_validation: Mapping[str, Any],
+                    model_epoch: ModelEpoch,
+                    dry_run_audit: Mapping[str, Any],
+                    dry_run_audit_sha256: str,
+                    smoke_receipts: Sequence[SeedProviderSmokeReceipt],
+                    minedojo_marker_passed: bool,
+                    required_difficulties=("basic", "medium", "complex")
+                    ) -> AcquisitionReadinessReport:
+    reasons = []
+    migration_ok = bool(migration_report.get("eligible", False))
+    blueprint_ok = bool(blueprint_validation.get("eligible", False))
+    dry_ok = bool(dry_run_audit.get("eligible", False))
+    epoch_ok = model_epoch.status == "closed" and not model_epoch.invariant_errors()
+    if not migration_ok:
+        reasons.append("semantic migration is not eligible")
+    if not blueprint_ok:
+        reasons.append("Blueprint validation is not eligible")
+    if not dry_ok:
+        reasons.append("tiny dry-run audit is not eligible")
+    if not epoch_ok:
+        reasons.append("model epoch is not validly closed")
+    if model_epoch.blueprint_id != blueprint_id:
+        reasons.append("model epoch Blueprint mismatch")
+    if model_epoch.source_commit != source_commit:
+        reasons.append("model epoch source commit mismatch")
+    if not minedojo_marker_passed:
+        reasons.append("MineDojo marker gate failed")
+    if not smoke_receipts:
+        reasons.append("no smoke receipts")
+    missing = set(required_difficulties) - {x.difficulty for x in smoke_receipts}
+    if missing:
+        reasons.append(f"missing smoke difficulties: {sorted(missing)}")
+    for item in smoke_receipts:
+        prefix = item.receipt_id
+        if item.process_exit_code != 0:
+            reasons.append(f"{prefix}: nonzero exit")
+        if not item.environment_started or not item.controller_started:
+            reasons.append(f"{prefix}: environment/controller not started")
+        if item.requested_seed != item.effective_seed:
+            reasons.append(f"{prefix}: seed mismatch")
+        if item.requested_model != "gpt-5.1":
+            reasons.append(f"{prefix}: requested model mismatch")
+        if not item.returned_models or set(item.returned_models) != {"gpt-5.1"}:
+            reasons.append(f"{prefix}: returned model mismatch")
+        if item.model_profile_id != model_epoch.model_profile_id:
+            reasons.append(f"{prefix}: profile mismatch")
+        if item.reasoning_effort != "low":
+            reasons.append(f"{prefix}: effort mismatch")
+        if item.expected_provider_call_count != item.actual_provider_call_count or (
+            not item.provider_call_count_matches_expected
+        ):
+            reasons.append(f"{prefix}: provider call mismatch")
+        if item.formal_memory_used:
+            reasons.append(f"{prefix}: formal memory used")
+        if item.technical_failure_count:
+            reasons.append(f"{prefix}: technical failure")
+        if not item.dry_run_root_guard_passed:
+            reasons.append(f"{prefix}: dry-run root guard failed")
+        if not item.trace_sha256:
+            reasons.append(f"{prefix}: trace hash missing")
+    return AcquisitionReadinessReport(
+        blueprint_id=blueprint_id,
+        source_commit=source_commit,
+        migration_report_id=str(migration_report.get("report_id", "")),
+        model_epoch_id=model_epoch.epoch_id,
+        dry_run_audit_sha256=dry_run_audit_sha256,
+        smoke_receipt_ids=tuple(x.receipt_id for x in smoke_receipts),
+        minedojo_marker_passed=minedojo_marker_passed,
+        blueprint_validation_eligible=blueprint_ok,
+        migration_eligible=migration_ok,
+        model_epoch_closed_valid=epoch_ok,
+        dry_run_audit_eligible=dry_ok,
+        eligible=not reasons,
+        reasons=tuple(dict.fromkeys(reasons)),
+    ).with_id()
+
+
+def load_receipt(path: str | Path):
+    value = json.loads(Path(path).read_text(encoding="utf-8"))
+    selected = {
+        "receipt_id": value.get("receipt_id") or value.get("truth_receipt_id", ""),
+        "task": value.get("task", ""),
+        "difficulty": value.get("difficulty", ""),
+        "requested_seed": value.get("requested_seed", ""),
+        "effective_seed": value.get("effective_seed", ""),
+        "process_exit_code": value.get("process_exit_code", 1),
+        "environment_started": value.get("environment_started", False),
+        "controller_started": value.get("controller_started", False),
+        "requested_model": value.get("requested_model", ""),
+        "returned_models": tuple(value.get("returned_models", ())),
+        "model_profile_id": value.get("model_profile_id", ""),
+        "reasoning_effort": value.get("reasoning_effort", ""),
+        "expected_provider_call_count": value.get("expected_provider_call_count", 0),
+        "actual_provider_call_count": value.get("actual_provider_call_count", 0),
+        "provider_call_count_matches_expected": value.get(
+            "provider_call_count_matches_expected", False
+        ),
+        "formal_memory_used": value.get("formal_memory_used", True),
+        "technical_failure_count": value.get("technical_failure_count", 1),
+        "dry_run_root_guard_passed": value.get("dry_run_root_guard_passed", False),
+        "trace_sha256": value.get("trace_sha256", ""),
+    }
+    return SeedProviderSmokeReceipt(**selected)
