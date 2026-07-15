@@ -1,5 +1,19 @@
 from dc3pa.experiments.final_taskset_release import FinalTasksetRelease
-from dc3pa.experiments.preacquisition_gate import audit_preacquisition_gate
+from dataclasses import replace
+from datetime import datetime, timedelta, timezone
+
+import pytest
+
+from dc3pa.experiments.model_epoch import (
+    ProbeObservation,
+    close_epoch,
+    open_epoch,
+)
+from dc3pa.experiments.phase_state import ExperimentPhaseState
+from dc3pa.experiments.preacquisition_gate import (
+    advance_round592_dry_run_phase,
+    audit_preacquisition_gate,
+)
 
 
 def release():
@@ -90,3 +104,74 @@ def test_missing_taskset_binding_fails():
         },
     )
     assert not result.formal_acquisition_permitted
+
+
+def closed_epoch():
+    now = datetime.now(timezone.utc)
+    probe = ProbeObservation(
+        now.isoformat(), "gpt-5.1", "gpt-5.1", "profile", "low",
+        "planning", True, False, False, "endpoint", "client", "probe",
+        1, 1, 0, 2,
+    )
+    opened = open_epoch(
+        epoch_name="dry", blueprint_id="blueprint", source_commit="commit",
+        prompt_hashes={"planner": "hash"}, model_profile_id="profile",
+        client_context_fingerprint="client",
+        endpoint_fingerprint="endpoint", schedule_id="schedule",
+        start_probes=[probe],
+    )
+    return close_epoch(
+        opened,
+        [replace(probe, observed_at=(now + timedelta(hours=1)).isoformat())],
+    )
+
+
+def test_phase_advance_requires_permitted_meta_gate():
+    taskset = release()
+    epoch = closed_epoch()
+    state = ExperimentPhaseState("blueprint", ()).with_id().advance(
+        phase="blueprint_frozen", source_commit="commit"
+    )
+    gate = {
+        "gate_id": "gate", "formal_acquisition_permitted": False,
+        "phase_can_advance": False, "reasons": ["blocked"],
+    }
+    with pytest.raises(ValueError, match="does not permit"):
+        advance_round592_dry_run_phase(
+            state=state, source_commit="commit", gate=gate,
+            readiness={"eligible": True}, model_epoch=epoch,
+            final_taskset=taskset,
+            migration_report={"report_id": "migration"},
+        )
+
+
+def test_phase_advance_binds_all_round592_evidence():
+    taskset = release()
+    epoch = closed_epoch()
+    state = ExperimentPhaseState("blueprint", ()).with_id().advance(
+        phase="blueprint_frozen", source_commit="commit"
+    )
+    gate = {
+        "gate_id": "gate", "formal_acquisition_permitted": True,
+        "phase_can_advance": True, "reasons": [],
+        "source_commit": "commit", "blueprint_id": "blueprint",
+        "acquisition_readiness_id": "readiness",
+        "closed_model_epoch_id": epoch.epoch_id,
+        "final_taskset_release_id": taskset.release_id,
+        "semantic_migration_report_id": "migration",
+    }
+    advanced = advance_round592_dry_run_phase(
+        state=state, source_commit="commit", gate=gate,
+        readiness={
+            "eligible": True, "readiness_id": "readiness",
+            "final_taskset_release_id": taskset.release_id,
+        },
+        model_epoch=epoch, final_taskset=taskset,
+        migration_report={"report_id": "migration"},
+    )
+    artifacts = advanced.records[-1].artifact_ids
+    assert set(artifacts) == {
+        "preacquisition_gate_id", "acquisition_readiness_id",
+        "closed_model_epoch_id", "blueprint_id",
+        "final_taskset_release_id", "semantic_migration_report_id",
+    }

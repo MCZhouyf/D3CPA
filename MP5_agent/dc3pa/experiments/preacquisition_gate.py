@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .final_taskset_release import FinalTasksetRelease
+from .model_epoch import ModelEpoch
+from .phase_state import ExperimentPhaseState
 
 
 SCHEMA_VERSION = 1
@@ -150,3 +152,73 @@ def audit_preacquisition_gate(
         formal_acquisition_permitted=permitted,
         reasons=tuple(dict.fromkeys(reasons)),
     ).with_id()
+
+
+def advance_round592_dry_run_phase(
+    *,
+    state: ExperimentPhaseState,
+    source_commit: str,
+    gate: Mapping[str, Any],
+    readiness: Mapping[str, Any],
+    model_epoch: ModelEpoch,
+    final_taskset: FinalTasksetRelease,
+    migration_report: Mapping[str, Any],
+) -> ExperimentPhaseState:
+    if gate.get("formal_acquisition_permitted") is not True:
+        raise ValueError("Pre-acquisition gate does not permit acquisition")
+    if gate.get("phase_can_advance") is not True or gate.get("reasons"):
+        raise ValueError("Pre-acquisition gate does not permit phase advance")
+    if readiness.get("eligible") is not True:
+        raise ValueError("Acquisition readiness is not eligible")
+    if model_epoch.status != "closed" or model_epoch.invariant_errors():
+        raise ValueError("Model epoch is not validly closed")
+    expected = {
+        "source commit": (
+            gate.get("source_commit"),
+            source_commit,
+        ),
+        "Blueprint": (
+            gate.get("blueprint_id"),
+            state.experiment_id,
+        ),
+        "readiness": (
+            gate.get("acquisition_readiness_id"),
+            readiness.get("readiness_id"),
+        ),
+        "model epoch": (
+            gate.get("closed_model_epoch_id"),
+            model_epoch.epoch_id,
+        ),
+        "final taskset": (
+            gate.get("final_taskset_release_id"),
+            final_taskset.release_id,
+        ),
+        "semantic migration": (
+            gate.get("semantic_migration_report_id"),
+            migration_report.get("report_id"),
+        ),
+    }
+    mismatches = [
+        name for name, (actual, wanted) in expected.items()
+        if actual != wanted
+    ]
+    if mismatches:
+        raise ValueError(
+            "Pre-acquisition evidence mismatch: " + ", ".join(mismatches)
+        )
+    if readiness.get("final_taskset_release_id") != final_taskset.release_id:
+        raise ValueError("Readiness final-taskset mismatch")
+    return state.advance(
+        phase="dry_run_completed",
+        source_commit=source_commit,
+        artifact_ids={
+            "preacquisition_gate_id": str(gate["gate_id"]),
+            "acquisition_readiness_id": str(readiness["readiness_id"]),
+            "closed_model_epoch_id": model_epoch.epoch_id,
+            "blueprint_id": state.experiment_id,
+            "final_taskset_release_id": final_taskset.release_id,
+            "semantic_migration_report_id": str(
+                migration_report["report_id"]
+            ),
+        },
+    )
