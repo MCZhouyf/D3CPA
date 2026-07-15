@@ -2,6 +2,7 @@ from .config import AdaptiveTriggerConfig, DualChainConfig, HybridProbabilityCon
 from .contracts import (
     ConfidenceRequest,
     DimensionScore,
+    FusionEvidence,
     ReliabilityContext,
     ReliabilityResult,
     StrategyWeights,
@@ -14,6 +15,13 @@ from .environment_v2 import (
     EnvironmentShadowStrategy,
     validate_environment_impl,
     validate_environment_scope,
+)
+from .fusion_artifact import FusionArtifact, validate_fusion_impl
+from .fusion_features import FeatureExtractionPolicy, ReliabilityFeatureVector
+from .fusion_model import (
+    LogisticFusionShadowModel,
+    MonotonicLogisticFusion,
+    MonotonicLogisticHybridModel,
 )
 from .factory import build_hybrid_probability_model
 from .hybrid import HybridProbabilityModel, ReliabilityStrategy
@@ -74,6 +82,9 @@ __all__ = [
     "EnvironmentReliabilityStrategyV2",
     "EnvironmentShadowStrategy",
     "ExcludedStep",
+    "FeatureExtractionPolicy",
+    "FusionArtifact",
+    "FusionEvidence",
     "HardGatedHybridProbabilityModel",
     "HybridProbabilityConfig",
     "HybridProbabilityModel",
@@ -84,15 +95,19 @@ __all__ = [
     "KnowledgeReliabilityStrategyV2",
     "KnowledgeShadowStrategy",
     "LinearMemoryWeightPolicy",
+    "LogisticFusionShadowModel",
     "BASE_ORDINAL_MAPPING",
     "MODEL_CONFIDENCE_IMPLS",
     "ModelConfidenceObservation",
+    "MonotonicLogisticFusion",
+    "MonotonicLogisticHybridModel",
     "ORDINAL_LEVELS",
     "OrdinalCalibrationArtifact",
     "OrdinalCalibrationSample",
     "OrdinalConfidenceStrategy",
     "PrerequisiteCheck",
     "ReliabilityContext",
+    "ReliabilityFeatureVector",
     "ReliabilityResult",
     "ReliabilityStrategy",
     "StepCalibrationExample",
@@ -110,4 +125,5 @@ __all__ = [
     "project_inventory",
     "validate_environment_impl",
     "validate_environment_scope",
+    "validate_fusion_impl",
 ]

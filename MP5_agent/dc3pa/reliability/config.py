@@ -7,6 +7,7 @@ from typing import Any, Dict, Mapping
 
 from ..errors import ContractValidationError
 from .environment_v2 import validate_environment_impl, validate_environment_scope
+from .fusion_artifact import validate_fusion_impl
 from .knowledge_v2 import validate_knowledge_impl
 from .ordinal_levels import validate_model_confidence_impl
 
@@ -57,6 +58,12 @@ class HybridProbabilityConfig:
     environment_match_threshold: float = 0.5
     environment_scope: str = "legacy_all_steps"
     environment_allow_legacy_text_fallback: bool = True
+    fusion_impl: str = "legacy_memory_weighted"
+    fusion_artifact_path: str = ""
+    fusion_knowledge_unknown_prior: float = 0.5
+    fusion_environment_unknown_compatibility: float = 0.5
+    fusion_shadow_fail_open: bool = True
+    fusion_memory_snapshot_sha256: str = ""
 
     def validate(self) -> None:
         visual = _finite_number(self.visual_similarity_weight, "visual_similarity_weight")
@@ -67,6 +74,14 @@ class HybridProbabilityConfig:
         )
         match_threshold = _finite_number(
             self.environment_match_threshold, "environment_match_threshold"
+        )
+        knowledge_prior = _finite_number(
+            self.fusion_knowledge_unknown_prior,
+            "fusion_knowledge_unknown_prior",
+        )
+        environment_unknown = _finite_number(
+            self.fusion_environment_unknown_compatibility,
+            "fusion_environment_unknown_compatibility",
         )
         if not 0.0 <= visual <= 1.0:
             raise ContractValidationError("visual_similarity_weight must be in [0, 1]")
@@ -87,9 +102,19 @@ class HybridProbabilityConfig:
             raise ContractValidationError(
                 "environment_allow_legacy_text_fallback must be bool"
             )
+        if not 0.0 <= knowledge_prior <= 1.0:
+            raise ContractValidationError(
+                "fusion_knowledge_unknown_prior must be in [0, 1]"
+            )
+        if not 0.0 <= environment_unknown <= 1.0:
+            raise ContractValidationError(
+                "fusion_environment_unknown_compatibility must be in [0, 1]"
+            )
+        if not isinstance(self.fusion_shadow_fail_open, bool):
+            raise ContractValidationError("fusion_shadow_fail_open must be bool")
         try:
-            validate_environment_impl(self.environment_impl)
-            validate_environment_scope(self.environment_scope)
+            environment_impl = validate_environment_impl(self.environment_impl)
+            environment_scope = validate_environment_scope(self.environment_scope)
         except ValueError as exc:
             raise ContractValidationError(str(exc)) from exc
         if self.model_failure_mode not in {"unavailable", "raise"}:
@@ -97,7 +122,7 @@ class HybridProbabilityConfig:
                 "model_failure_mode must be 'unavailable' or 'raise'"
             )
         try:
-            validate_knowledge_impl(self.knowledge_impl)
+            knowledge_impl = validate_knowledge_impl(self.knowledge_impl)
         except ValueError as exc:
             raise ContractValidationError(str(exc)) from exc
         _positive_int(self.graph_hard_min_support, "graph_hard_min_support")
@@ -120,6 +145,36 @@ class HybridProbabilityConfig:
             raise ContractValidationError(
                 f"{confidence_impl} requires model_confidence_artifact_path"
             )
+        try:
+            fusion_impl = validate_fusion_impl(self.fusion_impl)
+        except ValueError as exc:
+            raise ContractValidationError(str(exc)) from exc
+        if fusion_impl != "legacy_memory_weighted":
+            if not str(self.fusion_artifact_path).strip():
+                raise ContractValidationError(
+                    f"{fusion_impl} requires fusion_artifact_path"
+                )
+        if fusion_impl == "monotonic_logistic_v2":
+            requirements = {
+                "knowledge_impl": (knowledge_impl, "hard_gate_v2"),
+                "model_confidence_impl": (confidence_impl, "ordinal_calibrated"),
+                "environment_impl": (environment_impl, "topk_v2"),
+                "environment_scope": (environment_scope, "current_context_only"),
+            }
+            mismatches = [
+                f"{name}={actual!r} must be {expected!r}"
+                for name, (actual, expected) in requirements.items()
+                if actual != expected
+            ]
+            if mismatches:
+                raise ContractValidationError(
+                    "monotonic_logistic_v2 requires paper V2 settings: "
+                    + "; ".join(mismatches)
+                )
+            if not str(self.fusion_memory_snapshot_sha256).strip():
+                raise ContractValidationError(
+                    "monotonic_logistic_v2 requires fusion_memory_snapshot_sha256"
+                )
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> "HybridProbabilityConfig":

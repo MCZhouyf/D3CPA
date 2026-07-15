@@ -8,6 +8,13 @@ from .environment_v2 import (
     EnvironmentShadowStrategy,
     validate_environment_impl,
 )
+from .fusion_artifact import load_fusion_artifact, validate_fusion_impl
+from .fusion_features import FeatureExtractionPolicy
+from .fusion_model import (
+    LogisticFusionShadowModel,
+    MonotonicLogisticFusion,
+    MonotonicLogisticHybridModel,
+)
 from .hybrid import HybridProbabilityModel
 from .knowledge import KnowledgeReliabilityStrategy
 from .knowledge_v2 import (
@@ -109,7 +116,7 @@ def build_hybrid_probability_model(
         else:
             environment = candidate_environment
 
-    return model_class(
+    legacy_model = model_class(
         knowledge=knowledge,
         model=model_strategy,
         environment=environment,
@@ -118,4 +125,49 @@ def build_hybrid_probability_model(
             memory_weight_growth=config.memory_weight_growth,
         ),
         memory_counter=memory,
+    )
+
+    fusion_impl = validate_fusion_impl(config.fusion_impl)
+    if fusion_impl == "legacy_memory_weighted":
+        return legacy_model
+
+    fusion_artifact = load_fusion_artifact(config.fusion_artifact_path)
+    confidence_artifact_id = artifact.artifact_id if artifact is not None else ""
+    memory_snapshot_sha256 = (
+        str(config.fusion_memory_snapshot_sha256).strip()
+        or fusion_artifact.memory_snapshot_sha256
+    )
+    fusion_artifact.validate_runtime(
+        knowledge_impl=knowledge_impl,
+        model_confidence_impl=confidence_impl,
+        environment_impl=environment_impl,
+        environment_scope=config.environment_scope,
+        memory_snapshot_sha256=memory_snapshot_sha256,
+        confidence_artifact_id=confidence_artifact_id,
+    )
+    fusion = MonotonicLogisticFusion(
+        fusion_artifact,
+        policy=FeatureExtractionPolicy(
+            knowledge_unknown_prior=config.fusion_knowledge_unknown_prior,
+            environment_unknown_compatibility=(
+                config.fusion_environment_unknown_compatibility
+            ),
+            require_calibrated_model=True,
+            require_environment_v2=True,
+            exclude_technical_environment=True,
+            exclude_unavailable_model=True,
+        ),
+    )
+    if fusion_impl == "monotonic_logistic_shadow":
+        return LogisticFusionShadowModel(
+            legacy_model,
+            fusion,
+            fail_open=config.fusion_shadow_fail_open,
+            attach_to_result=True,
+        )
+    return MonotonicLogisticHybridModel(
+        knowledge=knowledge,
+        model=model_strategy,
+        environment=environment,
+        fusion=fusion,
     )

@@ -1,0 +1,12 @@
+{
+  "hybrid_probability": {
+    "knowledge_impl": "hard_gate_v2",
+    "model_confidence_impl": "ordinal_calibrated",
+    "environment_impl": "topk_v2",
+    "environment_scope": "current_context_only",
+    "fusion_impl": "monotonic_logistic_v2",
+    "fusion_artifact_path": "artifacts/fusion/fusion_artifact.json",
+    "fusion_knowledge_unknown_prior": 0.5,
+    "fusion_environment_unknown_compatibility": 0.5
+  }
+}
