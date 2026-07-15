@@ -83,3 +83,25 @@ def test_diamond_keeps_supported_extra_spawn_kwargs(monkeypatch, tmp_path):
     assert captured["spawn_rate"] == 1
     assert captured["spawn_range_low"] == (-10, -10, -10)
     assert captured["spawn_range_high"] == (10, 10, 10)
+
+
+@pytest.mark.parametrize(
+    ("task_name", "harvest_target"),
+    (("coal ore", "coal"), ("iron ore", "iron_ingot")),
+)
+def test_ore_display_names_use_minedojo_harvest_targets(
+    monkeypatch, tmp_path, task_name, harvest_target
+):
+    module = _load_run_agent(monkeypatch, tmp_path, task_name)
+    captured = {}
+
+    def fake_make(**kwargs):
+        captured.update(kwargs)
+        return object()
+
+    monkeypatch.setattr(module.minedojo, "make", fake_make)
+    evaluator = module.Evaluator()
+
+    assert evaluator.task_target_name == task_name
+    assert captured["target_names"] == harvest_target
+    assert captured["spawn_rate"] == 1

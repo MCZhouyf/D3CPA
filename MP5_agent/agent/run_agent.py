@@ -34,6 +34,8 @@ MINE_DOJO_TARGET_TO_SPAWN_ITEM = {
     "gold ore": "gold_ore",
     "iron ore": "iron_ore",
     "coal ore": "coal_ore",
+    "iron_ingot": "iron_ore",
+    "coal": "coal_ore",
     "pig": "pig",
     "cow": "cow",
     "bat": "bat",
@@ -103,6 +105,11 @@ class Evaluator:
         # MineDojo's harvest meta task crashes for redstone here; MP5 still checks redstone itself.
         if task_target_name == "redstone":
             return "diamond"
+        # Harvest names these goals by their drops, then spawns the matching ore blocks.
+        if task_target_name == "coal ore":
+            return "coal"
+        if task_target_name == "iron ore":
+            return "iron_ingot"
         return task_target_name
 
     def _extra_spawn_kwargs(self, env_target_name):
