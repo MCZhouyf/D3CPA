@@ -8,6 +8,8 @@ from .openai_responses import (
     AdapterMessage,
     OpenAIResponsesChatAdapter,
     ResponseUsage,
+    SafeResponseMetadata,
+    TextResponseWithMetadata,
     extract_output_text,
     normalize_input,
 )
@@ -18,6 +20,8 @@ __all__ = [
     "OpenAIResponsesChatAdapter",
     "OpenAIResponsesModelProfile",
     "ResponseUsage",
+    "SafeResponseMetadata",
+    "TextResponseWithMetadata",
     "extract_output_text",
     "normalize_input",
 ]

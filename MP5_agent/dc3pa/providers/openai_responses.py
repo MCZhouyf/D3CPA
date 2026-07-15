@@ -8,10 +8,12 @@ used by the legacy Planner/Reflexion and DC3PA reliability chains.
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import random
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Callable, Mapping, Optional, Sequence
 
 import requests
@@ -33,6 +35,27 @@ class ResponseUsage:
     output_tokens: int = 0
     reasoning_tokens: int = 0
     total_tokens: int = 0
+
+
+@dataclass(frozen=True)
+class SafeResponseMetadata:
+    requested_model: str
+    returned_model: str
+    profile_id: str
+    reasoning_effort: str
+    purpose: str
+    request_started_at: str
+    request_duration_seconds: float
+    response_id_sha256: str
+    usage: ResponseUsage
+    request_text_logged: bool = False
+    response_text_logged: bool = False
+
+
+@dataclass(frozen=True)
+class TextResponseWithMetadata:
+    text: str
+    metadata: SafeResponseMetadata
 
 
 def _role_name(message: Any) -> str:
@@ -209,11 +232,34 @@ class OpenAIResponsesChatAdapter:
         ) from last_error
 
     def invoke(self, value: Any, **_: Any) -> AdapterMessage:
+        return AdapterMessage(content=self.invoke_with_metadata(value).text)
+
+    def invoke_with_metadata(self, value: Any) -> TextResponseWithMetadata:
+        started_at = datetime.now(timezone.utc).isoformat()
+        started = time.monotonic()
         data = self._post(value)
+        duration = time.monotonic() - started
         usage = parse_usage(data)
         if self.usage_observer is not None:
             self.usage_observer(usage)
-        return AdapterMessage(content=extract_output_text(data))
+        response_id = str(data.get("id", ""))
+        metadata = SafeResponseMetadata(
+            requested_model=self.profile.model,
+            returned_model=str(data.get("model", "")),
+            profile_id=self.profile.profile_id,
+            reasoning_effort=self.profile.reasoning_effort,
+            purpose=self.purpose,
+            request_started_at=started_at,
+            request_duration_seconds=duration,
+            response_id_sha256=(
+                hashlib.sha256(response_id.encode("utf-8")).hexdigest()
+                if response_id else ""
+            ),
+            usage=usage,
+        )
+        return TextResponseWithMetadata(
+            text=extract_output_text(data), metadata=metadata
+        )
 
     def predict(self, text: str, **kwargs: Any) -> str:
         return self.invoke(text, **kwargs).content

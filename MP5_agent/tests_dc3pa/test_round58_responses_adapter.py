@@ -25,6 +25,7 @@ class _Response:
 
     def json(self):
         return {
+            "id": "response-id",
             "model": "gpt-5.1",
             "output": [
                 {
@@ -94,6 +95,11 @@ def test_adapter_sends_responses_request_without_sampling_or_prompt_logging():
     assert "temperature" not in payload
     assert "top_p" not in payload
     assert usage[0].reasoning_tokens == 2
+    result = adapter.invoke_with_metadata("hello")
+    assert result.metadata.returned_model == "gpt-5.1"
+    assert result.metadata.response_id_sha256
+    assert result.metadata.request_text_logged is False
+    assert result.metadata.response_text_logged is False
 
 
 def test_adapter_accepts_langchain_messages_invoke_and_call_interfaces():
