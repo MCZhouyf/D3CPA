@@ -16,6 +16,7 @@ TESTS = [
     "tests_dc3pa/test_round592_final_taskset_release.py",
     "tests_dc3pa/test_round592_command_evidence.py",
     "tests_dc3pa/test_round592_preacquisition_gate.py",
+    "tests_dc3pa/test_round592_approval.py",
 ]
 
 
