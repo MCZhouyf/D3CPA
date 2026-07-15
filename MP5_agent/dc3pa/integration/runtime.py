@@ -13,7 +13,8 @@ from ..memory.modes import MemoryMode
 from ..memory.multimodal_memory import SceneObservation, SuccessfulEpisode
 from ..memory.snapshot import MemorySnapshotManifest, SnapshotGuard
 from ..observability.trace import JsonlTraceWriter
-from ..reliability import ReliabilityContext
+from ..reliability import DimensionScore, ReliabilityContext
+from ..reliability.confidence_observation import ConfidenceObservationCollector
 from .events import AttemptRecord, RuntimeEvent, TaskRunResult, sanitize_for_trace
 from .round11_persistence import (
     commit_calibration_episode,
@@ -76,6 +77,18 @@ class MultimodalMemorySink(Protocol):
         ...
 
 
+@runtime_checkable
+class PassiveConfidenceScorer(Protocol):
+    def score(
+        self,
+        plan: Plan,
+        step_index: int,
+        state: AgentState,
+        context: Optional[ReliabilityContext] = None,
+    ) -> DimensionScore:
+        ...
+
+
 @dataclass(frozen=True)
 class _PlanningDecision:
     plan: Optional[Plan]
@@ -110,6 +123,8 @@ class Stage6ClosedLoopRunner:
         multimodal_memory_sink: Optional[MultimodalMemorySink] = None,
         acquisition_store: Optional[AcquisitionStore] = None,
         calibration_store: Optional[CalibrationEpisodeStore] = None,
+        confidence_observer: Optional[ConfidenceObservationCollector] = None,
+        passive_confidence_scorer: Optional[PassiveConfidenceScorer] = None,
         trace_writer: Optional[JsonlTraceWriter] = None,
     ):
         config.validate()
@@ -130,8 +145,20 @@ class Stage6ClosedLoopRunner:
         self.multimodal_memory_sink = multimodal_memory_sink
         self.acquisition_store = acquisition_store
         self.calibration_store = calibration_store
+        self.confidence_observer = confidence_observer
+        self.passive_confidence_scorer = passive_confidence_scorer
         self.trace_writer = trace_writer
         self.memory_mode = MemoryMode.parse(config.memory_mode)
+        if config.model_confidence_collection == "passive_final_plan":
+            if calibration_store is None:
+                raise ValueError(
+                    "passive_final_plan confidence collection requires calibration_store"
+                )
+            if confidence_observer is None or passive_confidence_scorer is None:
+                raise ValueError(
+                    "passive_final_plan confidence collection requires an observation "
+                    "collector and passive scorer"
+                )
 
     def _emit(
         self,
@@ -513,6 +540,7 @@ class Stage6ClosedLoopRunner:
         episode_id: str,
         success: bool,
         failure_reason: str,
+        confidence_observations: Tuple[Mapping[str, Any], ...] = (),
         attempt: int,
         events: list[RuntimeEvent],
     ) -> bool:
@@ -530,6 +558,7 @@ class Stage6ClosedLoopRunner:
             failure_reason=failure_reason,
             attempt=attempt,
             mode=self.config.mode,
+            confidence_observations=confidence_observations,
         )
         self._emit(
             events,
@@ -543,6 +572,51 @@ class Stage6ClosedLoopRunner:
             },
         )
         return True
+
+    def _collect_passive_final_plan_confidence(
+        self,
+        *,
+        plan: Plan,
+        state: AgentState,
+        context: ReliabilityContext,
+        attempt: int,
+        events: list[RuntimeEvent],
+    ) -> None:
+        if self.config.model_confidence_collection != "passive_final_plan":
+            return
+        assert self.confidence_observer is not None
+        assert self.passive_confidence_scorer is not None
+        self.confidence_observer.clear()
+        for step_index, _step in enumerate(plan.steps):
+            try:
+                self.passive_confidence_scorer.score(plan, step_index, state, context)
+            except Exception as exc:
+                self._emit(
+                    events,
+                    "passive_confidence_collection_failed",
+                    attempt,
+                    {
+                        "plan_id": plan.plan_id,
+                        "plan_version": plan.version,
+                        "step_index": step_index,
+                        "error_type": type(exc).__name__,
+                        "error": str(exc),
+                    },
+                )
+                continue
+        self._emit(
+            events,
+            "passive_confidence_collected",
+            attempt,
+            {
+                "plan_id": plan.plan_id,
+                "plan_version": plan.version,
+                "step_count": len(plan.steps),
+                "observation_count": len(
+                    self.confidence_observer.for_plan(plan.plan_id, plan.version)
+                ),
+            },
+        )
 
     def _reflect(
         self,
@@ -717,6 +791,7 @@ class Stage6ClosedLoopRunner:
 
             plan = decision.plan
             final_plan = plan
+            reliability_context = self._cognitive_context(planning_context, initial_snapshot)
             self._emit(
                 events,
                 "plan_ready_for_controller",
@@ -729,6 +804,14 @@ class Stage6ClosedLoopRunner:
                     "fallback_used": decision.fallback_used,
                     "unsafe_unresolved_execution": decision.unsafe_unresolved_execution,
                 },
+            )
+            episode_id = new_episode_id(task, attempt_index)
+            self._collect_passive_final_plan_confidence(
+                plan=plan,
+                state=initial_snapshot.state,
+                context=reliability_context,
+                attempt=attempt_index,
+                events=events,
             )
             controller_executions += 1
             try:
@@ -776,7 +859,16 @@ class Stage6ClosedLoopRunner:
                     else "controller_reported_failure"
                 )
             )
-            episode_id = new_episode_id(task, attempt_index)
+            confidence_observations: Tuple[Mapping[str, Any], ...] = ()
+            if self.confidence_observer is not None:
+                confidence_observations = tuple(
+                    item.to_dict()
+                    for item in self.confidence_observer.drain_for_execution(
+                        plan_id=plan.plan_id,
+                        plan_version=plan.version,
+                        episode_id=episode_id,
+                    )
+                )
             self._emit(
                 events,
                 "controller_completed",
@@ -798,6 +890,7 @@ class Stage6ClosedLoopRunner:
                 episode_id=episode_id,
                 success=goal_success,
                 failure_reason=attempt_failure_reason,
+                confidence_observations=confidence_observations,
                 attempt=attempt_index,
                 events=events,
             )

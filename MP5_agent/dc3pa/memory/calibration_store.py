@@ -43,6 +43,7 @@ class CalibrationEpisodeRecord:
     success: bool
     plan: Dict[str, Any]
     telemetry: Tuple[Dict[str, Any], ...]
+    confidence_observations: Tuple[Dict[str, Any], ...] = ()
     failure_reason: str = ""
     metadata: Dict[str, Any] = field(default_factory=dict)
 
@@ -50,7 +51,7 @@ class CalibrationEpisodeRecord:
 class CalibrationEpisodeStore:
     """Atomic one-file-per-episode calibration log."""
 
-    SCHEMA_VERSION = 1
+    SCHEMA_VERSION = 2
 
     def __init__(self, root: str | Path) -> None:
         self.root = Path(root)
@@ -98,7 +99,14 @@ class CalibrationEpisodeStore:
     def iter_payloads(self) -> Iterable[Dict[str, Any]]:
         for path in sorted(self.episodes_dir.glob("*.json")):
             payload = json.loads(path.read_text(encoding="utf-8"))
-            if payload.get("schema_version") != self.SCHEMA_VERSION:
+            schema_version = payload.get("schema_version")
+            if schema_version == 1:
+                record = payload.get("record", {})
+                if isinstance(record, dict):
+                    record.setdefault("confidence_observations", ())
+                yield payload
+                continue
+            if schema_version != self.SCHEMA_VERSION:
                 raise ValueError(f"unsupported calibration schema: {path}")
             yield payload
 

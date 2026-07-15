@@ -14,6 +14,7 @@ _UNRESOLVED_POLICIES = {"block", "reasoning_only", "execute"}
 _PLANNER_FAILURE_POLICIES = {"raise", "reasoning_only", "return_failure"}
 _CONTROLLER_EXCEPTION_POLICIES = {"raise", "return_failure"}
 _MEMORY_FAILURE_POLICIES = {"raise", "trace"}
+_MODEL_CONFIDENCE_COLLECTION = {"disabled", "passive_final_plan"}
 
 
 def _strict_bool(value: Any, label: str) -> bool:
@@ -54,6 +55,7 @@ class Stage6RuntimeConfig:
     acquisition_log_dir: str = ""
     calibration_log_dir: str = ""
     memory_snapshot_manifest: str = ""
+    model_confidence_collection: str = "disabled"
 
     def validate(self) -> None:
         if self.mode not in _RUNTIME_MODES:
@@ -80,6 +82,10 @@ class Stage6RuntimeConfig:
         if self.memory_failure_policy not in _MEMORY_FAILURE_POLICIES:
             raise ContractValidationError(
                 "memory_failure_policy must be 'raise' or 'trace'"
+            )
+        if self.model_confidence_collection not in _MODEL_CONFIDENCE_COLLECTION:
+            raise ContractValidationError(
+                "model_confidence_collection must be 'disabled' or 'passive_final_plan'"
             )
 
         for label in (

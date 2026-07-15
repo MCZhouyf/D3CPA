@@ -127,6 +127,7 @@ def commit_calibration_episode(
     failure_reason: str,
     attempt: int,
     mode: str,
+    confidence_observations: Sequence[Mapping[str, Any]] = (),
 ) -> str:
     """Persist a success or failure for later step-label construction."""
 
@@ -140,6 +141,7 @@ def commit_calibration_episode(
         success=bool(success),
         plan=plan.to_dict(),
         telemetry=telemetry,
+        confidence_observations=tuple(dict(item) for item in confidence_observations),
         failure_reason=str(failure_reason or ""),
         metadata={"stage": 6, "mode": mode, "attempt": int(attempt)},
     )
