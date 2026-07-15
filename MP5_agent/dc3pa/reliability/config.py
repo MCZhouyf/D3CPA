@@ -64,6 +64,8 @@ class HybridProbabilityConfig:
     fusion_environment_unknown_compatibility: float = 0.5
     fusion_shadow_fail_open: bool = True
     fusion_memory_snapshot_sha256: str = ""
+    fusion_paper_release_path: str = ""
+    fusion_holdout_report_path: str = ""
 
     def validate(self) -> None:
         visual = _finite_number(self.visual_similarity_weight, "visual_similarity_weight")
@@ -174,6 +176,15 @@ class HybridProbabilityConfig:
             if not str(self.fusion_memory_snapshot_sha256).strip():
                 raise ContractValidationError(
                     "monotonic_logistic_v2 requires fusion_memory_snapshot_sha256"
+                )
+        if str(self.fusion_paper_release_path).strip():
+            if fusion_impl != "monotonic_logistic_v2":
+                raise ContractValidationError(
+                    "fusion_paper_release_path is only valid for monotonic_logistic_v2"
+                )
+            if not str(self.fusion_holdout_report_path).strip():
+                raise ContractValidationError(
+                    "fusion_paper_release_path requires fusion_holdout_report_path"
                 )
 
     @classmethod

@@ -28,6 +28,9 @@ from .model import ConfidenceProvider, VerbalConfidenceStrategy
 from .ordinal_calibration import OrdinalCalibrationArtifact
 from .ordinal_confidence import OrdinalConfidenceStrategy
 from .ordinal_levels import validate_model_confidence_impl
+from .development_protocol import sha256_file
+from .holdout_evaluation import load_holdout_report
+from .paper_release import load_paper_release
 from .weights import LinearMemoryWeightPolicy
 
 
@@ -145,6 +148,27 @@ def build_hybrid_probability_model(
         memory_snapshot_sha256=memory_snapshot_sha256,
         confidence_artifact_id=confidence_artifact_id,
     )
+    if str(config.fusion_paper_release_path).strip():
+        release = load_paper_release(config.fusion_paper_release_path)
+        report = load_holdout_report(config.fusion_holdout_report_path)
+        artifact_id = fusion_artifact.artifact_id or fusion_artifact.compute_artifact_id()
+        report_id = report.report_id or report.compute_report_id()
+        if sha256_file(config.fusion_artifact_path) != release.fusion_artifact_sha256:
+            raise ValueError("Paper release fusion artifact file hash mismatch")
+        if sha256_file(config.fusion_holdout_report_path) != release.holdout_report_sha256:
+            raise ValueError("Paper release holdout report file hash mismatch")
+        release.validate_runtime(
+            fusion_artifact_id=artifact_id,
+            holdout_report_id=report_id,
+            memory_snapshot_sha256=memory_snapshot_sha256,
+            confidence_artifact_id=confidence_artifact_id,
+            environment_parameters={
+                "top_k": config.environment_top_k,
+                "text_threshold": config.environment_text_threshold,
+                "match_threshold": config.environment_match_threshold,
+                "scope": config.environment_scope,
+            },
+        )
     fusion = MonotonicLogisticFusion(
         fusion_artifact,
         policy=FeatureExtractionPolicy(
