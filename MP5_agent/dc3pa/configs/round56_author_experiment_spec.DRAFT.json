@@ -1,0 +1,31 @@
+{
+  "draft_only": true,
+  "blueprint_name": "REPLACE_WITH_AUTHOR_APPROVED_NAME",
+  "profile": "paper_minecraft_50",
+  "source_commit": "0547b67d950e844c32aa0019cf40c3927812f8a5",
+  "collector_mode": "single_chain_reactive",
+  "collector_reads_growing_scene_memory": true,
+  "controller_profile": "REPLACE_WITH_MATCHED_CONTROLLER_PROFILE",
+  "planner_model_id": "REPLACE_WITH_EXACT_MODEL_AND_VERSION",
+  "confidence_model_id": "REPLACE_WITH_EXACT_MODEL_AND_VERSION",
+  "prompt_hashes": {
+    "planner": "REPLACE",
+    "confidence": "REPLACE",
+    "evaluation": "REPLACE"
+  },
+  "environment_search_space": {
+    "top_k_values": [],
+    "text_threshold_values": [],
+    "match_threshold_values": [],
+    "environment_scope": "current_context_only"
+  },
+  "acquisition_assignments": [],
+  "development_assignments": [],
+  "phase_budgets": [],
+  "author_approval": {
+    "approval_record_id": "REPLACE_AFTER_AUTHOR_REVIEW",
+    "approved_at": "REPLACE",
+    "approved_blueprint_content_sha256": ""
+  },
+  "notes": "DRAFT ONLY. Fill external final-test, activation, and sufficiency files; print content SHA; obtain author approval; then freeze."
+}
