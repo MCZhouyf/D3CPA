@@ -30,6 +30,7 @@ from .ordinal_confidence import OrdinalConfidenceStrategy
 from .ordinal_levels import validate_model_confidence_impl
 from .development_protocol import sha256_file
 from .holdout_evaluation import load_holdout_report
+from .holdout_lock import load_holdout_lock
 from .paper_release import load_paper_release
 from .weights import LinearMemoryWeightPolicy
 
@@ -151,12 +152,19 @@ def build_hybrid_probability_model(
     if str(config.fusion_paper_release_path).strip():
         release = load_paper_release(config.fusion_paper_release_path)
         report = load_holdout_report(config.fusion_holdout_report_path)
+        lock = load_holdout_lock(config.fusion_holdout_lock_path)
         artifact_id = fusion_artifact.artifact_id or fusion_artifact.compute_artifact_id()
         report_id = report.report_id or report.compute_report_id()
         if sha256_file(config.fusion_artifact_path) != release.fusion_artifact_sha256:
             raise ValueError("Paper release fusion artifact file hash mismatch")
         if sha256_file(config.fusion_holdout_report_path) != release.holdout_report_sha256:
             raise ValueError("Paper release holdout report file hash mismatch")
+        if lock.lock_id != release.holdout_lock_id:
+            raise ValueError("Paper release holdout lock ID mismatch")
+        if sha256_file(config.fusion_attempt_ledger_path) != (
+            release.holdout_attempt_ledger_sha256
+        ):
+            raise ValueError("Paper release holdout attempt ledger hash mismatch")
         release.validate_runtime(
             fusion_artifact_id=artifact_id,
             holdout_report_id=report_id,
@@ -168,6 +176,13 @@ def build_hybrid_probability_model(
                 "match_threshold": config.environment_match_threshold,
                 "scope": config.environment_scope,
             },
+            final_test_exclusion_id=config.fusion_final_test_exclusion_id,
+            holdout_lock_id=lock.lock_id,
+            holdout_attempt_ledger_sha256=sha256_file(
+                config.fusion_attempt_ledger_path
+            ),
+            environment_parameter_sha256=config.fusion_environment_parameter_sha256,
+            source_commit=config.fusion_source_commit,
         )
     fusion = MonotonicLogisticFusion(
         fusion_artifact,

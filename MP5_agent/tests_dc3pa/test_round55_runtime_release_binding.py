@@ -15,6 +15,7 @@ from dc3pa.reliability.fusion_artifact import FusionArtifact
 from dc3pa.reliability.fusion_features import FEATURE_SCHEMA_VERSION
 from dc3pa.reliability.fusion_model import MonotonicLogisticHybridModel
 from dc3pa.reliability.holdout_evaluation import HoldoutActivationReport
+from dc3pa.reliability.holdout_lock import HoldoutLockManifest
 from dc3pa.reliability.ordinal_calibration import OrdinalCalibrationArtifact
 from dc3pa.reliability.ordinal_confidence import ordinal_prompt_template_sha256
 from dc3pa.reliability.paper_release import PaperFusionRelease
@@ -34,6 +35,10 @@ def _release():
         environment_parameters={"top_k": 3, "text_threshold": 0.5},
         source_commit="commit",
         eligible=True,
+        final_test_exclusion_id="exclusion",
+        holdout_lock_id="lock",
+        holdout_attempt_ledger_sha256="ledger-sha",
+        environment_parameter_sha256="environment-sha",
     ).with_id()
 
 
@@ -141,7 +146,39 @@ def _holdout_report(path, artifact):
     return report
 
 
-def _paper_release(path, *, artifact_path, report_path, artifact, report):
+def _holdout_lock(path, *, artifact_path, artifact):
+    lock = HoldoutLockManifest(
+        lock_name="lock",
+        holdout_dataset_sha256="dataset-sha",
+        development_protocol_id="protocol",
+        activation_policy_id="policy",
+        fusion_artifact_id=artifact.artifact_id,
+        fusion_artifact_sha256=sha256_file(artifact_path),
+        final_test_exclusion_id="exclusion",
+        collection_manifest_id="collection",
+        memory_snapshot_sha256="memory-hash",
+        confidence_artifact_id="confidence-artifact",
+        environment_parameter_sha256="environment-sha",
+        source_commit="commit",
+        created_at="2026-07-15T00:00:00+00:00",
+    ).with_id()
+    path.write_text(
+        json.dumps(lock.to_dict(), sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return lock
+
+
+def _paper_release(
+    path,
+    *,
+    artifact_path,
+    report_path,
+    ledger_path,
+    artifact,
+    report,
+    lock,
+):
     release = PaperFusionRelease(
         release_name="paper",
         fusion_artifact_id=artifact.artifact_id,
@@ -160,6 +197,10 @@ def _paper_release(path, *, artifact_path, report_path, artifact, report):
         },
         source_commit="commit",
         eligible=True,
+        final_test_exclusion_id="exclusion",
+        holdout_lock_id=lock.lock_id,
+        holdout_attempt_ledger_sha256=sha256_file(ledger_path),
+        environment_parameter_sha256="environment-sha",
     ).with_id()
     path.write_text(
         json.dumps(release.to_dict(), sort_keys=True) + "\n",
@@ -168,7 +209,15 @@ def _paper_release(path, *, artifact_path, report_path, artifact, report):
     return release
 
 
-def _paper_config(confidence_path, fusion_path, release_path, report_path, **updates):
+def _paper_config(
+    confidence_path,
+    fusion_path,
+    release_path,
+    report_path,
+    lock_path,
+    ledger_path,
+    **updates,
+):
     payload = dict(
         knowledge_impl="hard_gate_v2",
         model_confidence_impl="ordinal_calibrated",
@@ -181,6 +230,11 @@ def _paper_config(confidence_path, fusion_path, release_path, report_path, **upd
         fusion_memory_snapshot_sha256="memory-hash",
         fusion_paper_release_path=str(release_path),
         fusion_holdout_report_path=str(report_path),
+        fusion_holdout_lock_path=str(lock_path),
+        fusion_attempt_ledger_path=str(ledger_path),
+        fusion_final_test_exclusion_id="exclusion",
+        fusion_environment_parameter_sha256="environment-sha",
+        fusion_source_commit="commit",
     )
     payload.update(updates)
     return HybridProbabilityConfig(**payload)
@@ -190,23 +244,36 @@ def test_factory_accepts_eligible_release_binding(tmp_path):
     confidence_path = tmp_path / "confidence.json"
     fusion_path = tmp_path / "fusion.json"
     report_path = tmp_path / "holdout.json"
+    lock_path = tmp_path / "lock.json"
+    ledger_path = tmp_path / "attempt.json"
     release_path = tmp_path / "release.json"
     _ordinal_artifact(confidence_path)
     artifact = _fusion_artifact(fusion_path)
     report = _holdout_report(report_path, artifact)
+    ledger_path.write_text('{"status":"completed"}\n', encoding="utf-8")
+    lock = _holdout_lock(lock_path, artifact_path=fusion_path, artifact=artifact)
     _paper_release(
         release_path,
         artifact_path=fusion_path,
         report_path=report_path,
+        ledger_path=ledger_path,
         artifact=artifact,
         report=report,
+        lock=lock,
     )
 
     with MultimodalMemory(tmp_path / "memory") as memory:
         model = build_hybrid_probability_model(
             memory,
             CallableConfidenceProvider(lambda request: {"confidence_level": "likely"}),
-            _paper_config(confidence_path, fusion_path, release_path, report_path),
+            _paper_config(
+                confidence_path,
+                fusion_path,
+                release_path,
+                report_path,
+                lock_path,
+                ledger_path,
+            ),
         )
 
     assert isinstance(model, MonotonicLogisticHybridModel)
@@ -216,16 +283,22 @@ def test_factory_rejects_paper_release_environment_mismatch(tmp_path):
     confidence_path = tmp_path / "confidence.json"
     fusion_path = tmp_path / "fusion.json"
     report_path = tmp_path / "holdout.json"
+    lock_path = tmp_path / "lock.json"
+    ledger_path = tmp_path / "attempt.json"
     release_path = tmp_path / "release.json"
     _ordinal_artifact(confidence_path)
     artifact = _fusion_artifact(fusion_path)
     report = _holdout_report(report_path, artifact)
+    ledger_path.write_text('{"status":"completed"}\n', encoding="utf-8")
+    lock = _holdout_lock(lock_path, artifact_path=fusion_path, artifact=artifact)
     _paper_release(
         release_path,
         artifact_path=fusion_path,
         report_path=report_path,
+        ledger_path=ledger_path,
         artifact=artifact,
         report=report,
+        lock=lock,
     )
 
     with MultimodalMemory(tmp_path / "memory") as memory:
@@ -240,6 +313,49 @@ def test_factory_rejects_paper_release_environment_mismatch(tmp_path):
                     fusion_path,
                     release_path,
                     report_path,
+                    lock_path,
+                    ledger_path,
                     environment_text_threshold=0.6,
+                ),
+            )
+
+
+def test_factory_rejects_attempt_ledger_hash_mismatch(tmp_path):
+    confidence_path = tmp_path / "confidence.json"
+    fusion_path = tmp_path / "fusion.json"
+    report_path = tmp_path / "holdout.json"
+    lock_path = tmp_path / "lock.json"
+    ledger_path = tmp_path / "attempt.json"
+    release_path = tmp_path / "release.json"
+    _ordinal_artifact(confidence_path)
+    artifact = _fusion_artifact(fusion_path)
+    report = _holdout_report(report_path, artifact)
+    ledger_path.write_text('{"status":"completed"}\n', encoding="utf-8")
+    lock = _holdout_lock(lock_path, artifact_path=fusion_path, artifact=artifact)
+    _paper_release(
+        release_path,
+        artifact_path=fusion_path,
+        report_path=report_path,
+        ledger_path=ledger_path,
+        artifact=artifact,
+        report=report,
+        lock=lock,
+    )
+    ledger_path.write_text('{"status":"tampered"}\n', encoding="utf-8")
+
+    with MultimodalMemory(tmp_path / "memory") as memory:
+        with pytest.raises(ValueError, match="attempt ledger hash mismatch"):
+            build_hybrid_probability_model(
+                memory,
+                CallableConfidenceProvider(
+                    lambda request: {"confidence_level": "likely"}
+                ),
+                _paper_config(
+                    confidence_path,
+                    fusion_path,
+                    release_path,
+                    report_path,
+                    lock_path,
+                    ledger_path,
                 ),
             )

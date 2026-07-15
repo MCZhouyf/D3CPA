@@ -66,6 +66,11 @@ class HybridProbabilityConfig:
     fusion_memory_snapshot_sha256: str = ""
     fusion_paper_release_path: str = ""
     fusion_holdout_report_path: str = ""
+    fusion_holdout_lock_path: str = ""
+    fusion_attempt_ledger_path: str = ""
+    fusion_final_test_exclusion_id: str = ""
+    fusion_environment_parameter_sha256: str = ""
+    fusion_source_commit: str = ""
 
     def validate(self) -> None:
         visual = _finite_number(self.visual_similarity_weight, "visual_similarity_weight")
@@ -185,6 +190,21 @@ class HybridProbabilityConfig:
             if not str(self.fusion_holdout_report_path).strip():
                 raise ContractValidationError(
                     "fusion_paper_release_path requires fusion_holdout_report_path"
+                )
+            missing = [
+                name
+                for name in (
+                    "fusion_holdout_lock_path",
+                    "fusion_attempt_ledger_path",
+                    "fusion_final_test_exclusion_id",
+                    "fusion_environment_parameter_sha256",
+                    "fusion_source_commit",
+                )
+                if not str(getattr(self, name)).strip()
+            ]
+            if missing:
+                raise ContractValidationError(
+                    "fusion_paper_release_path requires " + ", ".join(missing)
                 )
 
     @classmethod

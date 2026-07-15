@@ -12,7 +12,7 @@ from .fusion_artifact import FusionArtifact
 from .holdout_evaluation import HoldoutActivationReport
 
 
-PAPER_RELEASE_SCHEMA_VERSION = 1
+PAPER_RELEASE_SCHEMA_VERSION = 2
 
 
 def _canonical_json(payload: Any) -> bytes:
@@ -38,16 +38,20 @@ class PaperFusionRelease:
     environment_parameters: Mapping[str, Any]
     source_commit: str
     eligible: bool
+    final_test_exclusion_id: str = ""
+    holdout_lock_id: str = ""
+    holdout_attempt_ledger_sha256: str = ""
+    environment_parameter_sha256: str = ""
     notes: str = ""
     schema_version: int = PAPER_RELEASE_SCHEMA_VERSION
     release_id: str = ""
 
     def __post_init__(self) -> None:
-        if self.schema_version != PAPER_RELEASE_SCHEMA_VERSION:
+        if self.schema_version not in {1, PAPER_RELEASE_SCHEMA_VERSION}:
             raise ValueError("Unsupported paper release schema")
         if not self.eligible:
             raise ValueError("Cannot create a paper release from an ineligible report")
-        required = (
+        required = [
             self.release_name,
             self.fusion_artifact_id,
             self.fusion_artifact_sha256,
@@ -58,7 +62,16 @@ class PaperFusionRelease:
             self.memory_snapshot_sha256,
             self.confidence_artifact_id,
             self.source_commit,
-        )
+        ]
+        if self.schema_version >= PAPER_RELEASE_SCHEMA_VERSION:
+            required.extend(
+                [
+                    self.final_test_exclusion_id,
+                    self.holdout_lock_id,
+                    self.holdout_attempt_ledger_sha256,
+                    self.environment_parameter_sha256,
+                ]
+            )
         if any(not str(value).strip() for value in required):
             raise ValueError("Paper release fields cannot be empty")
         expected = self.compute_release_id()
@@ -93,6 +106,11 @@ class PaperFusionRelease:
         memory_snapshot_sha256: str,
         confidence_artifact_id: str,
         environment_parameters: Mapping[str, Any],
+        final_test_exclusion_id: str = "",
+        holdout_lock_id: str = "",
+        holdout_attempt_ledger_sha256: str = "",
+        environment_parameter_sha256: str = "",
+        source_commit: str = "",
     ) -> None:
         expected = {
             "fusion_artifact_id": self.fusion_artifact_id,
@@ -108,6 +126,25 @@ class PaperFusionRelease:
             "confidence_artifact_id": confidence_artifact_id,
             "environment_parameters": dict(environment_parameters),
         }
+        if self.schema_version >= PAPER_RELEASE_SCHEMA_VERSION:
+            expected.update(
+                {
+                    "final_test_exclusion_id": self.final_test_exclusion_id,
+                    "holdout_lock_id": self.holdout_lock_id,
+                    "holdout_attempt_ledger_sha256": self.holdout_attempt_ledger_sha256,
+                    "environment_parameter_sha256": self.environment_parameter_sha256,
+                    "source_commit": self.source_commit,
+                }
+            )
+            actual.update(
+                {
+                    "final_test_exclusion_id": final_test_exclusion_id,
+                    "holdout_lock_id": holdout_lock_id,
+                    "holdout_attempt_ledger_sha256": holdout_attempt_ledger_sha256,
+                    "environment_parameter_sha256": environment_parameter_sha256,
+                    "source_commit": source_commit,
+                }
+            )
         mismatches = {
             key: {"expected": expected[key], "actual": actual[key]}
             for key in expected
@@ -128,6 +165,10 @@ def build_paper_release(
     activation_policy_id: str,
     environment_parameters: Mapping[str, Any],
     source_commit: str,
+    final_test_exclusion_id: str = "",
+    holdout_lock_id: str = "",
+    holdout_attempt_ledger_sha256: str = "",
+    environment_parameter_sha256: str = "",
 ) -> PaperFusionRelease:
     if not report.eligible:
         raise ValueError(
@@ -153,6 +194,10 @@ def build_paper_release(
         environment_parameters=dict(environment_parameters),
         source_commit=source_commit,
         eligible=True,
+        final_test_exclusion_id=final_test_exclusion_id,
+        holdout_lock_id=holdout_lock_id,
+        holdout_attempt_ledger_sha256=holdout_attempt_ledger_sha256,
+        environment_parameter_sha256=environment_parameter_sha256,
     ).with_id()
 
 
@@ -168,6 +213,10 @@ def save_paper_release(path: str | Path, release: PaperFusionRelease) -> str:
 
 
 def load_paper_release(path: str | Path) -> PaperFusionRelease:
-    return PaperFusionRelease(
-        **json.loads(Path(path).read_text(encoding="utf-8"))
-    )
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    if int(payload.get("schema_version", 1)) == 1:
+        payload.setdefault("final_test_exclusion_id", "")
+        payload.setdefault("holdout_lock_id", "")
+        payload.setdefault("holdout_attempt_ledger_sha256", "")
+        payload.setdefault("environment_parameter_sha256", "")
+    return PaperFusionRelease(**payload)
