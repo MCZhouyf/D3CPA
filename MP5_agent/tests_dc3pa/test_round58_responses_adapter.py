@@ -2,9 +2,18 @@ from __future__ import annotations
 
 import pytest
 import requests
-from langchain.schema import HumanMessage, SystemMessage
 
 from dc3pa.providers import OpenAIResponsesChatAdapter, OpenAIResponsesModelProfile
+
+
+class SystemMessage:
+    def __init__(self, content):
+        self.content = content
+
+
+class HumanMessage:
+    def __init__(self, content):
+        self.content = content
 
 
 class _Response:
