@@ -59,6 +59,10 @@ class Evaluator:
             
         seed_override = os.environ.get("DC3PA_WORLD_SEED")
         seed = int(seed_override) if seed_override is not None else random.randint(1,1000000000000)
+        simulator_seed = int(os.environ.get("DC3PA_SIM_SEED", 3))
+        self.requested_world_seed = seed_override
+        self.effective_world_seed = seed
+        self.effective_simulator_seed = simulator_seed
         random.seed(seed)
         np.random.seed(seed % (2 ** 32))
         vradius = 5
@@ -71,7 +75,7 @@ class Evaluator:
         self.env = minedojo.make(
             task_id="harvest", target_names=self.env_target_name,
             image_size=(512, 820), 
-            target_quantities=100, seed=int(os.environ.get("DC3PA_SIM_SEED", 3)), 
+            target_quantities=100, seed=simulator_seed,
             specified_biome = biome_string, 
             break_speed_multiplier = 100.0, 
             start_at_night = False, world_seed = seed, use_voxel = True, 

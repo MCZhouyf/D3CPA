@@ -53,6 +53,11 @@ from dc3pa.memory.snapshot import (  # noqa: E402
     resolve_snapshot_database,
 )
 from dc3pa.observability.trace import JsonlTraceWriter  # noqa: E402
+from dc3pa.providers import (  # noqa: E402
+    OpenAIResponsesChatAdapter,
+    OpenAIResponsesModelProfile,
+    ResponseUsage,
+)
 from dc3pa.reliability import (  # noqa: E402
     AdaptiveTriggerConfig,
     DualChainConfig,
@@ -103,7 +108,6 @@ class TracedChatModel:
                     "method": method_name,
                     "actual_method": actual_method_name,
                     "error_type": type(exc).__name__,
-                    "error": str(exc),
                 },
             )
             raise
@@ -171,6 +175,61 @@ def _load_task_list(task_path: str | Path) -> list[Mapping[str, Any]]:
             raise ValueError("Every task entry must be an object")
         return tasks
     raise ValueError("Task file must contain an object or list")
+
+
+def _resolve_model_profile(
+    cli_value: str, payload: Mapping[str, Any]
+) -> Optional[OpenAIResponsesModelProfile]:
+    configured = cli_value or payload.get("model_profile", "legacy")
+    if isinstance(configured, Mapping):
+        configured = configured.get("name", "")
+    name = str(configured).strip() or "legacy"
+    if name == "legacy":
+        return None
+    if name != "gpt51_reference":
+        raise ValueError(f"Unknown model profile {name!r}")
+    return OpenAIResponsesModelProfile().with_id()
+
+
+def _usage_observer(
+    trace_writer: JsonlTraceWriter,
+    profile: OpenAIResponsesModelProfile,
+    purpose: str,
+):
+    call_count = 0
+
+    def observe(usage: ResponseUsage) -> None:
+        nonlocal call_count
+        call_count += 1
+        trace_writer.write(
+            "model_profile_usage",
+            {
+                "profile_id": profile.profile_id,
+                "model": profile.model,
+                "reasoning_effort": profile.reasoning_effort,
+                "purpose": purpose,
+                "call_count": call_count,
+                "input_tokens": usage.input_tokens,
+                "output_tokens": usage.output_tokens,
+                "reasoning_tokens": usage.reasoning_tokens,
+                "total_tokens": usage.total_tokens,
+            },
+        )
+
+    return observe
+
+
+def _profile_chat_model(
+    profile: OpenAIResponsesModelProfile,
+    purpose: str,
+    trace_writer: JsonlTraceWriter,
+) -> TracedChatModel:
+    adapter = OpenAIResponsesChatAdapter(
+        profile=profile,
+        purpose=purpose,
+        usage_observer=_usage_observer(trace_writer, profile, purpose),
+    )
+    return TracedChatModel(adapter, trace_writer, purpose)
 
 
 @contextlib.contextmanager
@@ -262,6 +321,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--mllm_url", default="")
     parser.add_argument("--openai_key", default=os.environ.get("OPENAI_API_KEY", ""))
     parser.add_argument("--gpt_model_name", default=os.environ.get("GPT_MODEL_NAME", ""))
+    parser.add_argument(
+        "--model-profile",
+        choices=("legacy", "gpt51_reference"),
+        default="",
+        help="Explicit chat provider profile; legacy remains the default.",
+    )
     parser.add_argument("--task", default=os.environ.get("TASK_FILE", ""))
     parser.add_argument(
         "--config",
@@ -303,8 +368,6 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = parser.parse_args(argv)
     if not args.openai_key:
         parser.error("openai_key is required, set --openai_key or OPENAI_API_KEY")
-    if not args.gpt_model_name:
-        parser.error("gpt_model_name is required, set --gpt_model_name or GPT_MODEL_NAME")
     if not args.task:
         parser.error("task is required, set --task or TASK_FILE")
     if args.mode != "mp5_legacy" and not args.allow_legacy_task_hacks:
@@ -318,6 +381,19 @@ def main(argv: Optional[list[str]] = None) -> int:
     args.trace = args.trace.resolve()
 
     payload = _load_json(args.config)
+    try:
+        model_profile = _resolve_model_profile(args.model_profile, payload)
+    except ValueError as exc:
+        parser.error(str(exc))
+    if model_profile is None:
+        if not args.gpt_model_name:
+            parser.error("gpt_model_name is required, set --gpt_model_name or GPT_MODEL_NAME")
+    else:
+        if not os.environ.get(model_profile.api_key_environment_variable, ""):
+            parser.error(
+                "gpt51_reference requires OPENAI_API_KEY in the environment"
+            )
+        args.gpt_model_name = model_profile.model
     runtime_config = Stage6RuntimeConfig.from_mapping(payload.get("runtime", {}))
     runtime_config = replace(runtime_config, mode=args.mode)
     if args.max_execution_attempts is not None:
@@ -435,6 +511,17 @@ def main(argv: Optional[list[str]] = None) -> int:
             ),
         ).to_trace_payload()
 
+    requested_environment_seed = None
+    if model_profile is not None and args.real_experiment_blueprint:
+        try:
+            requested_environment_seed = int(args.real_experiment_seed)
+        except (TypeError, ValueError):
+            parser.error("GPT-5.1 reference runs require a positive integer experiment seed")
+        if requested_environment_seed <= 0:
+            parser.error("GPT-5.1 reference runs require a positive integer experiment seed")
+        os.environ["DC3PA_WORLD_SEED"] = str(requested_environment_seed)
+        os.environ["DC3PA_SIM_SEED"] = str(requested_environment_seed)
+
     def write_dry_run_receipt(result=None, exception: Optional[BaseException] = None) -> None:
         if not dry_run_enabled or dry_run_campaign is None or dry_run_entry is None:
             return
@@ -495,15 +582,56 @@ def main(argv: Optional[list[str]] = None) -> int:
                     "real_experiment_launch_validated",
                     real_experiment_trace_payload,
                 )
-            if hasattr(memory, "llm"):
+            if requested_environment_seed is not None:
+                effective_world_seed = getattr(evaluator, "effective_world_seed", None)
+                effective_simulator_seed = getattr(
+                    evaluator, "effective_simulator_seed", None
+                )
+                if (
+                    effective_world_seed != requested_environment_seed
+                    or effective_simulator_seed != requested_environment_seed
+                ):
+                    raise RuntimeError(
+                        "MineDojo effective seed does not match the approved seed"
+                    )
+                trace_writer.write(
+                    "environment_seed_applied",
+                    {
+                        "requested_seed": requested_environment_seed,
+                        "effective_world_seed": effective_world_seed,
+                        "effective_simulator_seed": effective_simulator_seed,
+                        "application_point": "minedojo.make",
+                    },
+                )
+            if model_profile is not None:
+                trace_writer.write(
+                    "model_profile_activated",
+                    {
+                        "profile_id": model_profile.profile_id,
+                        "model": model_profile.model,
+                        "reasoning_effort": model_profile.reasoning_effort,
+                    },
+                )
+                memory.llm = _profile_chat_model(
+                    model_profile,
+                    "dc3pa_confidence_and_evaluation",
+                    trace_writer,
+                )
+                reflexion.llm = _profile_chat_model(
+                    model_profile, "reflection", trace_writer
+                )
+                planner_instance.llm = _profile_chat_model(
+                    model_profile, "planning", trace_writer
+                )
+            elif hasattr(memory, "llm"):
                 memory.llm = TracedChatModel(
                     memory.llm, trace_writer, "dc3pa_confidence_and_evaluation"
                 )
-            if hasattr(reflexion, "llm"):
+            if model_profile is None and hasattr(reflexion, "llm"):
                 reflexion.llm = TracedChatModel(
                     reflexion.llm, trace_writer, "reflection"
                 )
-            if hasattr(planner_instance, "llm"):
+            if model_profile is None and hasattr(planner_instance, "llm"):
                 planner_instance.llm = TracedChatModel(
                     planner_instance.llm, trace_writer, "planning"
                 )
