@@ -44,6 +44,7 @@ class FusionExample:
     legacy_probability: Optional[float] = None
     confidence_artifact_id: str = ""
     memory_snapshot_sha256: str = ""
+    provenance: Mapping[str, Any] = field(default_factory=dict)
     metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -73,6 +74,7 @@ class FusionExample:
     def to_dict(self) -> dict[str, Any]:
         payload = asdict(self)
         payload["features"] = dict(self.features)
+        payload["provenance"] = dict(self.provenance)
         payload["metadata"] = dict(self.metadata)
         payload["dataset_schema_version"] = DATASET_SCHEMA_VERSION
         payload["feature_schema_version"] = FEATURE_SCHEMA_VERSION
@@ -184,6 +186,9 @@ def join_observations_and_labels(
                 legacy_probability=item.legacy_probability,
                 confidence_artifact_id=item.vector.confidence_artifact_id,
                 memory_snapshot_sha256=item.memory_snapshot_sha256,
+                provenance=dict(item.metadata.get("provenance", {}))
+                if isinstance(item.metadata.get("provenance", {}), Mapping)
+                else {},
                 metadata=dict(item.metadata),
             )
         )
