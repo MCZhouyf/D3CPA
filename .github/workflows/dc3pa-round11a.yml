@@ -12,6 +12,7 @@ on:
       - "round55-*"
       - "round551-*"
       - "round56-*"
+      - "round57-*"
   pull_request:
 
 permissions:
@@ -95,6 +96,11 @@ jobs:
         run: >-
           python scripts_dc3pa/run_round56_gate.py
           --junit artifacts/round56.xml
+
+      - name: Round 5.7 author-decision dry-run gate
+        run: >-
+          python scripts_dc3pa/run_round57_gate.py
+          --junit artifacts/round57.xml
 
       - name: Print reports on failure
         if: failure()
