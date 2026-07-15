@@ -53,6 +53,7 @@ def main() -> int:
     parser.add_argument("--output-runtime-tasks", required=True)
     parser.add_argument("--output-report", required=True)
     parser.add_argument("--output-resolution", required=True)
+    parser.add_argument("--source-commit", required=True)
     args = parser.parse_args()
 
     root = Path(args.asset_root)
@@ -68,6 +69,7 @@ def main() -> int:
         runtime_registry_entries=registry_entries,
         evaluator_loader=evaluator_loader,
         environment_smoke=environment_smoke,
+        source_commit=args.source_commit,
     )
 
     report_path = Path(args.output_report)

@@ -105,9 +105,11 @@ def test_schema_only_validation_never_grants_formal_readiness(tmp_path):
             (asset_root / json.loads(path.read_text())["creative_task_file"]).read_text()
         ),
         environment_smoke=lambda path: {"started": True},
+        source_commit="4113559efa1458126b10b6bd61976aa9f4c75b8c",
     )
     assert report.eligible
     assert report.evaluator_load_count == 50
     assert report.environment_construction_count == 50
     assert report.runtime_task_tree_sha256
     assert len(resolutions) == 50
+    assert report.source_commit == "4113559efa1458126b10b6bd61976aa9f4c75b8c"

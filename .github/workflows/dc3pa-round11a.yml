@@ -16,6 +16,7 @@ on:
       - "round58-*"
       - "round59-*"
       - "round591-*"
+      - "round592-*"
   pull_request:
 
 permissions:
@@ -114,6 +115,11 @@ jobs:
         run: >-
           python scripts_dc3pa/run_round59_gate.py
           --junit artifacts/round59.xml
+
+      - name: Round 5.9.2 final-taskset gate
+        run: >-
+          python scripts_dc3pa/run_round592_gate.py
+          --junit artifacts/round592.xml
 
       - name: Print reports on failure
         if: failure()

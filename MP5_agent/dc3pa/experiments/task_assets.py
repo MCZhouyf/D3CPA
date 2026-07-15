@@ -378,7 +378,12 @@ def validate_task_assets(
     runtime_registry_entries: Optional[Sequence[Mapping[str, Any]]] = None,
     evaluator_loader: Optional[Callable[[Path], Any]] = None,
     environment_smoke: Optional[Callable[[Path], Any]] = None,
+    source_commit: str = APPROVED_SOURCE_COMMIT,
 ) -> tuple[TaskAssetValidationReport, tuple[RegistryResolution, ...]]:
+    if len(source_commit) != 40 or not all(
+        character in "0123456789abcdef" for character in source_commit
+    ):
+        raise ValueError("source_commit must be a full lowercase Git SHA")
     catalog = load_catalog(catalog_path, mapping_manifest_path)
     root = Path(asset_root)
     errors: list[str] = []
@@ -489,5 +494,6 @@ def validate_task_assets(
         formal_tree_sha256=tree_sha256(root / "formal_task_specs"),
         runtime_registry_sha256=registry_sha,
         runtime_task_tree_sha256=_sha(loaded_runtime_tasks),
+        source_commit=source_commit,
     ).with_id()
     return report, resolutions
