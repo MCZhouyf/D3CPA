@@ -6,6 +6,7 @@ on:
       - round11a-ci-fix
       - round11-infra
       - "round2-*"
+      - "round3-*"
   pull_request:
 
 permissions:
@@ -59,6 +60,11 @@ jobs:
         run: >-
           python scripts_dc3pa/run_round2_gate.py
           --junit artifacts/round2.xml
+
+      - name: Round 3 confidence calibration gate
+        run: >-
+          python scripts_dc3pa/run_round3_gate.py
+          --junit artifacts/round3.xml
 
       - name: Print reports on failure
         if: failure()
