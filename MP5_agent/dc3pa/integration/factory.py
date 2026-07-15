@@ -16,6 +16,13 @@ from ..reliability import (
     HybridProbabilityConfig,
     build_hybrid_probability_model,
 )
+from ..reliability.confidence_observation import ConfidenceObservationCollector
+from ..reliability.ordinal_confidence import (
+    OrdinalConfidenceStrategy,
+    build_ordinal_confidence_prompt,
+)
+from ..reliability.ordinal_levels import validate_model_confidence_impl
+from ..reliability.model import build_verbal_confidence_prompt
 from .controller import LegacyControllerAdapter
 from .execution_observer import InMemoryExecutionObserver
 from .legacy import (
@@ -41,6 +48,7 @@ class Stage6RuntimeBundle:
     reasoning_chain: LegacyMP5ReasoningChain
     cognitive_planner: Optional[AdaptiveCognitiveControlPlanner]
     multimodal_memory: Optional[MultimodalMemory]
+    confidence_observer: Optional[ConfidenceObservationCollector] = None
 
 
 def build_legacy_state_provider(
@@ -107,6 +115,15 @@ def build_stage6_runtime(
         reasoning_chain, fixed_workflow_provider=fixed_workflow_provider
     )
     cognitive_planner: Optional[AdaptiveCognitiveControlPlanner] = None
+    confidence_impl = validate_model_confidence_impl(hybrid_config.model_confidence_impl)
+    use_ordinal_prompt = confidence_impl != "legacy_numeric"
+    confidence_observer = (
+        ConfidenceObservationCollector()
+        if use_ordinal_prompt
+        or runtime_config.model_confidence_collection == "passive_final_plan"
+        else None
+    )
+    passive_confidence_scorer = None
     if runtime_config.mode == "dc3pa":
         if multimodal_memory is None:
             raise ValueError("multimodal_memory is required in dc3pa mode")
@@ -115,8 +132,16 @@ def build_stage6_runtime(
         adapter = ChatModelTextAdapter(chat_model)
         reliability_model = build_hybrid_probability_model(
             multimodal_memory,
-            ChatModelConfidenceProvider(adapter),
+            ChatModelConfidenceProvider(
+                adapter,
+                prompt_builder=(
+                    build_ordinal_confidence_prompt
+                    if use_ordinal_prompt
+                    else build_verbal_confidence_prompt
+                ),
+            ),
             config=hybrid_config,
+            confidence_observer=confidence_observer,
         )
         evaluation_chain = StructuredEvaluationChain(
             ChatModelEvaluationProvider(adapter), failure_mode="request_replan"
@@ -128,6 +153,27 @@ def build_stage6_runtime(
             trigger_config=trigger_config,
             dual_chain_config=dual_chain_config,
             trace_writer=trace_writer,
+        )
+    elif runtime_config.model_confidence_collection == "passive_final_plan":
+        if chat_model is None:
+            raise ValueError("chat_model is required for passive_final_plan collection")
+
+    if runtime_config.model_confidence_collection == "passive_final_plan":
+        if not str(hybrid_config.model_confidence_model_id).strip():
+            raise ValueError(
+                "passive_final_plan collection requires model_confidence_model_id"
+            )
+        assert confidence_observer is not None
+        passive_confidence_scorer = OrdinalConfidenceStrategy(
+            ChatModelConfidenceProvider(
+                ChatModelTextAdapter(chat_model),
+                prompt_builder=build_ordinal_confidence_prompt,
+            ),
+            implementation="ordinal_v2",
+            model_id=hybrid_config.model_confidence_model_id,
+            prompt_version=hybrid_config.model_confidence_prompt_version,
+            observer=confidence_observer,
+            failure_mode=hybrid_config.model_failure_mode,
         )
 
     execution_observer = (
@@ -165,6 +211,8 @@ def build_stage6_runtime(
         multimodal_memory_sink=multimodal_memory,
         acquisition_store=acquisition_store,
         calibration_store=calibration_store,
+        confidence_observer=confidence_observer,
+        passive_confidence_scorer=passive_confidence_scorer,
         trace_writer=trace_writer,
     )
     return Stage6RuntimeBundle(
@@ -172,4 +220,5 @@ def build_stage6_runtime(
         reasoning_chain=reasoning_chain,
         cognitive_planner=cognitive_planner,
         multimodal_memory=multimodal_memory,
+        confidence_observer=confidence_observer,
     )

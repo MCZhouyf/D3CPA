@@ -11,7 +11,11 @@ from .knowledge_v2 import (
     KnowledgeShadowStrategy,
     validate_knowledge_impl,
 )
+from .confidence_observation import ConfidenceObservationCollector
 from .model import ConfidenceProvider, VerbalConfidenceStrategy
+from .ordinal_calibration import OrdinalCalibrationArtifact
+from .ordinal_confidence import OrdinalConfidenceStrategy
+from .ordinal_levels import validate_model_confidence_impl
 from .weights import LinearMemoryWeightPolicy
 
 
@@ -21,6 +25,7 @@ def build_hybrid_probability_model(
     config: HybridProbabilityConfig = HybridProbabilityConfig(),
     *,
     cache_model_confidence: bool = True,
+    confidence_observer: ConfidenceObservationCollector | None = None,
 ) -> HybridProbabilityModel:
     """Compose the Stage-3 model from Stage-2 memory and a confidence provider.
 
@@ -48,13 +53,33 @@ def build_hybrid_probability_model(
             knowledge = candidate_knowledge
             model_class = HardGatedHybridProbabilityModel
 
-    return model_class(
-        knowledge=knowledge,
-        model=VerbalConfidenceStrategy(
+    confidence_impl = validate_model_confidence_impl(config.model_confidence_impl)
+    if confidence_impl == "legacy_numeric":
+        model_strategy = VerbalConfidenceStrategy(
             confidence_provider,
             failure_mode=config.model_failure_mode,
             cache_enabled=cache_model_confidence,
-        ),
+        )
+    else:
+        artifact = None
+        if confidence_impl in {"ordinal_shadow", "ordinal_calibrated"}:
+            artifact = OrdinalCalibrationArtifact.load(
+                config.model_confidence_artifact_path
+            )
+        model_strategy = OrdinalConfidenceStrategy(
+            confidence_provider,
+            implementation=confidence_impl,
+            model_id=config.model_confidence_model_id,
+            prompt_version=config.model_confidence_prompt_version,
+            artifact=artifact,
+            observer=confidence_observer,
+            failure_mode=config.model_failure_mode,
+            cache_enabled=cache_model_confidence,
+        )
+
+    return model_class(
+        knowledge=knowledge,
+        model=model_strategy,
         environment=EnvironmentReliabilityStrategy(
             memory,
             visual_similarity_weight=config.visual_similarity_weight,

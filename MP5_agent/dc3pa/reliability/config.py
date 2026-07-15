@@ -7,6 +7,7 @@ from typing import Any, Dict, Mapping
 
 from ..errors import ContractValidationError
 from .knowledge_v2 import validate_knowledge_impl
+from .ordinal_levels import validate_model_confidence_impl
 
 
 def _finite_number(value: Any, label: str) -> float:
@@ -45,6 +46,10 @@ class HybridProbabilityConfig:
     task_name_filter_environment: bool = False
     knowledge_impl: str = "legacy_v1"
     graph_hard_min_support: int = 2
+    model_confidence_impl: str = "legacy_numeric"
+    model_confidence_model_id: str = ""
+    model_confidence_prompt_version: str = "ordinal-v1"
+    model_confidence_artifact_path: str = ""
 
     def validate(self) -> None:
         visual = _finite_number(self.visual_similarity_weight, "visual_similarity_weight")
@@ -69,6 +74,25 @@ class HybridProbabilityConfig:
         except ValueError as exc:
             raise ContractValidationError(str(exc)) from exc
         _positive_int(self.graph_hard_min_support, "graph_hard_min_support")
+        try:
+            confidence_impl = validate_model_confidence_impl(self.model_confidence_impl)
+        except ValueError as exc:
+            raise ContractValidationError(str(exc)) from exc
+        if confidence_impl != "legacy_numeric":
+            if not str(self.model_confidence_model_id).strip():
+                raise ContractValidationError(
+                    "ordinal model confidence modes require model_confidence_model_id"
+                )
+            if not str(self.model_confidence_prompt_version).strip():
+                raise ContractValidationError(
+                    "ordinal model confidence modes require model_confidence_prompt_version"
+                )
+        if confidence_impl in {"ordinal_shadow", "ordinal_calibrated"} and not str(
+            self.model_confidence_artifact_path
+        ).strip():
+            raise ContractValidationError(
+                f"{confidence_impl} requires model_confidence_artifact_path"
+            )
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> "HybridProbabilityConfig":

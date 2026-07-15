@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from ..reliability.contracts import ConfidenceRequest
 from ..reliability.model import build_verbal_confidence_prompt
@@ -47,9 +47,10 @@ class ChatModelTextAdapter:
 @dataclass
 class ChatModelConfidenceProvider:
     adapter: ChatModelTextAdapter
+    prompt_builder: Callable[[ConfidenceRequest], str] = build_verbal_confidence_prompt
 
     def confidence(self, request: ConfidenceRequest) -> Any:
-        return self.adapter.complete(build_verbal_confidence_prompt(request))
+        return self.adapter.complete(self.prompt_builder(request))
 
 
 @dataclass
