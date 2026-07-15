@@ -8,6 +8,7 @@ on:
       - "round2-*"
       - "round3-*"
       - "round4-*"
+      - "round5-*"
   pull_request:
 
 permissions:
@@ -71,6 +72,11 @@ jobs:
         run: >-
           python scripts_dc3pa/run_round4_gate.py
           --junit artifacts/round4.xml
+
+      - name: Round 5 monotonic fusion gate
+        run: >-
+          python scripts_dc3pa/run_round5_gate.py
+          --junit artifacts/round5.xml
 
       - name: Print reports on failure
         if: failure()
