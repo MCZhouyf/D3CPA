@@ -25,6 +25,7 @@ def receipt(task):
         semantic_validation_mode="controlled_success_fixture",
         requested_seed=f"seed:{task}",
         effective_seed=f"seed:{task}",
+        effective_simulator_seed=f"seed:{task}",
         process_exit_code=0,
         environment_started=True,
         controller_started=True,

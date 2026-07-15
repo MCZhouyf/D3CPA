@@ -12,6 +12,7 @@ from pathlib import Path
 TESTS = [
     "tests_dc3pa/test_round592_taskset_amendment.py",
     "tests_dc3pa/test_round592_task_semantics.py",
+    "tests_dc3pa/test_round592_semantic_fixture.py",
     "tests_dc3pa/test_round592_final_taskset_release.py",
     "tests_dc3pa/test_round592_command_evidence.py",
     "tests_dc3pa/test_round592_preacquisition_gate.py",

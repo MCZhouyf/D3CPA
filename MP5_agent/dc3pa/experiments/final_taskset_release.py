@@ -172,6 +172,7 @@ class TaskSemanticReceipt:
     semantic_validation_mode: str
     requested_seed: str
     effective_seed: str
+    effective_simulator_seed: str
     process_exit_code: int
     environment_started: bool
     controller_started: bool
@@ -284,6 +285,8 @@ def audit_task_semantics(
             errors.append(f"{prefix}: task-asset report mismatch")
         if receipt.requested_seed != receipt.effective_seed:
             errors.append(f"{prefix}: requested/effective seed mismatch")
+        if receipt.requested_seed != receipt.effective_simulator_seed:
+            errors.append(f"{prefix}: requested/simulator seed mismatch")
         if receipt.process_exit_code != 0:
             errors.append(f"{prefix}: process exit code is nonzero")
         if not receipt.environment_started or not receipt.controller_started:
