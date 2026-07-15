@@ -27,6 +27,7 @@ from dc3pa.reliability.holdout_lock import (
     fail_holdout_attempt,
     load_holdout_lock,
 )
+from dc3pa.experiments.dry_run import ensure_not_dry_run_artifact_path
 
 
 def main() -> int:
@@ -41,6 +42,8 @@ def main() -> int:
     parser.add_argument("--source-commit", required=True)
     args = parser.parse_args()
 
+    ensure_not_dry_run_artifact_path(args.artifact, label="fusion artifact")
+    ensure_not_dry_run_artifact_path(args.holdout_dataset, label="holdout dataset")
     protocol = load_protocol(args.protocol)
     policy = load_activation_policy(args.activation_policy)
     artifact = load_fusion_artifact(args.artifact)

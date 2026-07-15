@@ -30,6 +30,7 @@ from dc3pa.reliability.holdout_lock import (
     sha256_file,
     utc_now,
 )
+from dc3pa.experiments.dry_run import ensure_not_dry_run_artifact_path
 
 
 def main() -> int:
@@ -44,6 +45,9 @@ def main() -> int:
     parser.add_argument("--output-lock", required=True)
     args = parser.parse_args()
 
+    ensure_not_dry_run_artifact_path(args.holdout_dataset, label="holdout dataset")
+    ensure_not_dry_run_artifact_path(args.holdout_collection, label="holdout collection")
+    ensure_not_dry_run_artifact_path(args.fusion_artifact, label="fusion artifact")
     protocol = load_protocol(args.protocol)
     policy = load_activation_policy(args.activation_policy)
     exclusion = load_final_test_exclusion(args.final_test_exclusion)

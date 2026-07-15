@@ -249,3 +249,196 @@ def test_minecraft_entrypoint_enters_legacy_agent_cwd_with_absolute_paths(monkey
     assert validation[0]["payload"]["blueprint_id"] == blueprint.blueprint_id
     assert validation[0]["payload"]["run_manifest_ids"]["stage6"] == "manifest-id"
     assert Path.cwd() == ROOT
+
+
+def test_minecraft_entrypoint_writes_dry_run_receipt_without_formal_memory(
+    monkeypatch, tmp_path
+):
+    import scripts_dc3pa.stage6_run_minecraft as launcher
+    from dc3pa.experiments.dry_run import (
+        audit_dry_run,
+        build_dry_run_campaign,
+        load_receipt,
+        save_campaign,
+    )
+    from tests_dc3pa.round56_helpers import make_blueprint
+
+    blueprint = make_blueprint()
+    blueprint_path = tmp_path / "blueprint.json"
+    blueprint_path.write_text(
+        json.dumps(blueprint.to_dict(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    campaign = build_dry_run_campaign(
+        blueprint=blueprint,
+        selected_group_ids=["train"],
+        source_commit="commit",
+        require_confidence_observations=True,
+        require_execution_label_joins=True,
+    )
+    campaign_path = tmp_path / "campaign.json"
+    save_campaign(campaign_path, campaign)
+    entry = campaign.entries[0]
+    task_path = tmp_path / "task.json"
+    task_path.write_text(
+        json.dumps([{"task": entry.task, "quantity": 1}]),
+        encoding="utf-8",
+    )
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "runtime": {
+                    "mode": "reasoning_only",
+                    "max_execution_attempts": 1,
+                    "memory_mode": "acquire",
+                    "record_legacy_workflow_memory": True,
+                    "record_multimodal_memory": True,
+                },
+                "hybrid_probability": {},
+                "dual_chain": {},
+                "adaptive_trigger": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_root = tmp_path / "dry-output"
+    output_root.mkdir()
+    (output_root / "labels.json").write_text(
+        json.dumps(
+            {
+                "confidence_observations": [{"step_id": "s1"}],
+                "execution_label_joins": [{"step_id": "s1", "label": 1}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    receipt_path = tmp_path / "receipt.json"
+    observed = {}
+
+    class FakeEnv:
+        def reset(self):
+            pass
+
+        def set_inventory(self, inventory):
+            pass
+
+        def step(self, action):
+            return {
+                "inventory": {
+                    "name": SimpleNamespace(tolist=lambda: []),
+                    "quantity": SimpleNamespace(tolist=lambda: []),
+                }
+            }, 0, False, {}
+
+    class FakeEvaluator:
+        def __init__(self):
+            self.env = FakeEnv()
+
+    class FakeMemory:
+        llm = None
+        inventory = {}
+
+        def __init__(self, *args, **kwargs):
+            observed["use_history_workflow"] = kwargs.get("use_history_workflow")
+
+    class FakePlanner:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class FakeReflexion:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class FakeController:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    fake_module = SimpleNamespace(
+        Evaluator=FakeEvaluator,
+        Work_Memory=FakeMemory,
+        Reflexion=FakeReflexion,
+        Planner=FakePlanner,
+        Controller=FakeController,
+        share_memory=lambda memory, events: None,
+        args=None,
+    )
+
+    class FakeRuntime:
+        def run_task(self, task_information, underground=False):
+            del underground
+            return SimpleNamespace(
+                task=task_information["task"],
+                mode="reasoning_only",
+                success=False,
+                final_underground=False,
+                controller_execution_count=1,
+                events=(
+                    SimpleNamespace(
+                        event_type="passive_confidence_collected",
+                        payload={"observation_count": 1},
+                    ),
+                ),
+                final_plan=SimpleNamespace(steps=[SimpleNamespace(step_id="s1")]),
+                to_dict=lambda: {
+                    "success": False,
+                    "task": task_information["task"],
+                    "failure_reason": "goal_not_achieved",
+                },
+            )
+
+    def fake_build_runtime(**kwargs):
+        observed["runtime_config"] = kwargs["runtime_config"]
+        observed["multimodal_memory"] = kwargs["multimodal_memory"]
+        return SimpleNamespace(runtime=FakeRuntime())
+
+    monkeypatch.setattr(launcher.importlib, "import_module", lambda name: fake_module)
+    monkeypatch.setattr(launcher, "_validate_display_available", lambda: None)
+    monkeypatch.setattr(
+        launcher,
+        "build_legacy_state_provider",
+        lambda **kwargs: object(),
+    )
+    monkeypatch.setattr(launcher, "build_stage6_runtime", fake_build_runtime)
+
+    rc = launcher.main(
+        [
+            "--mode",
+            "reasoning_only",
+            "--openai_key",
+            "test-key",
+            "--gpt_model_name",
+            "gpt-4-turbo",
+            "--task",
+            str(task_path),
+            "--config",
+            str(config_path),
+            "--memory-root",
+            str(tmp_path / "formal-memory"),
+            "--trace",
+            str(tmp_path / "trace.jsonl"),
+            "--real-experiment-blueprint",
+            str(blueprint_path),
+            "--dry-run-campaign",
+            str(campaign_path),
+            "--dry-run-entry-id",
+            entry.entry_id,
+            "--dry-run-output-root",
+            str(output_root),
+            "--dry-run-receipt",
+            str(receipt_path),
+        ]
+    )
+
+    assert rc == 0
+    assert observed["runtime_config"].memory_mode == "disabled"
+    assert observed["runtime_config"].record_legacy_workflow_memory is False
+    assert observed["runtime_config"].record_multimodal_memory is False
+    assert observed["use_history_workflow"] is False
+    assert observed["multimodal_memory"] is None
+    receipt = load_receipt(receipt_path)
+    assert receipt.status == "pipeline_pass"
+    assert receipt.task_completed is False
+    assert receipt.excluded_from_formal_fitting is True
+    assert receipt.formal_memory_used is False
+    assert audit_dry_run(campaign, [receipt]).eligible

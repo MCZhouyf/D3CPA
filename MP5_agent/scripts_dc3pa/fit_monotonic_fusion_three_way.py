@@ -26,6 +26,7 @@ from dc3pa.reliability.fusion_artifact import FusionArtifact, save_fusion_artifa
 from dc3pa.reliability.fusion_dataset import dataset_sha256, load_jsonl
 from dc3pa.reliability.fusion_features import FEATURE_SCHEMA_VERSION
 from dc3pa.reliability.fusion_training import TrainerConfig, fit_monotonic_logistic
+from dc3pa.experiments.dry_run import ensure_not_dry_run_artifact_path
 
 
 def combined_hash(*values: str) -> str:
@@ -106,6 +107,12 @@ def main() -> int:
     parser.add_argument("--tune-collection", default="")
     args = parser.parse_args()
 
+    ensure_not_dry_run_artifact_path(args.train_dataset, label="train dataset")
+    ensure_not_dry_run_artifact_path(args.tune_dataset, label="tune dataset")
+    if args.train_collection:
+        ensure_not_dry_run_artifact_path(args.train_collection, label="train collection")
+    if args.tune_collection:
+        ensure_not_dry_run_artifact_path(args.tune_collection, label="tune collection")
     protocol = load_protocol(args.protocol)
     protocol_id = protocol.protocol_id or protocol.compute_protocol_id()
     training = load_jsonl(Path(args.train_dataset))

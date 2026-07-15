@@ -40,6 +40,7 @@ from dc3pa.memory.snapshot import (  # noqa: E402
     open_sqlite_readonly,
     sha256_file,
 )
+from dc3pa.experiments.dry_run import ensure_not_dry_run_artifact_path  # noqa: E402
 from dc3pa.reliability.environment_v2 import canonical_action_key  # noqa: E402
 
 
@@ -151,6 +152,10 @@ def build_snapshot(args: argparse.Namespace) -> Dict[str, Any]:
     if args.min_dependency_support <= 0:
         raise ValueError("--min-dependency-support must be positive")
 
+    ensure_not_dry_run_artifact_path(
+        args.acquisition_root,
+        label="acquisition root",
+    )
     acquisition = AcquisitionStore(args.acquisition_root)
     output_root = args.output_root.resolve()
     if output_root.exists() and any(output_root.iterdir()):

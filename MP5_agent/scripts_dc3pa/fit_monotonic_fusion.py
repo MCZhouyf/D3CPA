@@ -26,6 +26,7 @@ from dc3pa.reliability.fusion_training import (
     TrainerConfig,
     fit_monotonic_logistic,
 )
+from dc3pa.experiments.dry_run import ensure_not_dry_run_artifact_path
 
 
 def main() -> int:
@@ -48,6 +49,7 @@ def main() -> int:
     parser.add_argument("--patience", type=int, default=200)
     args = parser.parse_args()
 
+    ensure_not_dry_run_artifact_path(args.dataset, label="fusion dataset")
     examples = load_jsonl(Path(args.dataset))
     validate_group_isolation(examples)
     training = [item for item in examples if item.split == "train"]

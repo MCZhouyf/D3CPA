@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
 
 from dc3pa.reliability.data_audit import DataSufficiencyPolicy, audit_role
 from dc3pa.reliability.fusion_dataset import load_jsonl
+from dc3pa.experiments.dry_run import ensure_not_dry_run_artifact_path
 
 
 def main() -> int:
@@ -24,6 +25,7 @@ def main() -> int:
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
+    ensure_not_dry_run_artifact_path(args.dataset, label="development dataset")
     examples = load_jsonl(Path(args.dataset))
     payload = json.loads(Path(args.policy).read_text(encoding="utf-8"))
     payload["required_metadata_strata"] = {

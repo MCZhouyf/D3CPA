@@ -17,6 +17,7 @@ from dc3pa.reliability.confidence_observation import ModelConfidenceObservation
 from dc3pa.reliability.ordinal_calibration import fit_ordinal_calibration
 from dc3pa.reliability.ordinal_confidence import ordinal_prompt_template_sha256
 from dc3pa.reliability.step_labels import join_confidence_with_execution
+from dc3pa.experiments.dry_run import ensure_not_dry_run_artifact_path
 
 
 def _episode_payloads(root: Path) -> Iterable[Mapping[str, Any]]:
@@ -45,6 +46,10 @@ def main() -> int:
     parser.add_argument("--diagnostics-output", type=Path)
     args = parser.parse_args()
 
+    ensure_not_dry_run_artifact_path(
+        args.calibration_root,
+        label="calibration root",
+    )
     examples = []
     excluded = []
     for record in _episode_payloads(args.calibration_root):
