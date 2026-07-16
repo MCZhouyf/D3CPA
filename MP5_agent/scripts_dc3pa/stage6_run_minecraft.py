@@ -868,6 +868,18 @@ def main(argv: Optional[list[str]] = None) -> int:
                             formal_acquisition_campaign.bootstrap_data_binding_id,
                             formal_bootstrap_binding.binding_id,
                         ),
+                        "data-binding source": (
+                            formal_bootstrap_binding.source_commit,
+                            formal_acquisition_campaign.source_commit,
+                        ),
+                        "data-binding tooling": (
+                            formal_bootstrap_binding.execution_tooling_binding_id,
+                            formal_acquisition_campaign.execution_tooling_binding_id,
+                        ),
+                        "data-binding authorization": (
+                            formal_bootstrap_binding.parent_formal_authorization_id,
+                            formal_acquisition_campaign.formal_authorization_id,
+                        ),
                     }
                     bad_campaign_bindings = [
                         name

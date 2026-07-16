@@ -2,6 +2,8 @@ from dc3pa.experiments.execution_tooling_binding import (
     ALLOWED_CHANGE_CLASSES,
     ExecutionToolingBinding,
 )
+from dc3pa.experiments.bootstrap_data_guard import BootstrapDataBinding
+import pytest
 
 
 def test_tooling_binding_requires_protected_identities_unchanged():
@@ -36,5 +38,33 @@ def test_tooling_binding_requires_protected_identities_unchanged():
         seeds_or_schedule_changed=False,
         bootstrap_policy_changed=False,
         formal_acquisition_started_before_binding=False,
+    ).with_id()
+    assert item.binding_id
+
+
+def test_formal_data_binding_requires_complete_source_extension_lineage():
+    common = dict(
+        binding_name="formal",
+        bootstrap_policy_id="policy",
+        bootstrap_amendment_id="amendment",
+        source_commit="final",
+        blueprint_id="blueprint",
+        scope="formal_acquisition",
+        method_id="single_chain_reactive_acquisition",
+        task_catalog_sha256="tasks",
+        prompt_hash_bundle_id="prompts",
+        controller_identity_sha256="controller",
+        evaluator_identity_sha256="evaluator",
+    )
+    with pytest.raises(ValueError, match="source-extension"):
+        BootstrapDataBinding(
+            **common,
+            execution_tooling_binding_id="tooling",
+        )
+    item = BootstrapDataBinding(
+        **common,
+        parent_bootstrap_data_binding_id="readiness-binding",
+        parent_formal_authorization_id="authorization",
+        execution_tooling_binding_id="tooling",
     ).with_id()
     assert item.binding_id

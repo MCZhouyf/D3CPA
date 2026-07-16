@@ -38,6 +38,9 @@ class BootstrapDataBinding:
     prompt_hash_bundle_id: str
     controller_identity_sha256: str
     evaluator_identity_sha256: str
+    parent_bootstrap_data_binding_id: str = ""
+    parent_formal_authorization_id: str = ""
+    execution_tooling_binding_id: str = ""
     memory_snapshot_id: str = ""
     memory_snapshot_sha256: str = ""
     all_records_require_policy_id: bool = True
@@ -72,6 +75,13 @@ class BootstrapDataBinding:
             raise ValueError("Bootstrap data safeguards are incomplete")
         if bool(self.memory_snapshot_id) != bool(self.memory_snapshot_sha256):
             raise ValueError("Memory snapshot ID/SHA must appear together")
+        extension_fields = (
+            self.parent_bootstrap_data_binding_id,
+            self.parent_formal_authorization_id,
+            self.execution_tooling_binding_id,
+        )
+        if any(extension_fields) and not all(extension_fields):
+            raise ValueError("Formal source-extension binding is incomplete")
         expected = self.compute_binding_id()
         if self.binding_id and self.binding_id != expected:
             raise ValueError("Bootstrap data binding hash mismatch")
@@ -79,6 +89,15 @@ class BootstrapDataBinding:
     def payload_without_id(self) -> dict[str, Any]:
         payload = asdict(self)
         payload.pop("binding_id", None)
+        # Empty extension fields are omitted so all frozen pre-Round-5.10
+        # binding IDs remain byte-for-byte compatible.
+        for key in (
+            "parent_bootstrap_data_binding_id",
+            "parent_formal_authorization_id",
+            "execution_tooling_binding_id",
+        ):
+            if not payload[key]:
+                payload.pop(key)
         return payload
 
     def compute_binding_id(self) -> str:
