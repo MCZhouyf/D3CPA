@@ -31,12 +31,20 @@ class EpochPolicy:
     minimum_end_probes: int = 1
     require_interleaved_schedule: bool = True
     hidden_backend_drift_under_same_alias_is_unobservable: bool = True
+    require_returned_model_match: bool = True
+    provider_model_alias_policy_id: str = ""
 
     def __post_init__(self):
         if self.maximum_duration_hours <= 0:
             raise ValueError("maximum_duration_hours must be positive")
         if self.minimum_start_probes <= 0 or self.minimum_end_probes <= 0:
             raise ValueError("Probe counts must be positive")
+        if not self.require_returned_model_match and not (
+            self.provider_model_alias_policy_id
+        ):
+            raise ValueError("Model aliasing requires a frozen policy ID")
+        if self.require_returned_model_match and self.provider_model_alias_policy_id:
+            raise ValueError("Strict model identity cannot bind an alias policy")
 
 
 @dataclass(frozen=True)
@@ -58,6 +66,7 @@ class ProbeObservation:
     reasoning_tokens: int
     total_tokens: int
     response_id_sha256: str = ""
+    provider_model_alias_policy_id: str = ""
 
     def __post_init__(self):
         parse_time(self.observed_at)
@@ -125,8 +134,16 @@ class ModelEpoch:
                 reasons.append("probe request failed")
             if probe.requested_model != EXPECTED_MODEL:
                 reasons.append("requested model mismatch")
-            if probe.returned_model != EXPECTED_MODEL:
-                reasons.append("returned model mismatch")
+            if self.policy.require_returned_model_match:
+                if probe.returned_model != EXPECTED_MODEL:
+                    reasons.append("returned model mismatch")
+            else:
+                if not probe.returned_model.strip():
+                    reasons.append("returned model identity missing")
+                if probe.provider_model_alias_policy_id != (
+                    self.policy.provider_model_alias_policy_id
+                ):
+                    reasons.append("provider model-alias policy mismatch")
             if probe.profile_id != self.model_profile_id:
                 reasons.append("profile mismatch")
             if probe.reasoning_effort != EXPECTED_EFFORT:

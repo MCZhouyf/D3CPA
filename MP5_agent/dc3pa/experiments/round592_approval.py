@@ -51,6 +51,9 @@ class Round592ApprovalBinding:
     execution_schedule_salt: str
     schema_version: int = 1
     binding_id: str = ""
+    provider_model_alias_policy_id: str = ""
+    provider_model_alias_approval_sha256: str = ""
+    returned_model_identity_match_required: bool = True
 
     def __post_init__(self) -> None:
         required = [
@@ -62,6 +65,9 @@ class Round592ApprovalBinding:
                 "maximum_model_epoch_hours",
                 "schema_version",
                 "prompt_hashes",
+                "provider_model_alias_policy_id",
+                "provider_model_alias_approval_sha256",
+                "returned_model_identity_match_required",
             }
         ]
         if any(not str(value).strip() for value in required):
@@ -76,6 +82,18 @@ class Round592ApprovalBinding:
             raise ValueError("Mutable gpt-5.1 alias risk must be acknowledged")
         if self.maximum_model_epoch_hours != 12.0:
             raise ValueError("Model Epoch policy must be twelve hours")
+        if self.provider_model_alias_policy_id:
+            if len(self.provider_model_alias_policy_id) != 64:
+                raise ValueError("Provider model-alias policy ID is invalid")
+            if len(self.provider_model_alias_approval_sha256) != 64:
+                raise ValueError("Provider model-alias approval SHA256 is invalid")
+            if self.returned_model_identity_match_required:
+                raise ValueError("Alias approval must waive returned-model equality")
+        elif (
+            self.provider_model_alias_approval_sha256
+            or not self.returned_model_identity_match_required
+        ):
+            raise ValueError("Returned-model equality waiver is not policy-bound")
         if set(self.prompt_hashes) != {
             "planner", "confidence", "evaluation", "reflexion"
         } or any(len(value) != 64 for value in self.prompt_hashes.values()):
@@ -88,6 +106,10 @@ class Round592ApprovalBinding:
         payload = asdict(self)
         payload.pop("binding_id", None)
         payload["prompt_hashes"] = dict(sorted(self.prompt_hashes.items()))
+        if not self.provider_model_alias_policy_id:
+            payload.pop("provider_model_alias_policy_id", None)
+            payload.pop("provider_model_alias_approval_sha256", None)
+            payload.pop("returned_model_identity_match_required", None)
         return payload
 
     def compute_id(self) -> str:

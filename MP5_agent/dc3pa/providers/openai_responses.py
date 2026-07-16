@@ -159,6 +159,7 @@ class OpenAIResponsesChatAdapter:
         session: Optional[requests.Session] = None,
         usage_observer: Optional[Callable[[ResponseUsage], None]] = None,
         metadata_observer: Optional[Callable[[SafeResponseMetadata], None]] = None,
+        verify_returned_model: bool = True,
         sleep: Callable[[float], None] = time.sleep,
     ):
         self.profile = profile if profile.profile_id else profile.with_id()
@@ -179,6 +180,7 @@ class OpenAIResponsesChatAdapter:
         self.session = session or requests.Session()
         self.usage_observer = usage_observer
         self.metadata_observer = metadata_observer
+        self.verify_returned_model = bool(verify_returned_model)
         self.sleep = sleep
 
     def _request_payload(self, value: Any) -> dict[str, Any]:
@@ -219,7 +221,10 @@ class OpenAIResponsesChatAdapter:
                 if not isinstance(data, Mapping):
                     raise ValueError("Responses API JSON must be an object")
                 response_model = data.get("model")
-                if response_model != self.profile.model:
+                if (
+                    self.verify_returned_model
+                    and response_model != self.profile.model
+                ):
                     raise ValueError(
                         "Responses API did not confirm the selected model identifier"
                     )

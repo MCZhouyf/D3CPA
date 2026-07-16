@@ -632,7 +632,17 @@ def receipt_from_stage6_result(
         output_manifest_sha256=str(scan["output_manifest_sha256"]),
         task_completed=result.success if result is not None else None,
         errors=tuple(errors),
-        metadata={"dry_run_output_root_marker": DRY_RUN_MARKER},
+        metadata={
+            "dry_run_output_root_marker": DRY_RUN_MARKER,
+            "provider_model_identity_validation": (
+                "approved_alias_policy"
+                if truth.get("provider_model_alias_policy_id", "")
+                else "strict_identity_match"
+            ),
+            "provider_model_alias_policy_id": str(
+                truth.get("provider_model_alias_policy_id", "")
+            ),
+        },
         requested_seed=str(truth.get("requested_seed", "")),
         effective_seed=str(truth.get("effective_seed", "")),
         environment_started=bool(truth.get("environment_started", False)),

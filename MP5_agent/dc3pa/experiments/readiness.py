@@ -8,6 +8,7 @@ from typing import Any, Mapping, Sequence
 from .final_taskset_release import FinalTasksetRelease
 from .model_epoch import ModelEpoch
 from .log_fallback import assert_readiness_receipts_are_natural
+from .provider_model_alias import ProviderModelAliasPolicy
 
 
 def canonical(value: Any) -> bytes:
@@ -39,6 +40,8 @@ class SeedProviderSmokeReceipt:
     fallback_enabled: bool = False
     fallback_triggered: bool = False
     total_injected_logs: int = 0
+    provider_model_alias_policy_id: str = ""
+    provider_model_identity_validation: str = "strict_identity_match"
 
     def __post_init__(self):
         if not self.receipt_id or not self.task or not self.difficulty:
@@ -105,7 +108,8 @@ def audit_readiness(*, blueprint_id: str, source_commit: str,
                     dry_run_audit_sha256: str,
                     smoke_receipts: Sequence[SeedProviderSmokeReceipt],
                     minedojo_marker_passed: bool,
-                    required_difficulties=("basic", "medium", "complex")
+                    required_difficulties=("basic", "medium", "complex"),
+                    provider_model_alias_policy: ProviderModelAliasPolicy | None = None,
                     ) -> AcquisitionReadinessReport:
     reasons = []
     migration_ok = bool(migration_report.get("eligible", False))
@@ -143,6 +147,24 @@ def audit_readiness(*, blueprint_id: str, source_commit: str,
         reasons.append("mutable-alias risk is not acknowledged")
     if not str(approval_binding.get("binding_id", "")):
         reasons.append("approval binding ID is missing")
+    if provider_model_alias_policy is not None:
+        try:
+            provider_model_alias_policy.assert_activation_allowed(
+                scope="natural_readiness",
+                requested_model="gpt-5.1",
+            )
+        except ValueError as exc:
+            reasons.append(str(exc))
+        if approval_binding.get("provider_model_alias_policy_id") != (
+            provider_model_alias_policy.policy_id
+        ):
+            reasons.append("approval binding provider model-alias policy mismatch")
+        if model_epoch.policy.provider_model_alias_policy_id != (
+            provider_model_alias_policy.policy_id
+        ):
+            reasons.append("model epoch provider model-alias policy mismatch")
+    elif model_epoch.policy.provider_model_alias_policy_id:
+        reasons.append("model epoch has an unapproved provider model-alias policy")
     if not task_assets_ok:
         reasons.append("task-asset validation is not eligible")
     if approval_binding.get("task_asset_validation_report_id") != (
@@ -217,8 +239,23 @@ def audit_readiness(*, blueprint_id: str, source_commit: str,
             reasons.append(f"{prefix}: seed mismatch")
         if item.requested_model != "gpt-5.1":
             reasons.append(f"{prefix}: requested model mismatch")
-        if not item.returned_models or set(item.returned_models) != {"gpt-5.1"}:
-            reasons.append(f"{prefix}: returned model mismatch")
+        if provider_model_alias_policy is None:
+            if not item.returned_models or set(item.returned_models) != {"gpt-5.1"}:
+                reasons.append(f"{prefix}: returned model mismatch")
+            if item.provider_model_alias_policy_id:
+                reasons.append(f"{prefix}: unapproved provider model-alias policy")
+        else:
+            if item.provider_model_alias_policy_id != (
+                provider_model_alias_policy.policy_id
+            ):
+                reasons.append(f"{prefix}: provider model-alias policy mismatch")
+            if item.provider_model_identity_validation != "approved_alias_policy":
+                reasons.append(f"{prefix}: provider model-alias mode mismatch")
+            if not item.returned_models or not all(
+                provider_model_alias_policy.accepts_returned_model(value)
+                for value in item.returned_models
+            ):
+                reasons.append(f"{prefix}: returned model identity missing")
         if item.model_profile_id != model_epoch.model_profile_id:
             reasons.append(f"{prefix}: profile mismatch")
         if item.reasoning_effort != "low":
@@ -262,6 +299,9 @@ def load_receipt(path: str | Path):
     fallback_metrics = value.get("fallback_metrics")
     if not isinstance(fallback_metrics, Mapping):
         raise ValueError("Readiness receipt is missing structured fallback metrics")
+    metadata = value.get("metadata", {})
+    if not isinstance(metadata, Mapping):
+        raise ValueError("Readiness receipt metadata must be an object")
     selected = {
         "receipt_id": value.get("receipt_id") or value.get("truth_receipt_id", ""),
         "task": value.get("task", ""),
@@ -292,6 +332,15 @@ def load_receipt(path: str | Path):
         ),
         "total_injected_logs": int(
             fallback_metrics.get("total_injected_logs", 0) or 0
+        ),
+        "provider_model_alias_policy_id": str(
+            metadata.get("provider_model_alias_policy_id", "")
+        ),
+        "provider_model_identity_validation": str(
+            metadata.get(
+                "provider_model_identity_validation",
+                "strict_identity_match",
+            )
         ),
     }
     return SeedProviderSmokeReceipt(**selected)

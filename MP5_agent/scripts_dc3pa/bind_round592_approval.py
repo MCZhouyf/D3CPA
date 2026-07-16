@@ -18,6 +18,10 @@ from dc3pa.experiments.final_taskset_release import (
     save_immutable,
 )
 from dc3pa.experiments.round592_approval import Round592ApprovalBinding
+from dc3pa.experiments.provider_model_alias import (
+    load_provider_model_alias_policy,
+    sha256_file as sha256_alias_approval,
+)
 
 
 def load(path):
@@ -37,7 +41,26 @@ def main() -> int:
         "schedule-salt", "output",
     ):
         parser.add_argument("--" + name, required=True)
+    parser.add_argument("--provider-model-alias-policy")
+    parser.add_argument("--provider-model-alias-approval")
     args = parser.parse_args()
+    alias_arguments = (
+        args.provider_model_alias_policy,
+        args.provider_model_alias_approval,
+    )
+    if any(alias_arguments) and not all(alias_arguments):
+        parser.error(
+            "model aliasing requires --provider-model-alias-policy and "
+            "--provider-model-alias-approval"
+        )
+    alias_policy = (
+        load_provider_model_alias_policy(
+            args.provider_model_alias_policy,
+            approval_record=args.provider_model_alias_approval,
+        )
+        if all(alias_arguments)
+        else None
+    )
 
     amendment = load(args.author_amendment)
     blueprint = load_blueprint(args.blueprint)
@@ -80,6 +103,15 @@ def main() -> int:
         model_epoch_policy_version="round592-12h-v1",
         execution_schedule_policy_version="round592-block-interleaved-v1",
         execution_schedule_salt=args.schedule_salt,
+        provider_model_alias_policy_id=(
+            alias_policy.policy_id if alias_policy is not None else ""
+        ),
+        provider_model_alias_approval_sha256=(
+            sha256_alias_approval(args.provider_model_alias_approval)
+            if alias_policy is not None
+            else ""
+        ),
+        returned_model_identity_match_required=alias_policy is None,
     ).with_id()
     save_immutable(args.output, binding.to_dict())
     print(json.dumps(binding.to_dict(), indent=2, sort_keys=True))

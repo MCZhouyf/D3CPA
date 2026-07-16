@@ -40,6 +40,8 @@ def test_minecraft_entrypoint_help_has_no_minedojo_import_requirement():
     assert "--require-environment-score" in result.stdout
     assert "--real-experiment-blueprint" in result.stdout
     assert "--enable-diagnostic-log-fallback" in result.stdout
+    assert "--provider-model-alias-policy" in result.stdout
+    assert "--provider-model-alias-approval" in result.stdout
 
 
 def test_diagnostic_log_fallback_is_rejected_outside_dry_run(tmp_path):
@@ -65,6 +67,56 @@ def test_diagnostic_log_fallback_is_rejected_outside_dry_run(tmp_path):
                 str(tmp_path / "policy.json"),
                 "--paired-dry-run-protocol",
                 str(tmp_path / "protocol.json"),
+            ]
+        )
+
+
+def test_provider_model_alias_policy_requires_matching_approval_argument(tmp_path):
+    import scripts_dc3pa.stage6_run_minecraft as launcher
+
+    task_path = tmp_path / "task.json"
+    task_path.write_text(
+        json.dumps([{"task": "log", "quantity": 1}]), encoding="utf-8"
+    )
+    with pytest.raises(SystemExit, match="2"):
+        launcher.main(
+            [
+                "--mode",
+                "reasoning_only",
+                "--openai_key",
+                "test-key",
+                "--gpt_model_name",
+                "gpt-4-turbo",
+                "--task",
+                str(task_path),
+                "--provider-model-alias-policy",
+                str(tmp_path / "policy.json"),
+            ]
+        )
+
+
+def test_provider_model_alias_policy_requires_bound_blueprint(tmp_path):
+    import scripts_dc3pa.stage6_run_minecraft as launcher
+
+    task_path = tmp_path / "task.json"
+    task_path.write_text(
+        json.dumps([{"task": "log", "quantity": 1}]), encoding="utf-8"
+    )
+    with pytest.raises(SystemExit, match="2"):
+        launcher.main(
+            [
+                "--mode",
+                "reasoning_only",
+                "--openai_key",
+                "test-key",
+                "--gpt_model_name",
+                "gpt-4-turbo",
+                "--task",
+                str(task_path),
+                "--provider-model-alias-policy",
+                str(tmp_path / "policy.json"),
+                "--provider-model-alias-approval",
+                str(tmp_path / "approval.json"),
             ]
         )
 

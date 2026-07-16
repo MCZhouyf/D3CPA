@@ -170,3 +170,23 @@ def test_adapter_fails_closed_if_provider_does_not_confirm_selected_model():
     with pytest.raises(RuntimeError, match="after 1 attempts") as exc_info:
         adapter.predict("hello")
     assert "selected model identifier" in str(exc_info.value.__cause__)
+
+
+def test_adapter_can_explicitly_accept_provider_model_alias_for_diagnostics():
+    observed = []
+    adapter = OpenAIResponsesChatAdapter(
+        profile=OpenAIResponsesModelProfile(maximum_retries=0),
+        purpose="planning",
+        api_key="test-key",
+        session=_WrongModelSession(),
+        metadata_observer=observed.append,
+        verify_returned_model=False,
+        sleep=lambda _: None,
+    )
+
+    response = adapter.invoke_with_metadata("hello")
+
+    assert response.text == "ok"
+    assert response.metadata.requested_model == "gpt-5.1"
+    assert response.metadata.returned_model == "gpt-4-turbo"
+    assert observed == [response.metadata]

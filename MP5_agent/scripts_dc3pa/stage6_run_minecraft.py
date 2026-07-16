@@ -52,6 +52,9 @@ from dc3pa.experiments.log_fallback import (  # noqa: E402
 from dc3pa.experiments.paired_dry_run import (  # noqa: E402
     load_paired_protocol,
 )
+from dc3pa.experiments.provider_model_alias import (  # noqa: E402
+    load_provider_model_alias_policy,
+)
 from dc3pa.memory import (  # noqa: E402
     HashingTextEncoder,
     MultimodalMemory,
@@ -270,12 +273,15 @@ def _profile_chat_model(
     purpose: str,
     trace_writer: JsonlTraceWriter,
     metadata_observer=None,
+    *,
+    verify_returned_model: bool = True,
 ) -> TracedChatModel:
     adapter = OpenAIResponsesChatAdapter(
         profile=profile,
         purpose=purpose,
         usage_observer=_usage_observer(trace_writer, profile, purpose),
         metadata_observer=metadata_observer,
+        verify_returned_model=verify_returned_model,
     )
     return TracedChatModel(
         adapter,
@@ -417,6 +423,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--enable-diagnostic-log-fallback", action="store_true"
     )
+    parser.add_argument("--provider-model-alias-policy", type=Path)
+    parser.add_argument("--provider-model-alias-approval", type=Path)
     parser.add_argument("--log-fallback-policy", type=Path)
     parser.add_argument("--paired-dry-run-protocol", type=Path)
     return parser
@@ -488,6 +496,28 @@ def main(argv: Optional[list[str]] = None) -> int:
         args.log_fallback_policy or args.paired_dry_run_protocol
     ):
         parser.error("fallback policy/protocol require --enable-diagnostic-log-fallback")
+    alias_arguments_present = any(
+        (
+            args.provider_model_alias_policy,
+            args.provider_model_alias_approval,
+        )
+    )
+    if alias_arguments_present and not all(
+        (
+            args.provider_model_alias_policy,
+            args.provider_model_alias_approval,
+        )
+    ):
+        parser.error(
+            "provider model aliasing requires --provider-model-alias-policy "
+            "and --provider-model-alias-approval"
+        )
+    if alias_arguments_present and not args.real_experiment_blueprint:
+        parser.error(
+            "provider model aliasing requires a bound real experiment Blueprint"
+        )
+    if alias_arguments_present and model_profile is None:
+        parser.error("provider model aliasing requires an explicit model profile")
     if args.enable_diagnostic_log_fallback:
         missing = [
             name
@@ -542,6 +572,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     dry_run_difficulty = ""
     expected_provider_call_count = 0
     provider_metadata = []
+    provider_alias_policy = None
     effective_environment_seed = None
     environment_started = False
     fallback_policy = LogFallbackPolicy().with_id()
@@ -631,6 +662,23 @@ def main(argv: Optional[list[str]] = None) -> int:
                     )
                 except (OSError, TypeError, ValueError) as exc:
                     parser.error(str(exc))
+            if alias_arguments_present:
+                try:
+                    provider_alias_policy = load_provider_model_alias_policy(
+                        args.provider_model_alias_policy,
+                        approval_record=args.provider_model_alias_approval,
+                    )
+                    alias_scope = (
+                        "fallback_diagnostic"
+                        if args.enable_diagnostic_log_fallback
+                        else "natural_readiness"
+                    )
+                    provider_alias_policy.assert_activation_allowed(
+                        scope=alias_scope,
+                        requested_model=model_profile.model,
+                    )
+                except (OSError, TypeError, ValueError) as exc:
+                    parser.error(str(exc))
             args.real_experiment_phase = "dry_run_completed"
             args.real_experiment_task = dry_run_entry.task
             args.real_experiment_seed = dry_run_entry.seed
@@ -648,6 +696,22 @@ def main(argv: Optional[list[str]] = None) -> int:
                 parser.error(
                     "--real-experiment-blueprint requires " + ", ".join(missing)
                 )
+            if alias_arguments_present:
+                try:
+                    provider_alias_policy = load_provider_model_alias_policy(
+                        args.provider_model_alias_policy,
+                        approval_record=args.provider_model_alias_approval,
+                    )
+                    alias_scope = {
+                        "experience_acquisition": "formal_acquisition",
+                        "final_evaluation": "final_evaluation",
+                    }.get(args.real_experiment_phase, "development_experiment")
+                    provider_alias_policy.assert_activation_allowed(
+                        scope=alias_scope,
+                        requested_model=model_profile.model,
+                    )
+                except (OSError, TypeError, ValueError) as exc:
+                    parser.error(str(exc))
         real_experiment_trace_payload = validate_real_experiment_launch(
             blueprint=real_experiment_blueprint,
             binding=load_binding(args.real_experiment_binding)
@@ -712,6 +776,11 @@ def main(argv: Optional[list[str]] = None) -> int:
                 "actual_provider_call_count": len(provider_metadata),
                 "dry_run_root_guard_passed": (
                     dry_run_marker_for(args.dry_run_output_root) is not None
+                ),
+                "provider_model_alias_policy_id": (
+                    provider_alias_policy.policy_id
+                    if provider_alias_policy is not None
+                    else ""
                 ),
                 "trace_sha256": trace_sha256,
                 "task": dry_run_entry.task,
@@ -814,6 +883,16 @@ def main(argv: Optional[list[str]] = None) -> int:
                         "profile_id": model_profile.profile_id,
                         "model": model_profile.model,
                         "reasoning_effort": model_profile.reasoning_effort,
+                        "returned_model_validation": (
+                            "approved_alias_policy"
+                            if provider_alias_policy is not None
+                            else "strict_identity_match"
+                        ),
+                        "provider_model_alias_policy_id": (
+                            provider_alias_policy.policy_id
+                            if provider_alias_policy is not None
+                            else ""
+                        ),
                     },
                 )
                 memory.llm = _profile_chat_model(
@@ -821,12 +900,21 @@ def main(argv: Optional[list[str]] = None) -> int:
                     "dc3pa_confidence_and_evaluation",
                     trace_writer,
                     provider_metadata.append,
+                    verify_returned_model=provider_alias_policy is None,
                 )
                 reflexion.llm = _profile_chat_model(
-                    model_profile, "reflection", trace_writer, provider_metadata.append
+                    model_profile,
+                    "reflection",
+                    trace_writer,
+                    provider_metadata.append,
+                    verify_returned_model=provider_alias_policy is None,
                 )
                 planner_instance.llm = _profile_chat_model(
-                    model_profile, "planning", trace_writer, provider_metadata.append
+                    model_profile,
+                    "planning",
+                    trace_writer,
+                    provider_metadata.append,
+                    verify_returned_model=provider_alias_policy is None,
                 )
             elif hasattr(memory, "llm"):
                 memory.llm = TracedChatModel(

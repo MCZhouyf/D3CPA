@@ -1,3 +1,8 @@
+from dc3pa.experiments.dry_run import (
+    DryRunCampaign,
+    DryRunCampaignEntry,
+    receipt_from_stage6_result,
+)
 from dc3pa.experiments.log_fallback import (
     LogFallbackEvent,
     LogFallbackPolicy,
@@ -53,3 +58,42 @@ def test_natural_completion_has_no_fallback():
     )
     assert metrics.natural_completion
     assert not metrics.fallback_assisted_completion
+
+
+def test_receipt_binds_approved_provider_model_alias_policy(tmp_path):
+    entry = DryRunCampaignEntry(
+        entry_id="entry",
+        group_id="group",
+        task="craft crafting table",
+        seed="1",
+        maximum_high_level_steps=10,
+        maximum_llm_calls=2,
+        maximum_replans=0,
+        timeout_seconds=60,
+        launch_trace={},
+    )
+    campaign = DryRunCampaign(
+        campaign_name="diagnostic",
+        blueprint_id="blueprint",
+        source_commit="commit",
+        entries=(entry,),
+        require_confidence_observations=False,
+        require_execution_label_joins=False,
+    ).with_id()
+
+    receipt = receipt_from_stage6_result(
+        campaign=campaign,
+        entry_id=entry.entry_id,
+        result=None,
+        output_root=tmp_path / "output",
+        process_exit_code=0,
+        launch_validation_passed=True,
+        formal_memory_used=False,
+        truth_evidence={"provider_model_alias_policy_id": "policy-id"},
+    )
+
+    assert (
+        receipt.metadata["provider_model_identity_validation"]
+        == "approved_alias_policy"
+    )
+    assert receipt.metadata["provider_model_alias_policy_id"] == "policy-id"

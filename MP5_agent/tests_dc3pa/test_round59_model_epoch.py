@@ -1,5 +1,6 @@
 from datetime import datetime,timedelta,timezone
-from dc3pa.experiments.model_epoch import ProbeObservation,open_epoch,close_epoch
+import pytest
+from dc3pa.experiments.model_epoch import EpochPolicy,ProbeObservation,open_epoch,close_epoch
 
 def probe(at):
     return ProbeObservation(
@@ -25,3 +26,46 @@ def test_valid_epoch_closes():
 def test_overlong_epoch_invalidates():
     now=datetime.now(timezone.utc)
     assert close_epoch(opened(now),[probe(now+timedelta(hours=13))]).status=="invalid"
+
+def test_authorized_alias_epoch_preserves_returned_model_identity():
+    now=datetime.now(timezone.utc)
+    policy_id="a"*64
+    start=ProbeObservation(
+        observed_at=now.isoformat(),requested_model="gpt-5.1",
+        returned_model="gpt-4o",profile_id="profile",reasoning_effort="low",
+        purpose="planning",request_succeeded=True,request_text_logged=False,
+        response_text_logged=False,endpoint_fingerprint="endpoint",
+        client_context_fingerprint="client",probe_protocol_id="probe",
+        input_tokens=1,output_tokens=1,reasoning_tokens=0,total_tokens=2,
+        provider_model_alias_policy_id=policy_id)
+    epoch=open_epoch(epoch_name="alias",blueprint_id="bp",
+        source_commit="commit",prompt_hashes={"planner":"h"},
+        model_profile_id="profile",client_context_fingerprint="client",
+        endpoint_fingerprint="endpoint",schedule_id="schedule",
+        start_probes=[start],policy=EpochPolicy(
+            require_returned_model_match=False,
+            provider_model_alias_policy_id=policy_id))
+    end=ProbeObservation(**{
+        **start.to_dict(),
+        "observed_at":(now+timedelta(hours=1)).isoformat(),
+        "returned_model":"gpt-4.1",
+    })
+    assert close_epoch(epoch,[end]).status=="closed"
+
+def test_alias_epoch_rejects_probe_from_another_policy():
+    now=datetime.now(timezone.utc)
+    item=ProbeObservation(
+        observed_at=now.isoformat(),requested_model="gpt-5.1",
+        returned_model="gpt-4o",profile_id="profile",reasoning_effort="low",
+        purpose="planning",request_succeeded=True,request_text_logged=False,
+        response_text_logged=False,endpoint_fingerprint="endpoint",
+        client_context_fingerprint="client",probe_protocol_id="probe",
+        input_tokens=1,output_tokens=1,reasoning_tokens=0,total_tokens=2,
+        provider_model_alias_policy_id="b"*64)
+    with pytest.raises(ValueError, match="model-alias policy mismatch"):
+        open_epoch(epoch_name="alias",blueprint_id="bp",source_commit="commit",
+            prompt_hashes={"planner":"h"},model_profile_id="profile",
+            client_context_fingerprint="client",endpoint_fingerprint="endpoint",
+            schedule_id="schedule",start_probes=[item],policy=EpochPolicy(
+                require_returned_model_match=False,
+                provider_model_alias_policy_id="a"*64))

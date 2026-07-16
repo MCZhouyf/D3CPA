@@ -17,6 +17,7 @@ TESTS = [
     "tests_dc3pa/test_round593_paired_campaign.py",
     "tests_dc3pa/test_round593_controller_revision.py",
     "tests_dc3pa/test_round593_evidence_invalidation.py",
+    "tests_dc3pa/test_round593_provider_model_alias.py",
 ]
 
 

@@ -7,6 +7,7 @@ if str(ROOT) not in sys.path: sys.path.insert(0, str(ROOT))
 from dc3pa.experiments.model_epoch import load_epoch
 from dc3pa.experiments.final_taskset_release import load_taskset_release
 from dc3pa.experiments.readiness import audit_readiness, load_receipt
+from dc3pa.experiments.provider_model_alias import load_provider_model_alias_policy
 
 def load(path): return json.loads(Path(path).read_text())
 def sha_file(path):
@@ -40,7 +41,26 @@ def main():
                  "dry-run-audit","minedojo-marker-report","output-report"):
         p.add_argument("--"+name, required=True)
     p.add_argument("--smoke-receipt", action="append", required=True)
+    p.add_argument("--provider-model-alias-policy")
+    p.add_argument("--provider-model-alias-approval")
     a = p.parse_args()
+    alias_arguments = (
+        a.provider_model_alias_policy,
+        a.provider_model_alias_approval,
+    )
+    if any(alias_arguments) and not all(alias_arguments):
+        p.error(
+            "model aliasing requires --provider-model-alias-policy and "
+            "--provider-model-alias-approval"
+        )
+    alias_policy = (
+        load_provider_model_alias_policy(
+            a.provider_model_alias_policy,
+            approval_record=a.provider_model_alias_approval,
+        )
+        if all(alias_arguments)
+        else None
+    )
     marker = load(a.minedojo_marker_report)
     marker_passed = marker_evidence_passed(marker, a.source_commit)
     result = audit_readiness(
@@ -56,6 +76,7 @@ def main():
         dry_run_audit_sha256=sha_file(a.dry_run_audit),
         smoke_receipts=[load_receipt(x) for x in a.smoke_receipt],
         minedojo_marker_passed=marker_passed,
+        provider_model_alias_policy=alias_policy,
     )
     out = Path(a.output_report)
     if out.exists(): raise FileExistsError(f"Refusing to overwrite {out}")
