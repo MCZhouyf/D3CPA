@@ -442,6 +442,8 @@ def build_final_taskset_release(
     semantic_smoke: TaskSemanticSmokeReport,
     semantic_smoke_path: str | Path,
     resolution_report_path: str | Path,
+    prior_taskset_release: FinalTasksetRelease | None = None,
+    controller_revision: Mapping[str, Any] | None = None,
 ) -> FinalTasksetRelease:
     amendment = amendment if amendment.amendment_id else amendment.with_id()
     semantic_smoke = (
@@ -456,7 +458,24 @@ def build_final_taskset_release(
     if semantic_smoke.source_commit != source_commit:
         raise ValueError("Semantic-smoke source commit mismatch")
     if amendment.source_commit != source_commit:
-        raise ValueError("Taskset amendment source commit mismatch")
+        if prior_taskset_release is None or controller_revision is None:
+            raise ValueError("Taskset amendment source commit mismatch")
+        reuse_checks = {
+            "Controller revision source": controller_revision.get("source_commit")
+            == source_commit,
+            "prior release eligibility": prior_taskset_release.eligible,
+            "taskset amendment": prior_taskset_release.amendment_id
+            == amendment.amendment_id,
+            "catalog hash": prior_taskset_release.catalog_sha256
+            == task_asset_validation.get("catalog_sha256"),
+            "runtime task tree hash": prior_taskset_release.runtime_task_tree_sha256
+            == task_asset_validation.get("runtime_task_tree_sha256"),
+        }
+        failed = [name for name, passed in reuse_checks.items() if not passed]
+        if failed:
+            raise ValueError(
+                "Taskset amendment reuse checks failed: " + ", ".join(failed)
+            )
     report_id = str(task_asset_validation.get("report_id", ""))
     if semantic_smoke.task_asset_validation_report_id != report_id:
         raise ValueError("Semantic-smoke/task-asset binding mismatch")

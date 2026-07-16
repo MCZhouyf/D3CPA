@@ -15,6 +15,7 @@ if str(ROOT) not in sys.path:
 from dc3pa.experiments.final_taskset_release import (
     build_final_taskset_release,
     load_amendment,
+    load_taskset_release,
     load_semantic_report,
     save_immutable,
 )
@@ -36,7 +37,14 @@ def main() -> int:
     parser.add_argument("--task-semantic-smoke", required=True)
     parser.add_argument("--resolution-report", required=True)
     parser.add_argument("--output-release", required=True)
+    parser.add_argument("--prior-final-taskset-release")
+    parser.add_argument("--controller-revision")
     args = parser.parse_args()
+    if bool(args.prior_final_taskset_release) != bool(args.controller_revision):
+        parser.error(
+            "taskset amendment reuse requires both prior release and "
+            "Controller revision"
+        )
 
     release = build_final_taskset_release(
         release_name=args.release_name,
@@ -47,6 +55,14 @@ def main() -> int:
         semantic_smoke=load_semantic_report(args.task_semantic_smoke),
         semantic_smoke_path=args.task_semantic_smoke,
         resolution_report_path=args.resolution_report,
+        prior_taskset_release=(
+            load_taskset_release(args.prior_final_taskset_release)
+            if args.prior_final_taskset_release
+            else None
+        ),
+        controller_revision=(
+            load_json(args.controller_revision) if args.controller_revision else None
+        ),
     )
     save_immutable(args.output_release, release.to_dict())
     print(json.dumps(release.to_dict(), indent=2, sort_keys=True))
