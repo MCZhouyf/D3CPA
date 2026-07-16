@@ -253,6 +253,10 @@ def audit_formal_acquisition(
             "prompt_hash_bundle_id": campaign.prompt_hash_bundle_id,
             "model_profile_id": campaign.model_profile_id,
         }
+        if campaign.taskset_amendment_id:
+            frozen_expected["taskset_amendment_id"] = (
+                campaign.taskset_amendment_id
+            )
         for attempt in ledger.attempts:
             for field, expected in frozen_expected.items():
                 if getattr(attempt, field) != expected:
@@ -309,6 +313,7 @@ def audit_formal_acquisition(
                 expected_binding_id=campaign.bootstrap_data_binding_id,
                 expected_source_commit=campaign.source_commit,
                 expected_blueprint_id=campaign.blueprint_id,
+                expected_taskset_amendment_id=campaign.taskset_amendment_id,
             )
         except Exception as exc:
             errors.append(f"{path.name}: acquisition record invalid: {exc}")

@@ -15,7 +15,7 @@ from dc3pa.memory.acquisition import (
 )
 
 
-def provenance():
+def provenance(taskset_amendment_id=""):
     return AcquisitionRecordProvenance(
         campaign_id="campaign",
         schedule_id="schedule",
@@ -47,6 +47,7 @@ def provenance():
         reflection_calls=0,
         evaluation_chain_calls=0,
         trace_sha256="trace",
+        taskset_amendment_id=taskset_amendment_id,
     ).with_id()
 
 
@@ -83,6 +84,36 @@ def test_successful_payload_requires_formal_provenance():
         expected_blueprint_id="blueprint",
     )
     assert result.provenance_id == p.provenance_id
+
+
+def test_successful_payload_binds_taskset_amendment():
+    p = provenance("taskset-v2")
+    payload = {
+        "schema_version": 1,
+        "record": {
+            "episode_id": "run",
+            "task_name": "craft chest",
+            "seed": "1",
+            "plan": {"task": "craft chest", "steps": []},
+            "telemetry": [],
+            "scene_candidates": [],
+            "metadata": bind_record_metadata({}, p),
+        },
+    }
+    result = validate_acquisition_payload(
+        payload,
+        expected_campaign_id="campaign",
+        expected_schedule_id="schedule",
+        expected_authorization_id="authorization",
+        expected_tooling_binding_id="tooling",
+        expected_policy_id="policy",
+        expected_amendment_id="amendment",
+        expected_binding_id="binding",
+        expected_source_commit="commit",
+        expected_blueprint_id="blueprint",
+        expected_taskset_amendment_id="taskset-v2",
+    )
+    assert result.taskset_amendment_id == "taskset-v2"
 
 
 def test_staged_success_promotes_idempotently_without_overwrite(tmp_path):

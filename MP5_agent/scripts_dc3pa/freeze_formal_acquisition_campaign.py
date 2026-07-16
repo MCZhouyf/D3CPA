@@ -26,7 +26,16 @@ def main():
                  "prompt-hash-bundle-id","controller-identity-sha256",
                  "evaluator-identity-sha256","retry-policy","output"):
         p.add_argument("--"+name,required=True)
+    p.add_argument("--taskset-amendment")
     a=p.parse_args()
+    taskset_amendment_id=""
+    if getattr(a,"taskset_amendment",None):
+        taskset=load(a.taskset_amendment)
+        if taskset.get("source_commit")!=a.source_commit:
+            raise ValueError("Taskset amendment/source commit mismatch")
+        taskset_amendment_id=str(taskset.get("amendment_id", ""))
+        if not taskset_amendment_id:
+            raise ValueError("Taskset amendment ID is missing")
     blueprint=load(a.blueprint); authorization=load(a.authorization)
     schedule=load(a.schedule); policy=load(a.bootstrap_policy)
     tooling=load(a.execution_tooling_binding)
@@ -74,6 +83,7 @@ def main():
       controller_identity_sha256=a.controller_identity_sha256,
       evaluator_identity_sha256=a.evaluator_identity_sha256,
       retry_policy_id=retry.policy_id,
+      taskset_amendment_id=taskset_amendment_id,
     ).with_id()
     out=Path(a.output)
     if out.exists(): raise FileExistsError(out)

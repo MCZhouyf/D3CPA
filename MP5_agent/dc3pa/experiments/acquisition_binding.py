@@ -102,6 +102,7 @@ class AcquisitionRecordProvenance:
     reflection_calls: int
     evaluation_chain_calls: int
     trace_sha256: str
+    taskset_amendment_id: str = ""
     schema_version: int = SCHEMA_VERSION
     provenance_id: str = ""
 
@@ -164,6 +165,8 @@ class AcquisitionRecordProvenance:
     def payload_without_id(self) -> dict[str, Any]:
         payload = asdict(self)
         payload.pop("provenance_id", None)
+        if not self.taskset_amendment_id:
+            payload.pop("taskset_amendment_id", None)
         payload["returned_model_identities"] = list(
             self.returned_model_identities
         )
@@ -209,6 +212,7 @@ def validate_acquisition_payload(
     expected_binding_id: str,
     expected_source_commit: str,
     expected_blueprint_id: str,
+    expected_taskset_amendment_id: str = "",
 ) -> AcquisitionRecordProvenance:
     if payload.get("schema_version") not in {1, 2}:
         raise ValueError("Unsupported acquisition payload schema")
@@ -242,6 +246,8 @@ def validate_acquisition_payload(
         "source_commit": expected_source_commit,
         "blueprint_id": expected_blueprint_id,
     }
+    if expected_taskset_amendment_id:
+        expected["taskset_amendment_id"] = expected_taskset_amendment_id
     mismatches = {
         key: {"actual": getattr(provenance, key), "expected": value}
         for key, value in expected.items()

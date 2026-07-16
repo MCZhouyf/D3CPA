@@ -7,6 +7,10 @@ from dc3pa.experiments.round510_taskset_amendment import (
     Round510TasksetAmendment,
     validate_catalog_replacement,
 )
+from dc3pa.experiments.formal_acquisition_execution import (
+    FormalAcquisitionCampaign,
+    TechnicalRetryPolicy,
+)
 
 
 def _amendment():
@@ -78,3 +82,30 @@ def test_catalog_replacement_rejects_second_change():
         }
     ]
     assert "50 rows" in validate_catalog_replacement(prior, amended)[0]
+
+
+def test_campaign_serialization_adds_binding_without_changing_legacy_payload():
+    retry = TechnicalRetryPolicy().with_id()
+    kwargs = {
+        "campaign_name": "formal",
+        "source_commit": "commit",
+        "blueprint_id": "blueprint",
+        "formal_authorization_id": "authorization",
+        "execution_tooling_binding_id": "tooling",
+        "schedule_id": "schedule",
+        "bootstrap_policy_id": "policy",
+        "bootstrap_amendment_id": "amendment",
+        "bootstrap_data_binding_id": "binding",
+        "model_profile_id": "profile",
+        "prompt_hash_bundle_id": "prompts",
+        "controller_identity_sha256": "controller",
+        "evaluator_identity_sha256": "evaluator",
+        "retry_policy_id": retry.policy_id,
+    }
+    legacy = FormalAcquisitionCampaign(**kwargs).with_id()
+    amended = FormalAcquisitionCampaign(
+        **kwargs, taskset_amendment_id="taskset-v2"
+    ).with_id()
+    assert "taskset_amendment_id" not in legacy.to_dict()
+    assert amended.to_dict()["taskset_amendment_id"] == "taskset-v2"
+    assert amended.campaign_id != legacy.campaign_id

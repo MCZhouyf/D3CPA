@@ -223,6 +223,7 @@ def _formal_acquisition_provenance(
         reflection_calls=int(value("reflection_calls")),
         evaluation_chain_calls=int(value("evaluation_chain_calls")),
         trace_sha256=str(value("trace_sha256")),
+        taskset_amendment_id=campaign.taskset_amendment_id,
     ).with_id()
 
 

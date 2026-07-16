@@ -201,6 +201,7 @@ def main() -> int:
         acquisition_write_count=acquisition_writes,
         secret_scan_passed=args.secret_scan_passed,
         inline_rgb_detected=args.inline_rgb_detected,
+        taskset_amendment_id=str(campaign.get("taskset_amendment_id", "")),
     ).with_id()
 
     output = Path(args.output)

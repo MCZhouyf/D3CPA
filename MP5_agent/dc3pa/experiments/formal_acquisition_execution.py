@@ -168,6 +168,7 @@ class FormalAcquisitionCampaign:
     controller_identity_sha256: str
     evaluator_identity_sha256: str
     retry_policy_id: str
+    taskset_amendment_id: str = ""
     expected_episode_count: int = EXPECTED_EPISODES
     health_batch_size: int = 10
     schedule_order_must_be_preserved: bool = True
@@ -220,6 +221,8 @@ class FormalAcquisitionCampaign:
     def payload_without_id(self) -> dict[str, Any]:
         payload = asdict(self)
         payload.pop("campaign_id", None)
+        if not self.taskset_amendment_id:
+            payload.pop("taskset_amendment_id", None)
         return payload
 
     def compute_campaign_id(self) -> str:
@@ -284,6 +287,7 @@ class FormalAcquisitionAttempt:
     acquisition_write_count: int
     secret_scan_passed: bool
     inline_rgb_detected: bool
+    taskset_amendment_id: str = ""
     schema_version: int = SCHEMA_VERSION
     receipt_id: str = ""
 
@@ -409,6 +413,8 @@ class FormalAcquisitionAttempt:
     def payload_without_id(self) -> dict[str, Any]:
         payload = asdict(self)
         payload.pop("receipt_id", None)
+        if not self.taskset_amendment_id:
+            payload.pop("taskset_amendment_id", None)
         payload["returned_model_identities"] = list(
             self.returned_model_identities
         )
