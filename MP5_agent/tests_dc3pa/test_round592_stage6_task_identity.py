@@ -1,4 +1,5 @@
 from scripts_dc3pa.stage6_run_minecraft import (
+    _apply_formal_acquisition_execution_budget,
     _expected_reasoning_only_provider_calls,
     _runtime_target_matches_catalog_task,
     _validate_formal_task_spec,
@@ -81,6 +82,28 @@ def test_formal_task_spec_rejects_unapproved_runtime_name(tmp_path):
             runtime_task_path=task_path,
             runtime_task={"task": "wooden button", "quantity": 1},
         )
+
+
+def test_formal_acquisition_budget_caps_legacy_exploration(monkeypatch):
+    budget = type(
+        "Budget",
+        (),
+        {
+            "phase": "experience_acquisition",
+            "maximum_high_level_steps_per_episode": 60,
+        },
+    )()
+    blueprint = type("Blueprint", (), {"phase_budgets": (budget,)})()
+    monkeypatch.setenv("DC3PA_MAX_EXPLORE_STEPS", "10000")
+
+    assert _apply_formal_acquisition_execution_budget(blueprint) is budget
+    assert __import__("os").environ["DC3PA_MAX_EXPLORE_STEPS"] == "60"
+
+
+def test_formal_acquisition_budget_requires_one_frozen_phase():
+    blueprint = type("Blueprint", (), {"phase_budgets": ()})()
+    with pytest.raises(ValueError, match="exactly one"):
+        _apply_formal_acquisition_execution_budget(blueprint)
 
 
 def test_single_attempt_provider_calls_include_final_failure_reflection():

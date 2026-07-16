@@ -338,6 +338,25 @@ def _configure_real_experiment_seed(
     return requested_seed
 
 
+def _apply_formal_acquisition_execution_budget(blueprint: Any) -> Any:
+    """Bind legacy low-level exploration to the frozen acquisition budget."""
+    matching = tuple(
+        item
+        for item in getattr(blueprint, "phase_budgets", ())
+        if getattr(item, "phase", "") == "experience_acquisition"
+    )
+    if len(matching) != 1:
+        raise ValueError(
+            "Blueprint must define exactly one experience_acquisition budget"
+        )
+    budget = matching[0]
+    maximum_steps = int(budget.maximum_high_level_steps_per_episode)
+    if maximum_steps <= 0:
+        raise ValueError("Formal acquisition exploration budget must be positive")
+    os.environ["DC3PA_MAX_EXPLORE_STEPS"] = str(maximum_steps)
+    return budget
+
+
 def _formal_acquisition_provenance(
     *, campaign, entry: Mapping[str, Any], attempt_id: str, receipt
 ) -> AcquisitionRecordProvenance:
@@ -923,6 +942,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     formal_acquisition_entry = None
     formal_acquisition_attempt_id = ""
     formal_acquisition_staging_root = None
+    formal_acquisition_execution_budget = None
     if formal_acquisition_enabled:
         try:
             campaign_payload = _load_json(args.formal_acquisition_campaign)
@@ -1239,14 +1259,18 @@ def main(argv: Optional[list[str]] = None) -> int:
                     )
             if formal_acquisition_campaign is not None:
                 if args.real_experiment_phase != "acquisition_completed":
-                    parser.error("formal acquisition requires acquisition_completed phase")
+                    parser.error(
+                        "formal acquisition requires acquisition_completed phase"
+                    )
                 entry = formal_acquisition_entry
                 assert entry is not None
                 if (
                     args.real_experiment_task != str(entry["task"])
                     or str(args.real_experiment_seed) != str(entry["seed"])
                 ):
-                    parser.error("real experiment task/seed differs from schedule entry")
+                    parser.error(
+                        "real experiment task/seed differs from schedule entry"
+                    )
                 task_list = _load_task_list(args.task)
                 if len(task_list) != 1:
                     parser.error("task JSON differs from formal schedule entry")
@@ -1269,6 +1293,14 @@ def main(argv: Optional[list[str]] = None) -> int:
                         )
                     except (OSError, TypeError, ValueError) as exc:
                         parser.error(str(exc))
+                try:
+                    formal_acquisition_execution_budget = (
+                        _apply_formal_acquisition_execution_budget(
+                            real_experiment_blueprint
+                        )
+                    )
+                except (TypeError, ValueError) as exc:
+                    parser.error(str(exc))
             if alias_arguments_present:
                 try:
                     provider_alias_policy = load_provider_model_alias_policy(
@@ -1645,6 +1677,28 @@ def main(argv: Optional[list[str]] = None) -> int:
                 openai_key=args.openai_key, memory=memory, model_name=args.gpt_model_name
             )
             trace_writer = JsonlTraceWriter(args.trace)
+            if formal_acquisition_execution_budget is not None:
+                trace_writer.write(
+                    "formal_execution_budget_applied",
+                    {
+                        "phase": formal_acquisition_execution_budget.phase,
+                        "maximum_high_level_steps_per_episode": (
+                            formal_acquisition_execution_budget.maximum_high_level_steps_per_episode
+                        ),
+                        "maximum_llm_calls_per_episode": (
+                            formal_acquisition_execution_budget.maximum_llm_calls_per_episode
+                        ),
+                        "maximum_replans_per_episode": (
+                            formal_acquisition_execution_budget.maximum_replans_per_episode
+                        ),
+                        "timeout_seconds_per_episode": (
+                            formal_acquisition_execution_budget.timeout_seconds_per_episode
+                        ),
+                        "legacy_exploration_environment_variable": (
+                            "DC3PA_MAX_EXPLORE_STEPS"
+                        ),
+                    },
+                )
             if real_experiment_trace_payload is not None:
                 trace_writer.write(
                     "real_experiment_launch_validated",
