@@ -667,6 +667,14 @@ class Controller:
     def _apply_diagnostic_log_fallback(self, env, **kwargs):
         return self._apply_log_bootstrap(env, **kwargs)
 
+    @staticmethod
+    def _is_formal_log_acquisition_step(step):
+        return any(
+            action.get("name") in {"find", "move_to", "mine"}
+            and is_log_target_name(action.get("args", {}).get("obj"))
+            for action in step.get("actions", ())
+        )
+
     def _gather_logs(self, env, underground, target_logs, max_attempts=3):
         session = getattr(self, "_dc3pa_log_fallback_session", None)
         if session is not None and hasattr(session, "target_quantity"):
@@ -963,11 +971,7 @@ class Controller:
             formal_log_step = bool(
                 log_session is not None
                 and hasattr(log_session, "target_quantity")
-                and any(
-                    action.get("name") == "mine"
-                    and is_log_target_name(action.get("args", {}).get("obj"))
-                    for action in step.get("actions", ())
-                )
+                and self._is_formal_log_acquisition_step(step)
             )
             if formal_log_step:
                 declared_target = int(log_session.target_quantity(0))

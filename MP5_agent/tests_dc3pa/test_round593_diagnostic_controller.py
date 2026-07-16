@@ -202,3 +202,24 @@ def test_formal_controller_uses_plan_target_instead_of_local_target(monkeypatch)
     assert controller.memory.inventory == {"stick": 2.0, "log": 2.0}
     assert session.events[0].planner_declared_log_requirement == 2
     assert session.events[0].injected_logs == 2
+
+
+@pytest.mark.parametrize("action_name", ("find", "move_to", "mine"))
+def test_formal_log_step_detection_supports_split_workflows(action_name):
+    step = {
+        "actions": [
+            {"name": action_name, "args": {"obj": "log", "tool": None}}
+        ]
+    }
+
+    assert Controller._is_formal_log_acquisition_step(step)
+
+
+def test_formal_log_step_detection_does_not_expand_to_other_resources():
+    step = {
+        "actions": [
+            {"name": "move_to", "args": {"obj": "cobblestone"}}
+        ]
+    }
+
+    assert not Controller._is_formal_log_acquisition_step(step)
