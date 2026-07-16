@@ -14,6 +14,7 @@ try:
         emit_execution_event,
         snapshot_inventory,
     )
+    from dc3pa.experiments.formal_log_bootstrap import is_log_target_name
 except ModuleNotFoundError:
     mp5_root = Path(__file__).resolve().parents[1]
     if str(mp5_root) not in sys.path:
@@ -24,6 +25,7 @@ except ModuleNotFoundError:
         emit_execution_event,
         snapshot_inventory,
     )
+    from dc3pa.experiments.formal_log_bootstrap import is_log_target_name
 
 class Controller:
     def __init__(
@@ -963,9 +965,7 @@ class Controller:
                 and hasattr(log_session, "target_quantity")
                 and any(
                     action.get("name") == "mine"
-                    and normalize_inventory_name(
-                        action.get("args", {}).get("obj")
-                    ) == "log"
+                    and is_log_target_name(action.get("args", {}).get("obj"))
                     for action in step.get("actions", ())
                 )
             )

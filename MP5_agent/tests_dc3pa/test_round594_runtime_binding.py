@@ -49,6 +49,14 @@ def test_planner_log_target_uses_only_explicit_acquisition_declarations():
     assert planner_declared_log_requirement(_plan(craft_only)) == 0
 
 
+def test_planner_log_target_accepts_minecraft_log_item_names():
+    oak_log = PlanStep(
+        times=2,
+        actions=[Action(name="mine", args={"obj": "oak_log", "tool": ""})],
+    )
+    assert planner_declared_log_requirement(_plan(oak_log)) == 2
+
+
 def test_formal_session_injects_declared_shortfall_and_binds_plan_version():
     policy = FormalLogBootstrapPolicy().with_id()
     session = FormalLogBootstrapSession(

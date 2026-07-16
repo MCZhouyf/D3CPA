@@ -254,6 +254,11 @@ class FormalLogBootstrapEvent:
         return payload
 
 
+def is_log_target_name(value: Any) -> bool:
+    normalized = " ".join(str(value).replace("_", " ").lower().split())
+    return normalized == "log" or normalized.endswith(" log")
+
+
 def planner_declared_log_requirement(plan: Any) -> int:
     """Read only explicit ``mine log`` quantities from the current plan."""
 
@@ -286,10 +291,7 @@ def planner_declared_log_requirement(plan: Any) -> int:
                 args = action.get("args", {})
             if name != "mine" or not isinstance(args, Mapping):
                 continue
-            target = " ".join(
-                str(args.get("obj", "")).replace("_", " ").lower().split()
-            )
-            if target == "log":
+            if is_log_target_name(args.get("obj", "")):
                 declared += quantity
     return declared
 
