@@ -59,6 +59,27 @@ class FakeEnv:
         }
 
 
+class OneStaleFrameEnv(FakeEnv):
+    def __init__(self, memory):
+        super().__init__(memory)
+        self.pending_inventory = None
+        self.post_set_event_count = 0
+
+    def events(self):
+        if self.pending_inventory is not None:
+            self.post_set_event_count += 1
+            if self.post_set_event_count > 1:
+                self.memory.inventory = self.pending_inventory
+                self.pending_inventory = None
+        return super().events()
+
+    def set_inventory(self, items):
+        self.set_inventory_calls.append(tuple(items))
+        self.pending_inventory = {
+            item.name.replace("_", " "): float(item.quantity) for item in items
+        }
+
+
 def _controller(inventory=None):
     controller = Controller.__new__(Controller)
     controller.memory = FakeMemory(inventory)
@@ -108,3 +129,27 @@ def test_controller_without_session_never_calls_set_inventory(monkeypatch):
 
     assert not controller._gather_logs(env, False, target_logs=2, max_attempts=3)
     assert not env.set_inventory_calls
+
+
+def test_controller_fallback_tolerates_one_stale_inventory_frame(monkeypatch):
+    controller = _controller({"stick": 2})
+    env = OneStaleFrameEnv(controller.memory)
+    session = DiagnosticLogFallbackSession(
+        policy=LogFallbackPolicy().with_id(),
+        source_commit="commit",
+        task="craft fence",
+        seed="19",
+    )
+    controller._dc3pa_log_fallback_session = session
+    monkeypatch.setattr("controller.check_find", lambda *args, **kwargs: False)
+    monkeypatch.setattr("controller.approach", lambda *args, **kwargs: False)
+    monkeypatch.setattr(
+        "controller.explore_above_ground_none", lambda *args, **kwargs: None
+    )
+
+    assert controller._gather_logs(env, False, target_logs=4, max_attempts=3)
+
+    assert env.post_set_event_count == 2
+    assert controller.memory.inventory == {"stick": 2.0, "log": 4.0}
+    assert session.events[0].inventory_after == 4
+    assert session.events[0].injected_count == 4

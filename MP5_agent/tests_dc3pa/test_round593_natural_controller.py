@@ -33,6 +33,9 @@ class FakeMemory:
     def __init__(self, inventory=None):
         self.inventory = dict(inventory or {})
 
+    def update_inventory(self, inventory):
+        self.inventory = dict(inventory)
+
 
 def _controller(inventory=None):
     controller = Controller.__new__(Controller)
@@ -83,6 +86,99 @@ def test_consecutive_table_recipe_is_detected_without_inventory_fabrication():
     assert returned is events
     assert memory.inventory == {"planks": 3, "stick": 2}
     assert "crafting table" not in memory.inventory
+
+
+def test_inventory_count_normalizes_recipe_item_names():
+    events = _events(inventory={"wooden pickaxe": 1, "oak_log": 2})
+
+    assert structured_actions._inventory_item_count(events, "wooden_pickaxe") == 1
+    assert structured_actions._inventory_item_count(events, "oak log") == 2
+
+
+def test_table_inventory_decrease_proves_placement_when_nearby_sensor_is_false():
+    events = _events(inventory={})
+    events["nearby_tools"] = {"table": False}
+
+    assert structured_actions._crafting_table_placement_accepted(events, 1)
+    assert not structured_actions._crafting_table_placement_accepted(events, 0)
+
+
+@pytest.mark.parametrize(
+    ("provider_name", "registry_name"),
+    [
+        ("oak_planks", "planks"),
+        ("crafting_table", "crafting table"),
+        ("wooden_pickaxe", "wooden pickaxe"),
+        ("iron_ingot", "iron ingot"),
+    ],
+)
+def test_provider_item_names_normalize_to_controller_registry(
+    provider_name, registry_name
+):
+    assert structured_actions.normalize_inventory_name(provider_name) == registry_name
+
+
+def test_craft_execution_uses_normalized_target_and_platform(monkeypatch):
+    controller = _controller({"planks": 4, "crafting table": 1})
+    controller._sync_memory = lambda env: None
+    observed = {}
+
+    def fake_action_craft(
+        env,
+        item,
+        memory,
+        use_crafting_table,
+        use_furnace,
+        craft_num,
+        reclaim_crafting_table,
+    ):
+        observed.update(
+            item=item,
+            use_crafting_table=use_crafting_table,
+            use_furnace=use_furnace,
+        )
+        return ["planks", "crafting table"], [8.0, 1.0]
+
+    monkeypatch.setattr("controller.action_craft", fake_action_craft)
+
+    assert controller._execute_craft_with_retries(
+        object(),
+        {
+            "obj": {"oak_planks": 4},
+            "materials": {"oak_log": 1},
+            "platform": "crafting_table",
+        },
+        "planks",
+        4,
+        max_attempts=1,
+    )
+    assert observed == {
+        "item": "planks",
+        "use_crafting_table": True,
+        "use_furnace": False,
+    }
+
+
+def test_craft_preparation_accepts_provider_material_and_platform_names():
+    events = _events(inventory={"planks": 4, "crafting table": 1})
+
+    class FakeEnv:
+        def step(self, _action):
+            return events, 0, False, {}
+
+    result = _controller().check_action_preparation(
+        FakeEnv(),
+        "craft",
+        {
+            "obj": {"fence": 3},
+            "materials": {"oak_planks": 4},
+            "platform": "crafting_table",
+        },
+        {"task": "fence"},
+        events,
+    )
+
+    assert result["success"] is True
 
 
 @pytest.mark.parametrize("target", ["cobblestone", "log"])

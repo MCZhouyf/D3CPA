@@ -547,6 +547,11 @@ class Controller:
             ]
             env.set_inventory(inventory_items)
             self._sync_memory(env)
+            if dict(self.memory.inventory) != dict(requested):
+                # MineDojo can expose one stale frame immediately after an
+                # inventory intervention. A second mismatch still fails closed
+                # in DiagnosticLogFallbackSession.
+                self._sync_memory(env)
             return dict(self.memory.inventory)
 
         event = session.intervene(
@@ -731,6 +736,7 @@ class Controller:
         reclaim_crafting_table=True,
     ):
         target_name = normalize_inventory_name(list(args["obj"].keys())[0])
+        normalized_platform = normalize_inventory_name(args.get("platform"))
         target_quantity = int(list(args["obj"].values())[0])
         expected_quantity = self._inventory_count(target_name) + target_quantity
         adjusted_craft_num = update_craft_num(craft_name, craft_num)
@@ -745,8 +751,8 @@ class Controller:
                     env,
                     craft_name,
                     self.memory,
-                    args["platform"]=="crafting table",
-                    args["platform"]=="furnace",
+                    normalized_platform == "crafting table",
+                    normalized_platform == "furnace",
                     craft_num=adjusted_craft_num,
                     reclaim_crafting_table=reclaim_crafting_table,
                 )
@@ -1059,7 +1065,9 @@ class Controller:
                     elif name == "craft":
                         events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); 
                         share_memory(self.memory,events)
-                        craft_name = list(args["obj"].keys())[0].replace(" ", "_")
+                        craft_name = normalize_inventory_name(
+                            list(args["obj"].keys())[0]
+                        ).replace(" ", "_")
                         craft_num = int(list(args["obj"].values())[0])
                         crafted_obj = normalize_inventory_name(list(args["obj"].keys())[0])
                         if (
@@ -1410,29 +1418,33 @@ class Controller:
             print(f"Crafting my inventory is {self.memory.inventory}")
             platform = args_dict["platform"]
             if platform:
+                normalized_platform = normalize_inventory_name(platform)
                 nearby_key = {
                     "crafting table": "table",
                     "furnace": "furnace",
-                }.get(normalize_inventory_name(platform))
+                }.get(normalized_platform)
                 nearby_platform = bool(
                     nearby_key
                     and isinstance(events, dict)
                     and events.get("nearby_tools", {}).get(nearby_key, False)
                 )
                 tracked_platform = bool(
-                    normalize_inventory_name(platform) == "crafting table"
+                    normalized_platform == "crafting table"
                     and getattr(
                         self.memory, "_dc3pa_crafting_table_placed", False
                     )
                 )
                 if (
-                    (platform not in self.memory.inventory or self.memory.inventory[platform] <= 0)
+                    (
+                        normalized_platform not in self.memory.inventory
+                        or self.memory.inventory[normalized_platform] <= 0
+                    )
                     and not nearby_platform
                     and not tracked_platform
                 ):
                     if (
                         self._is_deep_mining_task(task_information)
-                        and normalize_inventory_name(platform) in {"crafting table", "furnace"}
+                        and normalized_platform in {"crafting table", "furnace"}
                     ):
                         print(f"{platform} is not in inventory; allowing deep mining craft attempt in case it is placed nearby.")
                     else:

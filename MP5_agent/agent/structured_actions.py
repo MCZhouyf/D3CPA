@@ -2094,11 +2094,23 @@ def _track_crafting_table_placement(memory, placed):
 def _inventory_item_count(events, item):
     names = events['inventory']['name'].tolist()
     quantities = events['inventory']['quantity'].tolist()
-    return sum(float(quantity) for name, quantity in zip(names, quantities) if name == item)
+    target = normalize_inventory_name(item)
+    return sum(
+        float(quantity)
+        for name, quantity in zip(names, quantities)
+        if normalize_inventory_name(name) == target
+    )
 
 
 def _camera_action_index(delta_degrees):
     return max(0, min(24, int(round(float(delta_degrees) / 15.0)) + 12))
+
+
+def _crafting_table_placement_accepted(events, before_count):
+    return (
+        _nearby_tool(events, "table")
+        or _inventory_item_count(events, "crafting table") < before_count
+    )
 
 
 def _place_crafting_table(env, events, memory, max_attempts=4):
@@ -2133,15 +2145,7 @@ def _place_crafting_table(env, events, memory, max_attempts=4):
             events,_,_,_ = env.step([0,0,0,12,12,6,0,table_index]); save_rgb_for_video(events)
             events = sleep(env)
             share_memory(memory, events)
-            if _nearby_tool(events, "table"):
-                _track_crafting_table_placement(memory, True)
-                return events, True
-            if (
-                "nearby_tools" not in events
-                and _inventory_item_count(events, 'crafting table') < before_count
-            ):
-                # Some MineDojo wrapper stacks omit nearby_tools, while a decreased
-                # inventory count still proves that the place command was accepted.
+            if _crafting_table_placement_accepted(events, before_count):
                 _track_crafting_table_placement(memory, True)
                 return events, True
 
@@ -2315,14 +2319,19 @@ def action_craft(
             name = events['inventory']['name'].tolist()
             num = events['inventory']['quantity'].tolist()
             return name, num
+        crafted_count_before = _inventory_item_count(events, item)
         print(f"crafting .....")
         for i in range(craft_num):
             events,_,_,_ = env.step([0,0,0,12,12,4,item_recipy_index,0]); save_rgb_for_video(events) #craft item
         events = sleep(env)
-        if reclaim_crafting_table:
+        crafted_count_after = _inventory_item_count(events, item)
+        if reclaim_crafting_table and crafted_count_after > crafted_count_before:
             events, table_reclaimed = _reclaim_crafting_table(env, events, memory)
             if not table_reclaimed:
                 print("crafted item, but crafting table recovery did not complete")
+        elif reclaim_crafting_table:
+            _track_crafting_table_placement(memory, True)
+            print("craft did not produce the target; keeping placed table for retry")
         else:
             _track_crafting_table_placement(memory, True)
             print("leaving placed crafting table available for the next table craft")
