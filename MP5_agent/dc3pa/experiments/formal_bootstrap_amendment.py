@@ -12,6 +12,11 @@ from typing import Any, Mapping, Sequence
 SCHEMA_VERSION = 1
 EXPECTED_AUTHOR = "ZYF"
 EXPECTED_MODEL = "gpt-5.1"
+STABLE_IDENTITY_POLICY = "record_and_require_epoch_stability"
+RECORD_ONLY_IDENTITY_POLICY = "record_only_no_stability_requirement"
+MODEL_IDENTITY_APPROVAL_SHA256 = (
+    "26ec20eb43aab76a8a9ba61a5072f11d24f1a2981a698acd68edf3b56583f6d0"
+)
 EXPECTED_PREVIOUS_GATE_ID = (
     "27f2bc9cd18a33c21b68fbd6a85cfdf8e7560005c63319381c1debcaa9f34a4d"
 )
@@ -63,6 +68,7 @@ class FormalBootstrapAmendment:
     final_seeds_changed: bool
     holdout_opened: bool
     author_statement: tuple[str, ...]
+    model_identity_approval_sha256: str = ""
     schema_version: int = SCHEMA_VERSION
     amendment_id: str = ""
 
@@ -92,14 +98,22 @@ class FormalBootstrapAmendment:
             raise ValueError("Formal bootstrap cannot be introduced after acquisition")
         if self.model_requested_alias != EXPECTED_MODEL:
             raise ValueError("Requested model alias must remain gpt-5.1")
-        if self.returned_model_identity_policy != (
-            "record_and_require_epoch_stability"
-        ):
+        if self.returned_model_identity_policy not in {
+            STABLE_IDENTITY_POLICY,
+            RECORD_ONLY_IDENTITY_POLICY,
+        }:
             raise ValueError("Unexpected returned-model identity policy")
         if not self.returned_identity_must_be_recorded:
             raise ValueError("Returned model identity must be recorded")
-        if not self.returned_identity_must_be_stable_within_epoch:
-            raise ValueError("Returned model identity must be epoch-stable")
+        if self.returned_model_identity_policy == STABLE_IDENTITY_POLICY:
+            if not self.returned_identity_must_be_stable_within_epoch:
+                raise ValueError("Stable identity policy requires epoch stability")
+        elif self.returned_identity_must_be_stable_within_epoch:
+            raise ValueError("Record-only identity policy must waive epoch stability")
+        elif self.model_identity_approval_sha256 != (
+            MODEL_IDENTITY_APPROVAL_SHA256
+        ):
+            raise ValueError("Record-only identity approval SHA256 mismatch")
         if self.requested_returned_equality_required:
             raise ValueError("Requested/returned equality is no longer required")
         if not all(

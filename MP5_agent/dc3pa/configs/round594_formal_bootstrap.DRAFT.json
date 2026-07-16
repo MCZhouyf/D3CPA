@@ -8,6 +8,6 @@
   "formal_acquisition_schedule_id": "REPLACE",
   "condition_name": "planning-focused log-bootstrap MineDojo",
   "requested_model": "gpt-5.1",
-  "returned_identity_policy": "record_and_require_epoch_stability",
+  "returned_identity_policy": "record_only_no_stability_requirement",
   "requested_returned_equality_required": false
 }

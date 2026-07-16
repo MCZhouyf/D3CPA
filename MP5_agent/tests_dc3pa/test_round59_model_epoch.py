@@ -52,6 +52,57 @@ def test_authorized_alias_epoch_preserves_returned_model_identity():
     })
     assert close_epoch(epoch,[end]).status=="closed"
 
+def test_record_only_alias_epoch_allows_returned_identity_changes():
+    now=datetime.now(timezone.utc)
+    policy_id="a"*64
+    start=ProbeObservation(
+        observed_at=now.isoformat(),requested_model="gpt-5.1",
+        returned_model="gpt-4o",profile_id="profile",reasoning_effort="low",
+        purpose="planning",request_succeeded=True,request_text_logged=False,
+        response_text_logged=False,endpoint_fingerprint="endpoint",
+        client_context_fingerprint="client",probe_protocol_id="probe",
+        input_tokens=1,output_tokens=1,reasoning_tokens=0,total_tokens=2,
+        provider_model_alias_policy_id=policy_id)
+    epoch=open_epoch(epoch_name="record-only",blueprint_id="bp",
+        source_commit="commit",prompt_hashes={"planner":"h"},
+        model_profile_id="profile",client_context_fingerprint="client",
+        endpoint_fingerprint="endpoint",schedule_id="schedule",
+        start_probes=[start],policy=EpochPolicy(
+            require_returned_model_match=False,
+            provider_model_alias_policy_id=policy_id,
+            require_returned_model_stability=False))
+    end=ProbeObservation(**{
+        **start.to_dict(),
+        "observed_at":(now+timedelta(hours=1)).isoformat(),
+        "returned_model":"gpt-4o-iri",
+    })
+    assert close_epoch(epoch,[end]).status=="closed"
+
+def test_stable_alias_epoch_rejects_returned_identity_changes():
+    now=datetime.now(timezone.utc)
+    policy_id="a"*64
+    start=ProbeObservation(
+        observed_at=now.isoformat(),requested_model="gpt-5.1",
+        returned_model="gpt-4o",profile_id="profile",reasoning_effort="low",
+        purpose="planning",request_succeeded=True,request_text_logged=False,
+        response_text_logged=False,endpoint_fingerprint="endpoint",
+        client_context_fingerprint="client",probe_protocol_id="probe",
+        input_tokens=1,output_tokens=1,reasoning_tokens=0,total_tokens=2,
+        provider_model_alias_policy_id=policy_id)
+    epoch=open_epoch(epoch_name="stable",blueprint_id="bp",
+        source_commit="commit",prompt_hashes={"planner":"h"},
+        model_profile_id="profile",client_context_fingerprint="client",
+        endpoint_fingerprint="endpoint",schedule_id="schedule",
+        start_probes=[start],policy=EpochPolicy(
+            require_returned_model_match=False,
+            provider_model_alias_policy_id=policy_id))
+    end=ProbeObservation(**{
+        **start.to_dict(),
+        "observed_at":(now+timedelta(hours=1)).isoformat(),
+        "returned_model":"gpt-4o-iri",
+    })
+    assert close_epoch(epoch,[end]).status=="invalid"
+
 def test_alias_epoch_rejects_probe_from_another_policy():
     now=datetime.now(timezone.utc)
     item=ProbeObservation(

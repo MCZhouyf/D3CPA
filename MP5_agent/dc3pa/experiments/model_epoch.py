@@ -33,6 +33,7 @@ class EpochPolicy:
     hidden_backend_drift_under_same_alias_is_unobservable: bool = True
     require_returned_model_match: bool = True
     provider_model_alias_policy_id: str = ""
+    require_returned_model_stability: bool = True
 
     def __post_init__(self):
         if self.maximum_duration_hours <= 0:
@@ -154,7 +155,10 @@ class ModelEpoch:
                 reasons.append("client context mismatch")
             if probe.request_text_logged or probe.response_text_logged:
                 reasons.append("text logging enabled")
-        if not self.policy.require_returned_model_match:
+        if (
+            not self.policy.require_returned_model_match
+            and self.policy.require_returned_model_stability
+        ):
             returned_identities = {
                 probe.returned_model.strip()
                 for probe in probes
@@ -175,6 +179,9 @@ class ModelEpoch:
     def payload(self):
         value = asdict(self)
         value.pop("epoch_id", None)
+        # Omit the historical default so existing immutable epoch IDs remain valid.
+        if self.policy.require_returned_model_stability:
+            value["policy"].pop("require_returned_model_stability", None)
         value["prompt_hashes"] = dict(sorted(self.prompt_hashes.items()))
         value["start_probes"] = [item.to_dict() for item in self.start_probes]
         value["end_probes"] = [item.to_dict() for item in self.end_probes]

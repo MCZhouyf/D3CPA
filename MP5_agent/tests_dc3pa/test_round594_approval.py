@@ -6,6 +6,7 @@ from dc3pa.experiments.formal_bootstrap_approval import (
     validate_formal_bootstrap_blueprint,
 )
 from dc3pa.experiments.formal_bootstrap_authorization import ZYF_APPROVAL_SHA256
+from dc3pa.experiments.formal_bootstrap_amendment import MODEL_IDENTITY_APPROVAL_SHA256
 from tests_dc3pa.round56_helpers import make_blueprint
 
 
@@ -29,7 +30,7 @@ def _binding(blueprint, controller, evaluator):
         final_seeds_sha256="seeds",
         prompt_hashes=blueprint.prompt_hashes,
         requested_model="gpt-5.1",
-        returned_identity_policy="record_and_require_epoch_stability",
+        returned_identity_policy="record_only_no_stability_requirement",
         requested_returned_equality_required=False,
         all_formal_methods_use_bootstrap=True,
         all_formal_scopes_use_bootstrap=True,
@@ -42,6 +43,7 @@ def _binding(blueprint, controller, evaluator):
         task_catalog_changed=False,
         final_seeds_changed=False,
         holdout_opened=False,
+        model_identity_approval_sha256=MODEL_IDENTITY_APPROVAL_SHA256,
     ).with_id()
 
 

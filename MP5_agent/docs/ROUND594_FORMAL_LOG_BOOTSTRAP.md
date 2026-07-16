@@ -12,9 +12,10 @@ Episodes begin with an empty inventory. For a plan version that explicitly
 declares log acquisition, the Controller performs at most three bounded
 natural collection attempts. If the declared target is still unmet, the
 runtime adds exactly the positive log shortfall. No other item may be added.
-The target is the sum of explicit `mine log` action quantities (`step.times`)
-in that exact plan version. Craft materials and recipes are not consulted, so
-an omitted or insufficient declaration remains a planning failure.
+The target is the sum of explicit log-mining action quantities (`step.times`)
+in that exact plan version, including normalized item names such as `oak_log`.
+Craft materials and recipes are not consulted, so an omitted or insufficient
+declaration remains a planning failure.
 
 ## Required reporting
 
@@ -42,9 +43,11 @@ variant and quantity, then re-reads the environment. A stale first frame is
 tolerated once; a second mismatch fails closed. This intervention does not
 change Controller/Evaluator task-success logic.
 
-## Remaining limitation
+## Returned-model identity
 
-A stable provider-returned model identity within an epoch is required, but it
-cannot prove that hidden backend weights stayed unchanged. Real MineDojo
-readiness evidence is therefore reported with this limitation rather than as
-backend identity proof.
+Every nonempty provider-returned model identity is recorded in run receipts and
+Model Epoch evidence. Requested/returned equality and identity stability within
+a run, campaign or epoch are not gating conditions under the author-approved
+record-only policy. This preserves intermediary variation for audit without
+claiming that a returned string proves the identity or stability of hidden
+backend weights.

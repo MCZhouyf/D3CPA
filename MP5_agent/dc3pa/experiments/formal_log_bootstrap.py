@@ -587,8 +587,6 @@ class FormalBootstrapRunReceipt:
             raise ValueError("Run receipt counts cannot be negative")
         if self.pipeline_pass and not self.returned_model_identities:
             raise ValueError("Passing run must record returned model identity")
-        if self.pipeline_pass and not self.returned_identity_stable_within_run:
-            raise ValueError("Returned model identity changed within a passing run")
         if self.pipeline_pass and not self.provider_call_contract_passed:
             raise ValueError("Provider call contract failed for a passing run")
         if self.pipeline_pass and not self.output_root_guard_passed:

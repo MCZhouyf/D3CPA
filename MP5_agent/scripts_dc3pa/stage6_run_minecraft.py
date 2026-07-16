@@ -311,7 +311,7 @@ def _returned_model_validation(
     if provider_alias_policy is not None:
         return "approved_alias_policy", False
     if formal_bootstrap_enabled:
-        return "formal_epoch_stability_policy", False
+        return "formal_record_only_policy", False
     return "strict_identity_match", True
 
 
@@ -975,7 +975,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             exception is None
             and environment_started
             and provider_contract
-            and identity_stable
+            and returned_identities
             and trace_sha256
         )
         receipt = FormalBootstrapRunReceipt(

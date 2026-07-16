@@ -24,6 +24,11 @@ def main():
     o.add_argument("--start-probe", action="append", required=True)
     o.add_argument("--provider-model-alias-policy")
     o.add_argument("--provider-model-alias-approval")
+    o.add_argument(
+        "--allow-returned-model-instability",
+        action="store_true",
+        help="Record returned identities without requiring epoch stability.",
+    )
     c = sub.add_parser("close")
     c.add_argument("--open-epoch", required=True)
     c.add_argument("--end-probe", action="append", required=True)
@@ -52,6 +57,14 @@ def main():
             policy = EpochPolicy(
                 require_returned_model_match=False,
                 provider_model_alias_policy_id=alias_policy.policy_id,
+                require_returned_model_stability=(
+                    not a.allow_returned_model_instability
+                ),
+            )
+        elif a.allow_returned_model_instability:
+            p.error(
+                "--allow-returned-model-instability requires the approved "
+                "provider model-alias policy"
             )
         item = open_epoch(
             epoch_name=a.epoch_name, blueprint_id=a.blueprint_id,

@@ -8,6 +8,10 @@ from dataclasses import asdict, dataclass, replace
 from typing import Any, Mapping, Sequence
 
 from .formal_log_bootstrap import FormalBootstrapRunReceipt
+from .formal_bootstrap_amendment import (
+    MODEL_IDENTITY_APPROVAL_SHA256,
+    RECORD_ONLY_IDENTITY_POLICY,
+)
 
 
 SCHEMA_VERSION = 1
@@ -68,8 +72,6 @@ class FormalBootstrapReadinessEvidence:
             raise ValueError("Requested/returned identity equality is not required")
         if not self.returned_model_identities:
             raise ValueError("Returned model identity must be recorded")
-        if not self.returned_identity_stable_within_epoch:
-            raise ValueError("Returned identity must be stable within epoch")
         if self.eligible and self.errors:
             raise ValueError("Eligible readiness evidence cannot contain errors")
         expected = self.compute_evidence_id()
@@ -179,6 +181,12 @@ def audit_formal_bootstrap_authorization(
         reasons.append("policy/amendment/Blueprint identity is incomplete")
     if amendment.get("formal_log_bootstrap_policy_id") != policy_id:
         reasons.append("amendment/bootstrap policy mismatch")
+    if amendment.get("returned_model_identity_policy") == (
+        RECORD_ONLY_IDENTITY_POLICY
+    ) and approval_binding.get("model_identity_approval_sha256") != (
+        MODEL_IDENTITY_APPROVAL_SHA256
+    ):
+        reasons.append("record-only identity approval mismatch")
     if amendment.get("source_commit") != AMENDMENT_BASELINE_COMMIT:
         reasons.append("amendment baseline commit mismatch")
     if not amendment.get("old_preacquisition_gate_superseded", False):
@@ -361,8 +369,6 @@ def audit_formal_bootstrap_readiness(
             errors.append(f"{label}: returned identities are malformed")
         else:
             returned.update(str(value) for value in identities if str(value))
-        if not bool(item.get("returned_identity_stable_within_run", False)):
-            errors.append(f"{label}: returned identity changed within run")
         pair = (str(item.get("task", "")), str(item.get("seed", "")))
         if all(pair) and pair not in seen_pairs:
             seen_pairs.add(pair)
@@ -390,10 +396,6 @@ def audit_formal_bootstrap_readiness(
     if not returned:
         errors.append("no returned model identity was recorded")
     epoch_stable = len(returned) == 1
-    if not epoch_stable:
-        errors.append(
-            f"returned model identity changed within epoch: {sorted(returned)}"
-        )
     if len(data_binding_ids) != 1:
         errors.append(
             f"readiness receipts mix bootstrap data bindings: {sorted(data_binding_ids)}"

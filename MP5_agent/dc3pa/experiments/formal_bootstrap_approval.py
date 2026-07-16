@@ -13,6 +13,11 @@ from .formal_bootstrap_authorization import (
     OLD_GATE_ID,
     ZYF_APPROVAL_SHA256,
 )
+from .formal_bootstrap_amendment import (
+    MODEL_IDENTITY_APPROVAL_SHA256,
+    RECORD_ONLY_IDENTITY_POLICY,
+    STABLE_IDENTITY_POLICY,
+)
 
 
 SCHEMA_VERSION = 1
@@ -71,6 +76,7 @@ class FormalBootstrapApprovalBinding:
     task_catalog_changed: bool
     final_seeds_changed: bool
     holdout_opened: bool
+    model_identity_approval_sha256: str = ""
     schema_version: int = SCHEMA_VERSION
     binding_id: str = ""
 
@@ -99,8 +105,16 @@ class FormalBootstrapApprovalBinding:
             raise ValueError("Previous Pre-Acquisition gate mismatch")
         if self.requested_model != EXPECTED_MODEL:
             raise ValueError("Requested model must remain gpt-5.1")
-        if self.returned_identity_policy != "record_and_require_epoch_stability":
+        if self.returned_identity_policy not in {
+            STABLE_IDENTITY_POLICY,
+            RECORD_ONLY_IDENTITY_POLICY,
+        }:
             raise ValueError("Returned-model identity policy mismatch")
+        if self.returned_identity_policy == RECORD_ONLY_IDENTITY_POLICY and (
+            self.model_identity_approval_sha256
+            != MODEL_IDENTITY_APPROVAL_SHA256
+        ):
+            raise ValueError("Record-only identity approval SHA256 mismatch")
         if self.requested_returned_equality_required:
             raise ValueError("Requested/returned string equality is not required")
         if not self.prompt_hashes:

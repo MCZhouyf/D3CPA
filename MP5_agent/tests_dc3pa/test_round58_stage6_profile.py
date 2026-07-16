@@ -188,7 +188,7 @@ def test_stage6_legacy_model_profile_remains_default():
     (
         (None, False, ("strict_identity_match", True)),
         (object(), False, ("approved_alias_policy", False)),
-        (None, True, ("formal_epoch_stability_policy", False)),
+        (None, True, ("formal_record_only_policy", False)),
     ),
 )
 def test_stage6_returned_model_validation_follows_approved_protocol(
