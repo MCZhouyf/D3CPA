@@ -30,6 +30,11 @@ from dc3pa.experiments.log_fallback import (  # noqa: E402
     DiagnosticLogFallbackSession,
     LogFallbackPolicy,
 )
+from dc3pa.contracts import Action, Plan, PlanStep  # noqa: E402
+from dc3pa.experiments.formal_log_bootstrap import (  # noqa: E402
+    FormalLogBootstrapPolicy,
+    FormalLogBootstrapSession,
+)
 
 
 class FakeMemory:
@@ -153,3 +158,47 @@ def test_controller_fallback_tolerates_one_stale_inventory_frame(monkeypatch):
     assert controller.memory.inventory == {"stick": 2.0, "log": 4.0}
     assert session.events[0].inventory_after == 4
     assert session.events[0].injected_count == 4
+
+
+def test_formal_controller_uses_plan_target_instead_of_local_target(monkeypatch):
+    controller = _controller({"stick": 2})
+    env = FakeEnv(controller.memory)
+    session = FormalLogBootstrapSession(
+        policy=FormalLogBootstrapPolicy().with_id(),
+        amendment_id="amendment",
+        source_commit="commit",
+        blueprint_id="blueprint",
+        scope="formal_acquisition",
+        method_id="single_chain_reactive_acquisition",
+        task="craft fence",
+        seed="23",
+    )
+    session.bind_plan(
+        Plan(
+            task="craft fence",
+            plan_id="plan",
+            version=3,
+            steps=[
+                PlanStep(
+                    times=2,
+                    actions=[
+                        Action(
+                            name="mine",
+                            args={"obj": "log", "tool": ""},
+                        )
+                    ],
+                )
+            ],
+        )
+    )
+    controller._dc3pa_log_fallback_session = session
+    monkeypatch.setattr("controller.check_find", lambda *args, **kwargs: False)
+    monkeypatch.setattr("controller.approach", lambda *args, **kwargs: False)
+    monkeypatch.setattr(
+        "controller.explore_above_ground_none", lambda *args, **kwargs: None
+    )
+
+    assert controller._gather_logs(env, False, target_logs=99, max_attempts=3)
+    assert controller.memory.inventory == {"stick": 2.0, "log": 2.0}
+    assert session.events[0].planner_declared_log_requirement == 2
+    assert session.events[0].injected_logs == 2

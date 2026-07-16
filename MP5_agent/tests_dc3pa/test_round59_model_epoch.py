@@ -48,7 +48,7 @@ def test_authorized_alias_epoch_preserves_returned_model_identity():
     end=ProbeObservation(**{
         **start.to_dict(),
         "observed_at":(now+timedelta(hours=1)).isoformat(),
-        "returned_model":"gpt-4.1",
+        "returned_model":"gpt-4o",
     })
     assert close_epoch(epoch,[end]).status=="closed"
 

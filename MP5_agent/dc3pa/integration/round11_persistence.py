@@ -44,6 +44,7 @@ def commit_successful_acquisition(
     execution_telemetry: Sequence[Any],
     attempt: int,
     mode: str,
+    metadata: Mapping[str, Any] | None = None,
 ) -> tuple[str, int]:
     """Commit one successful trajectory and its locally successful scenes."""
 
@@ -98,6 +99,7 @@ def commit_successful_acquisition(
                     "capture_point": "immediately_before_action",
                     "action_key": canonical_action_key(action),
                     "local_subgoal": local_subgoal,
+                    **dict(metadata or {}),
                 },
             )
         )
@@ -115,7 +117,12 @@ def commit_successful_acquisition(
         plan=plan.to_dict(),
         telemetry=tuple(telemetry_payload),
         scene_candidates=tuple(candidates),
-        metadata={"stage": 6, "mode": mode, "attempt": int(attempt)},
+        metadata={
+            "stage": 6,
+            "mode": mode,
+            "attempt": int(attempt),
+            **dict(metadata or {}),
+        },
     )
     path = store.commit_success(record)
     return str(path), len(candidates)
@@ -134,6 +141,7 @@ def commit_calibration_episode(
     attempt: int,
     mode: str,
     confidence_observations: Sequence[Mapping[str, Any]] = (),
+    metadata: Mapping[str, Any] | None = None,
 ) -> str:
     """Persist a success or failure for later step-label construction."""
 
@@ -147,8 +155,16 @@ def commit_calibration_episode(
         success=bool(success),
         plan=plan.to_dict(),
         telemetry=telemetry,
-        confidence_observations=tuple(dict(item) for item in confidence_observations),
+        confidence_observations=tuple(
+            {**dict(item), **dict(metadata or {})}
+            for item in confidence_observations
+        ),
         failure_reason=str(failure_reason or ""),
-        metadata={"stage": 6, "mode": mode, "attempt": int(attempt)},
+        metadata={
+            "stage": 6,
+            "mode": mode,
+            "attempt": int(attempt),
+            **dict(metadata or {}),
+        },
     )
     return str(store.commit(record))

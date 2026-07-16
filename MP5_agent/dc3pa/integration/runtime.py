@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Mapping, Optional, Protocol, Tuple, runtime_checkable
+from typing import Any, Callable, Dict, Mapping, Optional, Protocol, Tuple, runtime_checkable
 
 from ..contracts import AgentState, Plan
 from ..integration.controller import ControllerAdapter, ExecutionResult
@@ -126,6 +126,9 @@ class Stage6ClosedLoopRunner:
         confidence_observer: Optional[ConfidenceObservationCollector] = None,
         passive_confidence_scorer: Optional[PassiveConfidenceScorer] = None,
         trace_writer: Optional[JsonlTraceWriter] = None,
+        record_metadata_provider: Optional[
+            Callable[[bool], Mapping[str, Any]]
+        ] = None,
     ):
         config.validate()
         if config.mode == "dc3pa" and cognitive_planner is None:
@@ -148,6 +151,7 @@ class Stage6ClosedLoopRunner:
         self.confidence_observer = confidence_observer
         self.passive_confidence_scorer = passive_confidence_scorer
         self.trace_writer = trace_writer
+        self.record_metadata_provider = record_metadata_provider
         self.memory_mode = MemoryMode.parse(config.memory_mode)
         if config.model_confidence_collection == "passive_final_plan":
             if calibration_store is None:
@@ -159,6 +163,14 @@ class Stage6ClosedLoopRunner:
                     "passive_final_plan confidence collection requires an observation "
                     "collector and passive scorer"
                 )
+
+    def _record_metadata(self, task_completed: bool) -> Dict[str, Any]:
+        if self.record_metadata_provider is None:
+            return {}
+        metadata = dict(self.record_metadata_provider(bool(task_completed)))
+        if any(not str(key).strip() for key in metadata):
+            raise ValueError("Record metadata contains an empty key")
+        return metadata
 
     def _emit(
         self,
@@ -472,7 +484,12 @@ class Stage6ClosedLoopRunner:
                         task_name=task,
                         plan=plan,
                         scenes=tuple(scenes),
-                        metadata={"stage": 6, "mode": self.config.mode, "attempt": attempt},
+                        metadata={
+                            "stage": 6,
+                            "mode": self.config.mode,
+                            "attempt": attempt,
+                            **self._record_metadata(True),
+                        },
                     )
                 )
                 recorded_any = True
@@ -517,6 +534,7 @@ class Stage6ClosedLoopRunner:
             execution_telemetry=execution_telemetry,
             attempt=attempt,
             mode=self.config.mode,
+            metadata=self._record_metadata(True),
         )
         self._emit(
             events,
@@ -560,6 +578,7 @@ class Stage6ClosedLoopRunner:
             attempt=attempt,
             mode=self.config.mode,
             confidence_observations=confidence_observations,
+            metadata=self._record_metadata(success),
         )
         self._emit(
             events,

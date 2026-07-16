@@ -49,6 +49,20 @@ from dc3pa.experiments.log_fallback import (  # noqa: E402
     load_log_fallback_policy,
     receipt_metrics_from_events,
 )
+from dc3pa.experiments.bootstrap_data_guard import (  # noqa: E402
+    assert_bootstrap_snapshot_binding,
+    load_bootstrap_data_binding,
+)
+from dc3pa.experiments.formal_bootstrap_amendment import (  # noqa: E402
+    load_formal_bootstrap_amendment,
+)
+from dc3pa.experiments.formal_log_bootstrap import (  # noqa: E402
+    FormalBootstrapRunReceipt,
+    FormalLogBootstrapSession,
+    load_formal_log_bootstrap_policy,
+    mark_formal_bootstrap_output_root,
+    validate_events_for_receipt,
+)
 from dc3pa.experiments.paired_dry_run import (  # noqa: E402
     load_paired_protocol,
 )
@@ -427,6 +441,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--provider-model-alias-approval", type=Path)
     parser.add_argument("--log-fallback-policy", type=Path)
     parser.add_argument("--paired-dry-run-protocol", type=Path)
+    parser.add_argument("--formal-log-bootstrap-policy", type=Path)
+    parser.add_argument("--formal-bootstrap-amendment", type=Path)
+    parser.add_argument("--formal-bootstrap-data-binding", type=Path)
+    parser.add_argument("--formal-bootstrap-scope", default="")
+    parser.add_argument("--formal-bootstrap-method-id", default="")
+    parser.add_argument("--formal-bootstrap-output-root", type=Path)
+    parser.add_argument("--formal-bootstrap-receipt", type=Path)
     return parser
 
 
@@ -490,6 +511,22 @@ def main(argv: Optional[list[str]] = None) -> int:
             args.paired_dry_run_protocol,
         )
     )
+    formal_bootstrap_arguments = (
+        args.formal_log_bootstrap_policy,
+        args.formal_bootstrap_amendment,
+        args.formal_bootstrap_data_binding,
+        args.formal_bootstrap_scope,
+        args.formal_bootstrap_method_id,
+        args.formal_bootstrap_output_root,
+        args.formal_bootstrap_receipt,
+    )
+    formal_bootstrap_enabled = any(formal_bootstrap_arguments)
+    if formal_bootstrap_enabled and not all(formal_bootstrap_arguments):
+        parser.error("formal log bootstrap requires all formal bootstrap arguments")
+    if formal_bootstrap_enabled and fallback_arguments_present:
+        parser.error("diagnostic fallback and formal bootstrap are mutually exclusive")
+    if formal_bootstrap_enabled and not args.real_experiment_blueprint:
+        parser.error("formal log bootstrap requires a real experiment Blueprint")
     if fallback_arguments_present and not dry_run_enabled:
         parser.error("diagnostic log fallback is allowed only in dry-run receipt mode")
     if not args.enable_diagnostic_log_fallback and (
@@ -577,8 +614,68 @@ def main(argv: Optional[list[str]] = None) -> int:
     environment_started = False
     fallback_policy = LogFallbackPolicy().with_id()
     fallback_session = None
+    formal_bootstrap_policy = None
+    formal_bootstrap_amendment = None
+    formal_bootstrap_binding = None
+    formal_bootstrap_session = None
     if args.real_experiment_blueprint:
         real_experiment_blueprint = load_blueprint(args.real_experiment_blueprint)
+        if formal_bootstrap_enabled:
+            try:
+                formal_bootstrap_policy = load_formal_log_bootstrap_policy(
+                    args.formal_log_bootstrap_policy
+                )
+                formal_bootstrap_amendment = load_formal_bootstrap_amendment(
+                    args.formal_bootstrap_amendment
+                )
+                formal_bootstrap_binding = load_bootstrap_data_binding(
+                    args.formal_bootstrap_data_binding
+                )
+                formal_bootstrap_policy.assert_scope(args.formal_bootstrap_scope)
+                expected_bindings = {
+                    "policy": (
+                        formal_bootstrap_binding.bootstrap_policy_id,
+                        formal_bootstrap_policy.policy_id,
+                    ),
+                    "amendment": (
+                        formal_bootstrap_binding.bootstrap_amendment_id,
+                        formal_bootstrap_amendment.amendment_id,
+                    ),
+                    "amendment policy": (
+                        formal_bootstrap_amendment.formal_log_bootstrap_policy_id,
+                        formal_bootstrap_policy.policy_id,
+                    ),
+                    "Blueprint": (
+                        formal_bootstrap_binding.blueprint_id,
+                        real_experiment_blueprint.blueprint_id,
+                    ),
+                    "scope": (
+                        formal_bootstrap_binding.scope,
+                        args.formal_bootstrap_scope,
+                    ),
+                    "method": (
+                        formal_bootstrap_binding.method_id,
+                        args.formal_bootstrap_method_id,
+                    ),
+                }
+                mismatches = [
+                    name for name, (actual, expected) in expected_bindings.items()
+                    if actual != expected
+                ]
+                if mismatches:
+                    raise ValueError(
+                        "Formal bootstrap binding mismatch: " + ", ".join(mismatches)
+                    )
+                mark_formal_bootstrap_output_root(
+                    args.formal_bootstrap_output_root,
+                    policy_id=formal_bootstrap_policy.policy_id,
+                    amendment_id=formal_bootstrap_amendment.amendment_id,
+                    blueprint_id=real_experiment_blueprint.blueprint_id,
+                    scope=args.formal_bootstrap_scope,
+                    method_id=args.formal_bootstrap_method_id,
+                )
+            except (OSError, TypeError, ValueError) as exc:
+                parser.error(str(exc))
         if dry_run_enabled:
             dry_run_campaign = load_campaign(args.dry_run_campaign)
             matching = [
@@ -612,6 +709,12 @@ def main(argv: Optional[list[str]] = None) -> int:
             if len(assignments) != 1:
                 parser.error("dry-run entry does not resolve to one Blueprint assignment")
             dry_run_difficulty = assignments[0].difficulty
+            if formal_bootstrap_enabled and args.formal_bootstrap_scope != (
+                "bootstrap_readiness_dry_run"
+            ):
+                parser.error(
+                    "formal bootstrap dry runs require bootstrap_readiness_dry_run scope"
+                )
             if model_profile is not None:
                 if args.mode != "reasoning_only":
                     parser.error("formal GPT-5.1 dry runs must use reasoning_only")
@@ -696,6 +799,15 @@ def main(argv: Optional[list[str]] = None) -> int:
                 parser.error(
                     "--real-experiment-blueprint requires " + ", ".join(missing)
                 )
+            if formal_bootstrap_enabled:
+                expected_scope = {
+                    "experience_acquisition": "formal_acquisition",
+                    "final_evaluation": "final_evaluation",
+                }.get(args.real_experiment_phase)
+                if expected_scope and args.formal_bootstrap_scope != expected_scope:
+                    parser.error(
+                        "formal bootstrap scope does not match real experiment phase"
+                    )
             if alias_arguments_present:
                 try:
                     provider_alias_policy = load_provider_model_alias_policy(
@@ -729,6 +841,17 @@ def main(argv: Optional[list[str]] = None) -> int:
                 "--real-experiment-run-manifest-id",
             ),
         ).to_trace_payload()
+        if formal_bootstrap_enabled:
+            formal_bootstrap_session = FormalLogBootstrapSession(
+                policy=formal_bootstrap_policy,
+                amendment_id=formal_bootstrap_amendment.amendment_id,
+                source_commit=formal_bootstrap_binding.source_commit,
+                blueprint_id=real_experiment_blueprint.blueprint_id,
+                scope=args.formal_bootstrap_scope,
+                method_id=args.formal_bootstrap_method_id,
+                task=args.real_experiment_task,
+                seed=args.real_experiment_seed,
+            )
 
     requested_environment_seed = None
     if model_profile is not None and args.real_experiment_blueprint:
@@ -805,6 +928,121 @@ def main(argv: Optional[list[str]] = None) -> int:
             ).to_dict(),
         )
         save_receipt(args.dry_run_receipt, receipt)
+
+    def write_formal_bootstrap_receipt(
+        result=None, exception: Optional[BaseException] = None
+    ) -> None:
+        if formal_bootstrap_session is None:
+            return
+        from dc3pa.experiments.dry_run import sha256_file
+
+        trace_sha256 = sha256_file(args.trace) if args.trace.exists() else ""
+        returned_identities = tuple(
+            item.returned_model for item in provider_metadata
+            if str(item.returned_model).strip()
+        )
+        identity_stable = bool(returned_identities) and (
+            len(set(returned_identities)) == 1
+        )
+        expected_calls = expected_provider_call_count
+        if model_profile is not None and args.mode == "reasoning_only":
+            expected_calls = _expected_reasoning_only_provider_calls(
+                task_count=expected_provider_call_count,
+                result=result,
+            )
+        provider_contract = expected_calls == len(provider_metadata)
+        event_items = formal_bootstrap_session.events
+        triggered = tuple(
+            item for item in event_items if item.intervention_triggered
+        )
+        result_events = tuple(getattr(result, "events", ()) or ())
+        acquisition_writes = sum(
+            item.event_type == "acquisition_record_committed"
+            for item in result_events
+        )
+        task_completed = bool(result is not None and result.success)
+        pipeline_pass = bool(
+            exception is None
+            and environment_started
+            and provider_contract
+            and identity_stable
+            and trace_sha256
+        )
+        receipt = FormalBootstrapRunReceipt(
+            run_id=(
+                dry_run_entry.entry_id
+                if dry_run_entry is not None
+                else f"{args.real_experiment_task}:{args.real_experiment_seed}"
+            ),
+            readiness_campaign_id=(
+                dry_run_campaign.campaign_id
+                if dry_run_campaign is not None
+                else ""
+            ),
+            policy_id=formal_bootstrap_policy.policy_id,
+            bootstrap_amendment_id=formal_bootstrap_amendment.amendment_id,
+            bootstrap_data_binding_id=formal_bootstrap_binding.binding_id,
+            scope=args.formal_bootstrap_scope,
+            method_id=args.formal_bootstrap_method_id,
+            task=args.real_experiment_task,
+            seed=args.real_experiment_seed,
+            source_commit=formal_bootstrap_binding.source_commit,
+            blueprint_id=real_experiment_blueprint.blueprint_id,
+            model_profile_id=model_profile.profile_id if model_profile else "legacy",
+            requested_model=model_profile.model if model_profile else args.gpt_model_name,
+            returned_model_identities=returned_identities,
+            returned_identity_stable_within_run=identity_stable,
+            process_exit_code=0 if exception is None else 1,
+            pipeline_pass=pipeline_pass,
+            task_completed=task_completed,
+            planner_calls=sum(item.purpose == "planning" for item in provider_metadata),
+            reflection_calls=sum(
+                item.purpose == "reflection" for item in provider_metadata
+            ),
+            evaluation_chain_calls=(
+                int(getattr(result, "evaluation_count", 0) or 0)
+                if result is not None
+                else 0
+            ),
+            controller_execution_count=(
+                int(getattr(result, "controller_execution_count", 0) or 0)
+                if result is not None
+                else 0
+            ),
+            event_ids=tuple(item.event_id for item in triggered),
+            intervention_trigger_count=len(triggered),
+            total_injected_logs=sum(item.injected_logs for item in triggered),
+            total_naturally_collected_logs=sum(
+                item.naturally_collected_logs for item in event_items
+            ),
+            natural_completion=bool(task_completed and not triggered),
+            bootstrap_assisted_completion=bool(task_completed and triggered),
+            formal_memory_write_count=int(
+                bool(result is not None and result.memory_recorded)
+            ),
+            acquisition_write_count=acquisition_writes,
+            provider_call_contract_passed=provider_contract,
+            output_root_guard_passed=(
+                args.formal_bootstrap_output_root
+                / ".dc3pa-formal-log-bootstrap-output.json"
+            ).is_file(),
+            trace_sha256=trace_sha256,
+        ).with_id()
+        validate_events_for_receipt(
+            policy=formal_bootstrap_policy,
+            receipt=receipt,
+            events=triggered,
+        )
+        output = args.formal_bootstrap_receipt
+        if output.exists():
+            raise FileExistsError(
+                f"Refusing to overwrite formal bootstrap receipt: {output}"
+            )
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(
+            json.dumps(receipt.to_dict(), indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
 
     try:
         image_encoder, text_encoder = _build_encoders(args)
@@ -929,8 +1167,9 @@ def main(argv: Optional[list[str]] = None) -> int:
                     planner_instance.llm, trace_writer, "planning"
                 )
             controller = legacy_runner.Controller(memory=memory, checker=reflexion)
-            if fallback_session is not None:
-                controller._dc3pa_log_fallback_session = fallback_session
+            active_log_session = formal_bootstrap_session or fallback_session
+            if active_log_session is not None:
+                controller._dc3pa_log_fallback_session = active_log_session
             state_provider = build_legacy_state_provider(
                 env=evaluator.env,
                 legacy_memory=memory,
@@ -952,6 +1191,13 @@ def main(argv: Optional[list[str]] = None) -> int:
                 manifest = MemorySnapshotManifest.from_json(
                     runtime_config.memory_snapshot_manifest
                 )
+                if formal_bootstrap_binding is not None:
+                    assert_bootstrap_snapshot_binding(
+                        manifest.metadata,
+                        expected_policy_id=formal_bootstrap_policy.policy_id,
+                        expected_amendment_id=formal_bootstrap_amendment.amendment_id,
+                        expected_binding_id=formal_bootstrap_binding.binding_id,
+                    )
                 resolve_snapshot_database(manifest, memory_root=args.memory_root)
             elif memory_mode.memory_enabled:
                 args.memory_root.mkdir(parents=True, exist_ok=True)
@@ -982,6 +1228,18 @@ def main(argv: Optional[list[str]] = None) -> int:
                     dual_chain_config=dual_config,
                     trigger_config=trigger_config,
                     trace_writer=trace_writer,
+                    record_metadata_provider=(
+                        lambda task_completed: {
+                            **formal_bootstrap_session.record_metadata(
+                                task_completed=task_completed
+                            ),
+                            "bootstrap_data_binding_id": (
+                                formal_bootstrap_binding.binding_id
+                            ),
+                        }
+                        if formal_bootstrap_session is not None
+                        else None
+                    ),
                 )
                 task_list = _load_task_list(args.task)
                 underground = False
@@ -998,8 +1256,15 @@ def main(argv: Optional[list[str]] = None) -> int:
                         all_succeeded = False
                         break
                 write_dry_run_receipt(last_result)
+                write_formal_bootstrap_receipt(last_result)
     except Exception as exc:
-        write_dry_run_receipt(None, exc)
+        if not dry_run_enabled or not args.dry_run_receipt.exists():
+            write_dry_run_receipt(None, exc)
+        if (
+            not formal_bootstrap_enabled
+            or not args.formal_bootstrap_receipt.exists()
+        ):
+            write_formal_bootstrap_receipt(None, exc)
         raise
     if dry_run_enabled:
         return 0

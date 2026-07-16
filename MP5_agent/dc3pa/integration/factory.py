@@ -102,6 +102,9 @@ def build_stage6_runtime(
     dual_chain_config: DualChainConfig = DualChainConfig(),
     trigger_config: AdaptiveTriggerConfig = AdaptiveTriggerConfig(),
     trace_writer: Optional[JsonlTraceWriter] = None,
+    record_metadata_provider: Optional[
+        Callable[[bool], Mapping[str, Any]]
+    ] = None,
 ) -> Stage6RuntimeBundle:
     """Compose Stage 0–5 components into the Stage-6 closed loop.
 
@@ -214,6 +217,7 @@ def build_stage6_runtime(
         confidence_observer=confidence_observer,
         passive_confidence_scorer=passive_confidence_scorer,
         trace_writer=trace_writer,
+        record_metadata_provider=record_metadata_provider,
     )
     return Stage6RuntimeBundle(
         runtime=runtime,

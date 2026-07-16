@@ -83,6 +83,12 @@ class LegacyControllerAdapter:
         if observer is not None:
             observer.clear()
 
+        bootstrap_session = getattr(
+            self.legacy_controller, "_dc3pa_log_fallback_session", None
+        )
+        if bootstrap_session is not None and hasattr(bootstrap_session, "bind_plan"):
+            bootstrap_session.bind_plan(plan)
+
         sentinel = object()
         previous_observer = getattr(
             self.legacy_controller, OBSERVER_ATTRIBUTE, sentinel

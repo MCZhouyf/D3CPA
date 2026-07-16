@@ -112,7 +112,7 @@ def test_approved_provider_alias_is_auditable_readiness_evidence():
             provider_model_alias_policy_id=alias_policy.policy_id))
     epoch=close_epoch(epoch,[replace(
         alias_probe,observed_at=(now+timedelta(hours=1)).isoformat(),
-        returned_model="gpt-4.1")])
+        returned_model="gpt-4o")])
     final_taskset=taskset()
     approval={"blueprint_id":"bp","semantic_migration_report_id":"m",
               "mutable_alias_risk_acknowledged":True,"binding_id":"a",

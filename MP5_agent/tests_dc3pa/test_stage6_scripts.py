@@ -42,6 +42,8 @@ def test_minecraft_entrypoint_help_has_no_minedojo_import_requirement():
     assert "--enable-diagnostic-log-fallback" in result.stdout
     assert "--provider-model-alias-policy" in result.stdout
     assert "--provider-model-alias-approval" in result.stdout
+    assert "--formal-log-bootstrap-policy" in result.stdout
+    assert "--formal-bootstrap-data-binding" in result.stdout
 
 
 def test_diagnostic_log_fallback_is_rejected_outside_dry_run(tmp_path):
@@ -67,6 +69,30 @@ def test_diagnostic_log_fallback_is_rejected_outside_dry_run(tmp_path):
                 str(tmp_path / "policy.json"),
                 "--paired-dry-run-protocol",
                 str(tmp_path / "protocol.json"),
+            ]
+        )
+
+
+def test_formal_log_bootstrap_requires_complete_manifest_set(tmp_path):
+    import scripts_dc3pa.stage6_run_minecraft as launcher
+
+    task_path = tmp_path / "task.json"
+    task_path.write_text(
+        json.dumps([{"task": "log", "quantity": 1}]), encoding="utf-8"
+    )
+    with pytest.raises(SystemExit, match="2"):
+        launcher.main(
+            [
+                "--mode",
+                "reasoning_only",
+                "--openai_key",
+                "test-key",
+                "--gpt_model_name",
+                "gpt-4-turbo",
+                "--task",
+                str(task_path),
+                "--formal-log-bootstrap-policy",
+                str(tmp_path / "policy.json"),
             ]
         )
 

@@ -520,7 +520,39 @@ class Controller:
             return self.memory.inventory.get(target, 0) >= int(required_quantity)
         return False
 
-    def _apply_diagnostic_log_fallback(
+    @staticmethod
+    def _inventory_slots(events):
+        inventory = events.get("inventory", {}) if isinstance(events, dict) else {}
+
+        def values(name, default):
+            value = inventory.get(name, default)
+            return value.tolist() if hasattr(value, "tolist") else list(value)
+
+        names = values("name", [])
+        quantities = values("quantity", [0] * len(names))
+        variants = values("variant", [None] * len(names))
+        if not (len(names) == len(quantities) == len(variants)):
+            raise RuntimeError("MineDojo inventory arrays have inconsistent lengths")
+        return tuple(
+            {
+                "slot": slot,
+                "name": str(name),
+                "variant": variants[slot],
+                "quantity": int(quantities[slot]),
+            }
+            for slot, name in enumerate(names)
+            if str(name).lower() != "air" and int(quantities[slot]) > 0
+        )
+
+    @staticmethod
+    def _unrelated_slot_signature(slots):
+        return tuple(
+            (item["slot"], item["name"], item["variant"], item["quantity"])
+            for item in slots
+            if normalize_inventory_name(item["name"]) != "log"
+        )
+
+    def _apply_log_bootstrap(
         self,
         env,
         *,
@@ -532,26 +564,80 @@ class Controller:
         if session is None:
             return False
 
-        self._sync_memory(env)
+        events = self._sync_memory(env)
         inventory_before = dict(self.memory.inventory)
+        slots_before = self._inventory_slots(events)
 
         def apply_inventory(requested):
+            requested_logs = int(requested.get("log", 0))
+            current_logs = sum(
+                item["quantity"]
+                for item in slots_before
+                if normalize_inventory_name(item["name"]) == "log"
+            )
+            shortfall = requested_logs - current_logs
+            if shortfall <= 0:
+                raise ValueError("Log bootstrap requires a positive slot shortfall")
+
+            updated = [dict(item) for item in slots_before]
+            log_slots = [
+                item for item in updated
+                if normalize_inventory_name(item["name"]) == "log"
+            ]
+            if log_slots:
+                log_slots[0]["quantity"] += shortfall
+            else:
+                occupied = {item["slot"] for item in updated}
+                free_slot = next(
+                    (slot for slot in range(36) if slot not in occupied), None
+                )
+                if free_slot is None:
+                    raise RuntimeError("No free inventory slot is available for log bootstrap")
+                updated.append(
+                    {
+                        "slot": free_slot,
+                        "name": "log",
+                        "variant": None,
+                        "quantity": shortfall,
+                    }
+                )
             inventory_items = [
                 InventoryItem(
-                    slot=slot,
-                    name=("gold_ore" if name == "gold" else name.replace(" ", "_")),
-                    variant=None,
-                    quantity=quantity,
+                    slot=item["slot"],
+                    name=item["name"],
+                    variant=item["variant"],
+                    quantity=item["quantity"],
                 )
-                for slot, (name, quantity) in enumerate(requested.items())
+                for item in updated
             ]
             env.set_inventory(inventory_items)
-            self._sync_memory(env)
-            if dict(self.memory.inventory) != dict(requested):
-                # MineDojo can expose one stale frame immediately after an
-                # inventory intervention. A second mismatch still fails closed
-                # in DiagnosticLogFallbackSession.
-                self._sync_memory(env)
+            after_events = self._sync_memory(env)
+            slots_after = self._inventory_slots(after_events)
+            after_logs = sum(
+                item["quantity"]
+                for item in slots_after
+                if normalize_inventory_name(item["name"]) == "log"
+            )
+            if (
+                self._unrelated_slot_signature(slots_after)
+                != self._unrelated_slot_signature(slots_before)
+                or after_logs != requested_logs
+            ):
+                after_events = self._sync_memory(env)
+                slots_after = self._inventory_slots(after_events)
+            if self._unrelated_slot_signature(slots_after) != (
+                self._unrelated_slot_signature(slots_before)
+            ):
+                raise RuntimeError(
+                    "Log bootstrap could not preserve unrelated inventory slots"
+                )
+            after_logs = sum(
+                item["quantity"]
+                for item in slots_after
+                if normalize_inventory_name(item["name"]) == "log"
+            )
+            if after_logs != requested_logs:
+                raise RuntimeError("Log bootstrap inventory verification failed")
             return dict(self.memory.inventory)
 
         event = session.intervene(
@@ -563,15 +649,26 @@ class Controller:
             bounded_attempts_exhausted=True,
             apply_inventory=apply_inventory,
         )
+        event_type = (
+            "formal_log_bootstrap"
+            if hasattr(event, "planner_declared_log_requirement")
+            else "log_fallback"
+        )
         emit_execution_event(
             self,
-            "log_fallback",
+            event_type,
             status="applied",
             **event.to_dict(),
         )
         return self.memory.inventory.get("log", 0) >= target_logs
 
+    def _apply_diagnostic_log_fallback(self, env, **kwargs):
+        return self._apply_log_bootstrap(env, **kwargs)
+
     def _gather_logs(self, env, underground, target_logs, max_attempts=3):
+        session = getattr(self, "_dc3pa_log_fallback_session", None)
+        if session is not None and hasattr(session, "target_quantity"):
+            target_logs = int(session.target_quantity(target_logs))
         self._sync_memory(env)
         initial_logs = self.memory.inventory.get("log", 0)
         for attempt_idx in range(max_attempts):
@@ -617,7 +714,7 @@ class Controller:
             naturally_collected = max(
                 0, self.memory.inventory.get("log", 0) - initial_logs
             )
-            return self._apply_diagnostic_log_fallback(
+            return self._apply_log_bootstrap(
                 env,
                 target_logs=target_logs,
                 naturally_collected_count=naturally_collected,
@@ -860,6 +957,49 @@ class Controller:
         for step_index, step in enumerate(workflow):
             events = self._sync_memory(env)
             emit_step_started(step, step_index)
+            log_session = getattr(self, "_dc3pa_log_fallback_session", None)
+            formal_log_step = bool(
+                log_session is not None
+                and hasattr(log_session, "target_quantity")
+                and any(
+                    action.get("name") == "mine"
+                    and normalize_inventory_name(
+                        action.get("args", {}).get("obj")
+                    ) == "log"
+                    for action in step.get("actions", ())
+                )
+            )
+            if formal_log_step:
+                declared_target = int(log_session.target_quantity(0))
+                if self.memory.inventory.get("log", 0) < declared_target:
+                    reached_target = self._gather_logs(
+                        env,
+                        underground,
+                        declared_target,
+                        max_attempts=3,
+                    )
+                    if not reached_target:
+                        check_result = {
+                            "feedback": (
+                                "Bounded formal log bootstrap did not reach the "
+                                "Planner-declared target."
+                            ),
+                            "success": False,
+                            "suggestion": "Reflect on the explicit log requirement.",
+                        }
+                        return finish_failure(
+                            step,
+                            step_index,
+                            0,
+                            step["actions"][0],
+                            check_result,
+                            underground,
+                        )
+                log_session.complete_acquisition(
+                    self.memory.inventory.get("log", 0)
+                )
+                emit_step_finished(step, step_index, "skipped_satisfied")
+                continue
             if (
                 self._is_deep_mining_task(task_information)
                 and not underground

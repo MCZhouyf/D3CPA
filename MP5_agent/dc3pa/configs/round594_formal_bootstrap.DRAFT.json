@@ -1,0 +1,13 @@
+{
+  "draft_only": true,
+  "source_commit": "db8778ddcaf4655ee86cf50c9d0a9919a832d7d3",
+  "formal_log_bootstrap_policy_id": "REPLACE_AFTER_FREEZE",
+  "formal_bootstrap_amendment_id": "REPLACE_AFTER_ZYF_BINDING",
+  "blueprint_id": "REPLACE_AFTER_REAPPROVAL",
+  "bootstrap_readiness_campaign_id": "REPLACE",
+  "formal_acquisition_schedule_id": "REPLACE",
+  "condition_name": "planning-focused log-bootstrap MineDojo",
+  "requested_model": "gpt-5.1",
+  "returned_identity_policy": "record_and_require_epoch_stability",
+  "requested_returned_equality_required": false
+}

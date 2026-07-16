@@ -154,6 +154,14 @@ class ModelEpoch:
                 reasons.append("client context mismatch")
             if probe.request_text_logged or probe.response_text_logged:
                 reasons.append("text logging enabled")
+        if not self.policy.require_returned_model_match:
+            returned_identities = {
+                probe.returned_model.strip()
+                for probe in probes
+                if probe.returned_model.strip()
+            }
+            if len(returned_identities) > 1:
+                reasons.append("returned model identity changed within epoch")
         if self.start_probes and self.end_probes:
             start = min(parse_time(item.observed_at) for item in self.start_probes)
             end = max(parse_time(item.observed_at) for item in self.end_probes)
