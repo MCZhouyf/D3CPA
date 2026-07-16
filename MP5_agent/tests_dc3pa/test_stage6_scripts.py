@@ -97,6 +97,37 @@ def test_formal_log_bootstrap_requires_complete_manifest_set(tmp_path):
         )
 
 
+def test_formal_acquisition_requires_phase_state(tmp_path):
+    import scripts_dc3pa.stage6_run_minecraft as launcher
+
+    task_path = tmp_path / "task.json"
+    task_path.write_text(json.dumps([{"task": "log", "quantity": 1}]), encoding="utf-8")
+    values = {
+        "--formal-log-bootstrap-policy": "policy.json",
+        "--formal-bootstrap-amendment": "amendment.json",
+        "--formal-bootstrap-data-binding": "binding.json",
+        "--formal-bootstrap-scope": "formal_acquisition",
+        "--formal-bootstrap-method-id": "single_chain_reactive_acquisition",
+        "--formal-bootstrap-output-root": "output",
+        "--formal-bootstrap-receipt": "receipt.json",
+        "--formal-acquisition-campaign": "campaign.json",
+        "--formal-acquisition-entry": "entry.json",
+        "--formal-acquisition-ledger": "ledger.json",
+        "--formal-acquisition-retry-policy": "retry.json",
+        "--formal-acquisition-attempt-index": "0",
+        "--formal-acquisition-root": "acquisition",
+    }
+    argv = [
+        "--mode", "reasoning_only", "--openai_key", "test-key",
+        "--gpt_model_name", "gpt-5.1", "--task", str(task_path),
+        "--real-experiment-blueprint", str(tmp_path / "blueprint.json"),
+    ]
+    for name, value in values.items():
+        argv.extend((name, str(tmp_path / value) if "." in value else value))
+    with pytest.raises(SystemExit, match="2"):
+        launcher.main(argv)
+
+
 def test_provider_model_alias_policy_requires_matching_approval_argument(tmp_path):
     import scripts_dc3pa.stage6_run_minecraft as launcher
 

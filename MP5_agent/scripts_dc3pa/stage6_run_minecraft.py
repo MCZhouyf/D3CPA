@@ -617,6 +617,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         parser.error("formal acquisition requires all formal acquisition arguments")
     if formal_acquisition_enabled and not formal_bootstrap_enabled:
         parser.error("formal acquisition requires formal Log Bootstrap")
+    if formal_acquisition_enabled and not args.real_experiment_phase_state:
+        parser.error("formal acquisition requires a frozen phase-state ledger")
     if formal_acquisition_enabled and args.mode != "reasoning_only":
         parser.error("formal acquisition requires single-chain reasoning_only mode")
     if formal_acquisition_enabled and (
@@ -1027,6 +1029,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             if formal_bootstrap_enabled:
                 expected_scope = {
                     "experience_acquisition": "formal_acquisition",
+                    "acquisition_completed": "formal_acquisition",
                     "final_evaluation": "final_evaluation",
                 }.get(args.real_experiment_phase)
                 if expected_scope and args.formal_bootstrap_scope != expected_scope:
@@ -1034,8 +1037,8 @@ def main(argv: Optional[list[str]] = None) -> int:
                         "formal bootstrap scope does not match real experiment phase"
                     )
             if formal_acquisition_campaign is not None:
-                if args.real_experiment_phase != "experience_acquisition":
-                    parser.error("formal acquisition requires experience_acquisition phase")
+                if args.real_experiment_phase != "acquisition_completed":
+                    parser.error("formal acquisition requires acquisition_completed phase")
                 entry = formal_acquisition_entry
                 assert entry is not None
                 if (
