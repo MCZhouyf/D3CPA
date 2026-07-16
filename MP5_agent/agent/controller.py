@@ -512,6 +512,14 @@ class Controller:
 
         return has_inventory_goal and all_satisfied
 
+    def _mine_step_already_satisfied(self, step, required_quantity):
+        for action in step.get("actions", ()):
+            if action.get("name") != "mine":
+                continue
+            target = update_inventory_obj_name(action.get("args", {}).get("obj"))
+            return self.memory.inventory.get(target, 0) >= int(required_quantity)
+        return False
+
     def _gather_logs(self, env, underground, target_logs, max_attempts=2):
         for attempt_idx in range(max_attempts):
             self._sync_memory(env)
@@ -552,12 +560,6 @@ class Controller:
                         break
                 if self.memory.inventory.get("log", 0) >= target_logs:
                     return True
-        if not underground and self.memory.inventory.get("log", 0) < target_logs:
-            print(
-                "Fallback adding logs after bounded MineDojo log-gather attempts: "
-                f"{self.memory.inventory.get('log', 0)} -> {target_logs}"
-            )
-            self._set_inventory_from_memory(env, {"log": target_logs})
         return self.memory.inventory.get("log", 0) >= target_logs
 
     def _craft_bootstrap_item(self, env, craft_name, use_crafting_table, craft_num=1):
@@ -648,7 +650,28 @@ class Controller:
         inventory = self.memory.inventory
         return inventory.get("wooden pickaxe", 0) >= 1
 
-    def _execute_craft_with_retries(self, env, args, craft_name, craft_num, max_attempts=3):
+    @staticmethod
+    def _should_keep_crafting_table_placed(workflow, step_index, action_index):
+        for candidate_step_index in range(step_index, len(workflow)):
+            actions = workflow[candidate_step_index]["actions"]
+            first_action_index = action_index + 1 if candidate_step_index == step_index else 0
+            for candidate in actions[first_action_index:]:
+                return (
+                    candidate["name"] == "craft"
+                    and normalize_inventory_name(candidate["args"].get("platform"))
+                    == "crafting table"
+                )
+        return False
+
+    def _execute_craft_with_retries(
+        self,
+        env,
+        args,
+        craft_name,
+        craft_num,
+        max_attempts=3,
+        reclaim_crafting_table=True,
+    ):
         target_name = normalize_inventory_name(list(args["obj"].keys())[0])
         target_quantity = int(list(args["obj"].values())[0])
         expected_quantity = self._inventory_count(target_name) + target_quantity
@@ -667,6 +690,7 @@ class Controller:
                     args["platform"]=="crafting table",
                     args["platform"]=="furnace",
                     craft_num=adjusted_craft_num,
+                    reclaim_crafting_table=reclaim_crafting_table,
                 )
             except Exception as exc:
                 print(f"Craft attempt failed with exception for {target_name}: {exc}")
@@ -847,6 +871,24 @@ class Controller:
 
                     events = self._sync_memory(env)
                     if (
+                        step_contains_mine
+                        and self._mine_step_already_satisfied(step, times)
+                    ):
+                        print(
+                            "Skipping remaining mining-step actions because the "
+                            f"inventory target is already satisfied: {step}; "
+                            f"inventory={self.memory.inventory}"
+                        )
+                        mine_finish = True
+                        emit_action_finished(
+                            step,
+                            step_index,
+                            action_index,
+                            action,
+                            "skipped_satisfied",
+                        )
+                        break
+                    if (
                         self._is_deep_mining_task(task_information)
                         and not underground
                         and self._has_wooden_pickaxe_materials()
@@ -983,8 +1025,19 @@ class Controller:
 
                         print(f"action_crafting-----")
                         craft_attempts = 1 if self._is_deep_mining_task(task_information) else 3
+                        reclaim_crafting_table = not (
+                            normalize_inventory_name(args.get("platform")) == "crafting table"
+                            and self._should_keep_crafting_table_placed(
+                                workflow, step_index, action_index
+                            )
+                        )
                         craft_success = self._execute_craft_with_retries(
-                            env, args, craft_name, craft_num, max_attempts=craft_attempts
+                            env,
+                            args,
+                            craft_name,
+                            craft_num,
+                            max_attempts=craft_attempts,
+                            reclaim_crafting_table=reclaim_crafting_table,
                         )
                         if (
                             not craft_success
@@ -1299,7 +1352,26 @@ class Controller:
             print(f"Crafting my inventory is {self.memory.inventory}")
             platform = args_dict["platform"]
             if platform:
-                if platform not in self.memory.inventory or self.memory.inventory[platform] <= 0:
+                nearby_key = {
+                    "crafting table": "table",
+                    "furnace": "furnace",
+                }.get(normalize_inventory_name(platform))
+                nearby_platform = bool(
+                    nearby_key
+                    and isinstance(events, dict)
+                    and events.get("nearby_tools", {}).get(nearby_key, False)
+                )
+                tracked_platform = bool(
+                    normalize_inventory_name(platform) == "crafting table"
+                    and getattr(
+                        self.memory, "_dc3pa_crafting_table_placed", False
+                    )
+                )
+                if (
+                    (platform not in self.memory.inventory or self.memory.inventory[platform] <= 0)
+                    and not nearby_platform
+                    and not tracked_platform
+                ):
                     if (
                         self._is_deep_mining_task(task_information)
                         and normalize_inventory_name(platform) in {"crafting table", "furnace"}

@@ -710,62 +710,70 @@ def mine(target,equipment,underground,env,memory):
         print(f"Present inventory:{events['inventory']['quantity']}")
     else:
         events = sleep(env)
+        def attack_voxel_until_changed(index, max_attacks=24):
+            nonlocal events
+            for _ in range(max_attacks):
+                if events['voxels']['block_name'][index] != target:
+                    return True
+                events,reward,ended,addinfo = env.step(
+                    [0,0,0,12,12,3,0,0]
+                ); save_rgb_for_video(events)
+            changed = events['voxels']['block_name'][index] != target
+            if not changed:
+                print(
+                    f"bounded underground mining stopped after {max_attacks} "
+                    f"attacks with target {target} still present"
+                )
+            return changed
+
         # right down
         if (events['voxels']['block_name'][vradius][vradius][vradius+1]==target):
             events,_,_,_ = env.step([0,0,0,12,18,0,0,0]); save_rgb_for_video(events)
             events,_,_,_ = env.step([0,0,0,15,12,0,0,0]); save_rgb_for_video(events)
-            while (events['voxels']['block_name'][vradius][vradius][vradius+1]==target):
-                events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+            attack_voxel_until_changed((vradius, vradius, vradius+1))
             events,_,_,_ = env.step([0,0,0,9,12,0,0,0]); save_rgb_for_video(events)
             events,_,_,_ = env.step([0,0,0,12,6,0,0,0]); save_rgb_for_video(events)
             sleep(env)
         # right top
         if (events['voxels']['block_name'][vradius][vradius+1][vradius+1]==target):
             events,_,_,_ = env.step([0,0,0,12,18,0,0,0]); save_rgb_for_video(events)
-            while (events['voxels']['block_name'][vradius][vradius+1][vradius+1]==target):
-                events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+            attack_voxel_until_changed((vradius, vradius+1, vradius+1))
             events,_,_,_ = env.step([0,0,0,12,6,0,0,0]); save_rgb_for_video(events)
             sleep(env)
         # forward down
         if (events['voxels']['block_name'][vradius+1][vradius][vradius]==target):
             events,_,_,_ = env.step([0,0,0,15,12,0,0,0]); save_rgb_for_video(events)
-            while (events['voxels']['block_name'][vradius+1][vradius][vradius]==target):
-                events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+            attack_voxel_until_changed((vradius+1, vradius, vradius))
             events,_,_,_ = env.step([0,0,0,9,12,0,0,0]); save_rgb_for_video(events)
             sleep(env)
         # forward top
         if (events['voxels']['block_name'][vradius+1][vradius+1][vradius]==target):
-            while (events['voxels']['block_name'][vradius+1][vradius+1][vradius]==target):
-                events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+            attack_voxel_until_changed((vradius+1, vradius+1, vradius))
             sleep(env)
         # left down
         if (events['voxels']['block_name'][vradius][vradius][vradius-1]==target):
             events,_,_,_ = env.step([0,0,0,12,6,0,0,0]); save_rgb_for_video(events)
             events,_,_,_ = env.step([0,0,0,15,12,0,0,0]); save_rgb_for_video(events)
-            while (events['voxels']['block_name'][vradius][vradius][vradius-1]==target):
-                events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+            attack_voxel_until_changed((vradius, vradius, vradius-1))
             events,_,_,_ = env.step([0,0,0,9,12,0,0,0]); save_rgb_for_video(events)
             events,_,_,_ = env.step([0,0,0,12,18,0,0,0]); save_rgb_for_video(events)
             sleep(env)
         # left top
         if (events['voxels']['block_name'][vradius][vradius+1][vradius-1]==target):
             events,_,_,_ = env.step([0,0,0,12,6,0,0,0]); save_rgb_for_video(events)
-            while (events['voxels']['block_name'][vradius][vradius+1][vradius-1]==target):
-                events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+            attack_voxel_until_changed((vradius, vradius+1, vradius-1))
             events,_,_,_ = env.step([0,0,0,12,18,0,0,0]); save_rgb_for_video(events)
             sleep(env)
         # top
         if (events['voxels']['block_name'][vradius][vradius+2][vradius]==target):
             events,_,_,_ = env.step([0,0,0,6,12,0,0,0]); save_rgb_for_video(events)
-            while (events['voxels']['block_name'][vradius][vradius+2][vradius]==target):
-                events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+            attack_voxel_until_changed((vradius, vradius+2, vradius))
             events,_,_,_ = env.step([0,0,0,18,12,0,0,0]); save_rgb_for_video(events)
             sleep(env)
         # down
         if (events['voxels']['block_name'][vradius][vradius-1][vradius]==target):
             events,_,_,_ = env.step([0,0,0,18,12,0,0,0]); save_rgb_for_video(events)
-            while (events['voxels']['block_name'][vradius][vradius-1][vradius]==target):
-                events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+            attack_voxel_until_changed((vradius, vradius-1, vradius))
             events,_,_,_ = env.step([0,0,0,6,12,0,0,0]); save_rgb_for_video(events)
             sleep(env)
 
@@ -955,17 +963,30 @@ def move_one_block(env,memory,movedir=0,underground=0,jumpornot = 0):
 
         return False
     else:
-        if ( not jumpornot):
-            if (movedir == 0):
-                try_num = 0    
-                while (events['location_stats']['pos'][0]<math.ceil(events['location_stats']['pos'][0])+0.45):
-                    if (try_num > 20):
+        if movedir == 0:
+            if jumpornot:
+                mine_ahead(env, memory, 0)
+                events = sleep(env)
+
+            start_x = float(events['location_stats']['pos'][0])
+            no_progress_steps = 0
+            for _ in range(16):
+                previous_x = float(events['location_stats']['pos'][0])
+                events,_,_,_ = env.step([1,0,0,12,12,0,0,0]); save_rgb_for_video(events)
+                current_x = float(events['location_stats']['pos'][0])
+                if current_x - start_x >= 0.45:
+                    action_stack.append((movedir, jumpornot))
+                    return True
+                if abs(current_x - previous_x) < 1e-3:
+                    no_progress_steps += 1
+                    if no_progress_steps >= 2:
                         return False
-                    try_num += 1
-                    events,_,_,_ = env.step([1,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-                    # events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-                    # print(f"present x is {events['location_stats']['pos'][0]} and it should be larger than {math.floor(events['location_stats']['pos'][0])+0.44}")
-            elif (movedir == 2):# right
+                else:
+                    no_progress_steps = 0
+            return False
+
+        if ( not jumpornot):
+            if (movedir == 2):# right
                 try_num = 0
                 while (events['location_stats']['pos'][0]>math.floor(events['location_stats']['pos'][0])-0.45):
                     if (try_num > 20):
@@ -991,18 +1012,7 @@ def move_one_block(env,memory,movedir=0,underground=0,jumpornot = 0):
                     # events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)      
         else:
       
-            if (movedir == 0):
-                try_num = 0    
-                mine_ahead(env,memory,0)
-                while (events['location_stats']['pos'][0]<math.ceil(events['location_stats']['pos'][0])+0.45):
-                    if (try_num > 10):
-                        return False
-                    try_num += 1
-                    # mine_ahead(env,0)
-                    events,_,_,_ = env.step([1,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-                    # events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-                    # print(f"present x is {events['location_stats']['pos'][0]} and it should be larger than {math.floor(events['location_stats']['pos'][0])+0.44}")
-            elif (movedir == 2):# right
+            if (movedir == 2):# right
                 events,reward,ended,addinfo = env.step([0,0,0,12,14,0,0,0]); save_rgb_for_video(events)
                 events,reward,ended,addinfo = env.step([0,0,0,12,14,0,0,0]); save_rgb_for_video(events)
                 events,reward,ended,addinfo = env.step([0,0,0,12,14,0,0,0]); save_rgb_for_video(events)
@@ -1144,7 +1154,7 @@ def try_forward(env,memory,underground,approach=0):
         elif ((events['voxels']['block_name'][vradius+1][vradius-1][vradius] in ("lava", "water")) or events['voxels']['block_name'][vradius+1][vradius][vradius] in ("lava", "water") or events['voxels']['block_name'][vradius+1][vradius+1][vradius] in ("lava", "water")) or events['voxels']['block_name'][vradius+2][vradius-1][vradius] in ("lava", "water") or events['voxels']['block_name'][vradius+2][vradius][vradius] in ("lava", "water") or events['voxels']['block_name'][vradius+2][vradius+1][vradius] in ("lava", "water"):
             return False# lava right in front of you
         elif ((events['voxels']['block_name'][vradius+1][vradius-1][vradius]!="lava") and events['voxels']['block_name'][vradius+1][vradius][vradius] != "lava" and events['voxels']['block_name'][vradius+1][vradius+1][vradius]!="lava"):
-            move_one_block(env,memory,0,1,1)#solid blocks ahead, have to mine them
+            return move_one_block(env,memory,0,1,1)#solid blocks ahead, have to mine them
         
         else:
             no_climb = True
@@ -1840,6 +1850,37 @@ def select_target_block(events, object_name):
 
     return best_target
 
+
+def tracked_target_block(events, selected_target, object_name):
+    """Project one selected world coordinate into the current voxel view."""
+    current_x = float(events['location_stats']['pos'][0])
+    current_y = float(events['location_stats']['pos'][1])
+    current_z = float(events['location_stats']['pos'][2])
+    forward_offset = int(round(float(selected_target["world_x"]) - current_x))
+    vertical_offset = int(round(float(selected_target["world_y"]) - current_y))
+    side_offset = int(round(float(selected_target["world_z"]) - current_z))
+    indices = (
+        vradius + forward_offset,
+        vradius + vertical_offset,
+        vradius + side_offset,
+    )
+    shape = events['voxels']['block_name'].shape
+    if any(index < 0 or index >= shape[axis] for axis, index in enumerate(indices)):
+        return None
+    if events['voxels']['block_name'][indices] != object_name:
+        return None
+    return {
+        "world_x": selected_target["world_x"],
+        "world_y": selected_target["world_y"],
+        "world_z": selected_target["world_z"],
+        "x_index": indices[0],
+        "y_index": indices[1],
+        "z_index": indices[2],
+        "forward_offset": forward_offset,
+        "vertical_offset": vertical_offset,
+        "side_offset": side_offset,
+    }
+
     
 # The function for approaching a desired object once it has already been sighted.
 def approach(env,memory,object,underground):# tbd: scanning blocknames not enough if you want to approach live entity
@@ -1872,7 +1913,7 @@ def approach(env,memory,object,underground):# tbd: scanning blocknames not enoug
     stagnation_count = 0
     for try_num in range(30):
         events = sleep(env)
-        target_block = select_target_block(events, object)
+        target_block = tracked_target_block(events, target_block, object)
         if target_block is None:
             print("approach lost sight of target")
             return False
@@ -1924,7 +1965,7 @@ def approach(env,memory,object,underground):# tbd: scanning blocknames not enoug
 
         print("finished moving sideways")
         if forward_offset >= 2:
-            if try_forward(env,memory,0,1) == False:
+            if try_forward(env,memory,underground,1) == False:
                 print("stuck trying to go ahead in APPROACH!")
                 return False
             continue
@@ -1949,12 +1990,12 @@ def approach(env,memory,object,underground):# tbd: scanning blocknames not enoug
                     return False
             continue
         if forward_offset == 1:
-            if try_forward(env,memory,0,1) == False:
+            if try_forward(env,memory,underground,1) == False:
                 return False
             continue
         break
 
-    target_block = select_target_block(events, object)
+    target_block = tracked_target_block(events, target_block, object)
     if target_block is not None:
         print(
             f"APPROACH ended:). present position is {events['location_stats']['pos']}, "
@@ -1991,7 +2032,7 @@ def approach(env,memory,object,underground):# tbd: scanning blocknames not enoug
             if events['rays']['block_distance'][idx]<3:
                 return True
     if object == "wood":
-        target_block = select_target_block(events, object)
+        target_block = tracked_target_block(events, target_block, object)
         if interaction_ready(target_block, object):
             return True
     return False
@@ -2033,9 +2074,130 @@ def sleep(env, duration = 1):
         events,_,_,_ = env.step([0,0,0,12,12,0,0,0])
     return events
 
+
+def _nearby_tool(events, tool):
+    nearby_tools = events.get("nearby_tools", {}) if isinstance(events, dict) else {}
+    try:
+        return bool(nearby_tools.get(tool, False))
+    except (TypeError, ValueError):
+        return False
+
+
+def _crafting_table_placement_tracked(memory):
+    return bool(getattr(memory, "_dc3pa_crafting_table_placed", False))
+
+
+def _track_crafting_table_placement(memory, placed):
+    setattr(memory, "_dc3pa_crafting_table_placed", bool(placed))
+
+
+def _inventory_item_count(events, item):
+    names = events['inventory']['name'].tolist()
+    quantities = events['inventory']['quantity'].tolist()
+    return sum(float(quantity) for name, quantity in zip(names, quantities) if name == item)
+
+
+def _camera_action_index(delta_degrees):
+    return max(0, min(24, int(round(float(delta_degrees) / 15.0)) + 12))
+
+
+def _place_crafting_table(env, events, memory, max_attempts=4):
+    if _nearby_tool(events, "table") or _crafting_table_placement_tracked(memory):
+        _track_crafting_table_placement(memory, True)
+        return events, True
+
+    # Place directly from the inventory slot. MineDojo's NN action 6 is the
+    # place action; equipping followed by use does not place the table reliably.
+    # Camera movement must happen on an earlier frame because the place handler
+    # ray-traces the view that was active before the current action is applied.
+    for recovery_round in range(2):
+        for attempt_idx in range(max_attempts):
+            inventory = events['inventory']['name'].tolist()
+            if 'crafting table' not in inventory:
+                break
+            table_index = inventory.index('crafting table')
+            before_count = _inventory_item_count(events, 'crafting table')
+            print(
+                f"Crafting-table placement attempt {attempt_idx + 1}/{max_attempts} "
+                f"(round {recovery_round + 1}/2)"
+            )
+            current_pitch = float(np.asarray(events['location_stats']['pitch']).reshape(-1)[0])
+            pitch_action = _camera_action_index(60.0 - current_pitch)
+            yaw_action = 12 if attempt_idx == 0 else 18
+            events,_,_,_ = env.step([0,0,0,pitch_action,yaw_action,0,0,0]); save_rgb_for_video(events)
+            events = sleep(env)
+            inventory = events['inventory']['name'].tolist()
+            if 'crafting table' not in inventory:
+                break
+            table_index = inventory.index('crafting table')
+            events,_,_,_ = env.step([0,0,0,12,12,6,0,table_index]); save_rgb_for_video(events)
+            events = sleep(env)
+            share_memory(memory, events)
+            if _nearby_tool(events, "table"):
+                _track_crafting_table_placement(memory, True)
+                return events, True
+            if (
+                "nearby_tools" not in events
+                and _inventory_item_count(events, 'crafting table') < before_count
+            ):
+                # Some MineDojo wrapper stacks omit nearby_tools, while a decreased
+                # inventory count still proves that the place command was accepted.
+                _track_crafting_table_placement(memory, True)
+                return events, True
+
+        if recovery_round == 0 and 'crafting table' in events['inventory']['name'].tolist():
+            print("No valid table surface found; clearing one bounded placement niche.")
+            current_pitch = float(np.asarray(events['location_stats']['pitch']).reshape(-1)[0])
+            pitch_action = _camera_action_index(-current_pitch)
+            events,_,_,_ = env.step([0,0,0,pitch_action,12,0,0,0]); save_rgb_for_video(events)
+            events = sleep(env)
+            mine_ahead(env, memory)
+            events = sleep(env)
+
+    return events, False
+
+
+def _reclaim_crafting_table(env, events, memory, max_attacks=12):
+    if not _nearby_tool(events, "table") and _inventory_item_count(events, 'crafting table') > 0:
+        _track_crafting_table_placement(memory, False)
+        return events, True
+
+    for _ in range(max_attacks):
+        events,_,_,_ = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+        if _inventory_item_count(events, 'crafting table') > 0:
+            share_memory(memory, events)
+            _track_crafting_table_placement(memory, False)
+            return events, True
+
+    # Walk over the dropped item, then restore the original position. This is
+    # bounded so a failed recovery cannot stall the whole episode.
+    for direction in (1, 2):
+        for _ in range(6):
+            events,_,_,_ = env.step([direction,0,0,12,12,0,0,0]); save_rgb_for_video(events)
+            if _inventory_item_count(events, 'crafting table') > 0:
+                share_memory(memory, events)
+                _track_crafting_table_placement(memory, False)
+                return events, True
+
+    # Item pickup can arrive one observation after the final movement step.
+    events = sleep(env)
+    share_memory(memory, events)
+    reclaimed = _inventory_item_count(events, 'crafting table') > 0
+    _track_crafting_table_placement(memory, not reclaimed and _nearby_tool(events, "table"))
+    return events, reclaimed
+
+
 # The structured action for craft, it first finds level ground for a crafting table 
 # if crafting table is needed, then proceeds to craft the desired tool.
-def action_craft(env, item, memory,use_crafting_table,use_furnace,craft_num):
+def action_craft(
+    env,
+    item,
+    memory,
+    use_crafting_table,
+    use_furnace,
+    craft_num,
+    reclaim_crafting_table=True,
+):
     """
     Craft item
     :env: minedojo env
@@ -2142,96 +2304,28 @@ def action_craft(env, item, memory,use_crafting_table,use_furnace,craft_num):
                 events,_,_,_ = env.step([0,0,0,12,12,4,item_recipy_index,0]); save_rgb_for_video(events)
                 events = sleep(env)
     else:
-        if (events['location_stats']['pos'][1]<=56):
-            print("aciton_crafting---1")
-            events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-            #events = sleep(env)
-        
-            share_memory(memory,events)
-            print("underground crafting-table use: skip tunnel clearing and try direct crafting table interaction")
-        else:
-            print("aciton_crafting---4")
-            move_to_middle(env)
-            events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-
-            print(events['voxels']['block_name'][vradius+1][vradius-1][vradius])
-            print(events['voxels']['block_name'][vradius+1][vradius][vradius])
-            ready_for_table = (
-                events['voxels']['block_name'][vradius+1][vradius][vradius] != "water"
-                and events['voxels']['block_name'][vradius+1][vradius-1][vradius] not in ("air", "water")
-                and events['voxels']['block_name'][vradius+1][vradius][vradius] == "air"
-                and events['voxels']['block_name'][vradius+1][vradius+1][vradius] == "air"
-            )
-            if not ready_for_table:
-                # Keep table-placement preparation bounded; getting stuck here blocks all later tool upgrades.
-                for prep_try in range(3):
-                    print(f"crafting-table prep try {prep_try + 1}/3")
-                    mine_ahead(env,memory)
-                    move_to_middle(env)
-                    events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-                    ready_for_table = (
-                        events['voxels']['block_name'][vradius+1][vradius][vradius] != "water"
-                        and events['voxels']['block_name'][vradius+1][vradius-1][vradius] not in ("air", "water")
-                        and events['voxels']['block_name'][vradius+1][vradius][vradius] == "air"
-                        and events['voxels']['block_name'][vradius+1][vradius+1][vradius] == "air"
-                    )
-                    if ready_for_table:
-                        break
-                    move_one_block(env,memory,3,0,0)
-                    events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-            print(f"action_craft: front floor{events['voxels']['block_name'][vradius+1][vradius-1][vradius]}\n block in front of body is {events['voxels']['block_name'][vradius+1][vradius][vradius]} \n and block in front of head is {events['voxels']['block_name'][vradius+1][vradius+1][vradius]}\n begin crafting {item}")
-            print(f"7777777777")
-            if not ready_for_table:
-                print("proceeding to use crafting table despite imperfect placement area")
-            else:
-                mine_ahead(env,memory)
-            move_to_middle(env)
         events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-        #events = sleep(env)
-        
         share_memory(memory,events)
         print(f"{memory.inventory}")
         print('crafting table' in memory.inventory)
         
-        inventory = events['inventory']['name'].tolist()
-        if 'crafting table' not in inventory:
-            print("crafting table is not currently in inventory; assuming it may already be placed nearby")
+        events, table_ready = _place_crafting_table(env, events, memory)
+        if not table_ready:
+            print("crafting table could not be placed or found nearby")
             name = events['inventory']['name'].tolist()
             num = events['inventory']['quantity'].tolist()
             return name, num
-        cb_inventory_index = inventory.index('crafting table')
-        print(f"crafting table is there")
-        events,_,_,_ = env.step([0,0,0,16,12,0,0,0]); save_rgb_for_video(events)
-        events = sleep(env)
-        events,_,_,_ = env.step([0,0,0,12,12,5,0,cb_inventory_index]); save_rgb_for_video(events) #equip crafting tabsle
-        # sleep(env)
-        # while events['inventory']['name'].tolist()[0]=='crafting table':
-        #     events,_,_,_ = env.step([0,0,0,12,12,6,0,0]); save_rgb_for_video(events) #place crafting table
-        #     events,_,_,_ = env.step([2,0,0,12,12,0,0,0]); save_rgb_for_video(events) 
-        events = sleep(env)
-        events,_,_,_ = env.step([0,0,0,12,12,1,0,0]); save_rgb_for_video(events) #use
         print(f"crafting .....")
         for i in range(craft_num):
             events,_,_,_ = env.step([0,0,0,12,12,4,item_recipy_index,0]); save_rgb_for_video(events) #craft item
         events = sleep(env)
-        '''
-        cb_inventory_index = events['inventory']['name'].tolist().index('dirt')  #################for debug, could be changed
-        events,_,_,_ = env.step([0,0,0,12,12,5,0,cb_inventory_index]); save_rgb_for_video(events) #equip stone pickaxe
-        '''
-        for i in range(5):# may have to adjust
-            events,_,_,_ = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events) #attack 5 times to get crafting table
-        events,_,_,_ = env.step([0,0,0,8,12,0,0,0]); save_rgb_for_video(events)
-        events = sleep(env)
-        
-        share_memory(memory,events)
-        print(f"{memory.inventory}")
-        print('crafting table' in memory.inventory)
-
-        if 'crafting table' not in memory.inventory:
-            for i in range(10):
-                events,_,_,_ = env.step([1,0,0,12,12,0,0,0]); save_rgb_for_video(events) #get crafting table
-            for i in range(10):
-                events,_,_,_ = env.step([2,0,0,12,12,0,0,0]); save_rgb_for_video(events) #go back
+        if reclaim_crafting_table:
+            events, table_reclaimed = _reclaim_crafting_table(env, events, memory)
+            if not table_reclaimed:
+                print("crafted item, but crafting table recovery did not complete")
+        else:
+            _track_crafting_table_placement(memory, True)
+            print("leaving placed crafting table available for the next table craft")
     #print(events['inventory']['name'].tolist())
     name = events['inventory']['name'].tolist()
     num  = events['inventory']['quantity'].tolist()
