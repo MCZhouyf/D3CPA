@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import time
+from types import MethodType
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -128,6 +129,33 @@ class TracedChatModel:
         self._include_error_detail = include_error_detail
         self._metadata_observer = metadata_observer
         self._requested_model = requested_model
+        self._legacy_raw_response_metadata: list[Mapping[str, Any]] = []
+        self._install_legacy_response_capture()
+
+    def _install_legacy_response_capture(self) -> None:
+        """Preserve safe metadata discarded by older LangChain ChatOpenAI."""
+        if self._metadata_observer is None or not hasattr(
+            self._model, "_create_chat_result"
+        ):
+            return
+        original = self._model._create_chat_result
+
+        def create_chat_result(model: Any, response: Any) -> Any:
+            if isinstance(response, Mapping):
+                usage = response.get("usage", {})
+                self._legacy_raw_response_metadata.append(
+                    {
+                        "model": str(response.get("model", "")).strip(),
+                        "usage": dict(usage) if isinstance(usage, Mapping) else {},
+                    }
+                )
+            return original(response)
+
+        object.__setattr__(
+            self._model,
+            "_create_chat_result",
+            MethodType(create_chat_result, self._model),
+        )
 
     def _resolve_method(self, method_name: str) -> tuple[str, Any]:
         if hasattr(self._model, method_name):
@@ -157,6 +185,7 @@ class TracedChatModel:
         )
         started_at = datetime.now(timezone.utc).isoformat()
         started = time.monotonic()
+        self._legacy_raw_response_metadata.clear()
         try:
             result = method(*args, **kwargs)
         except Exception as exc:
@@ -178,6 +207,14 @@ class TracedChatModel:
                 request_started_at=started_at,
                 request_duration_seconds=time.monotonic() - started,
             )
+            if metadata is None and self._legacy_raw_response_metadata:
+                metadata = _legacy_raw_response_metadata(
+                    self._legacy_raw_response_metadata[-1],
+                    requested_model=self._requested_model,
+                    purpose=self._purpose,
+                    request_started_at=started_at,
+                    request_duration_seconds=time.monotonic() - started,
+                )
             if metadata is not None:
                 self._metadata_observer(metadata)
         self._trace_writer.write(
@@ -233,6 +270,39 @@ def _legacy_response_metadata(
             )
             or 0
         ),
+        total_tokens=int(raw_usage.get("total_tokens", 0) or 0),
+    )
+    return SafeResponseMetadata(
+        requested_model=requested_model,
+        returned_model=returned_model,
+        profile_id="legacy",
+        reasoning_effort="none",
+        purpose=purpose,
+        request_started_at=request_started_at,
+        request_duration_seconds=request_duration_seconds,
+        response_id_sha256="",
+        usage=usage,
+    )
+
+
+def _legacy_raw_response_metadata(
+    response: Mapping[str, Any],
+    *,
+    requested_model: str,
+    purpose: str,
+    request_started_at: str,
+    request_duration_seconds: float,
+) -> Optional[SafeResponseMetadata]:
+    """Build safe metadata captured before legacy LangChain drops response fields."""
+    returned_model = str(response.get("model", "")).strip()
+    if not returned_model:
+        return None
+    raw_usage = response.get("usage", {})
+    if not isinstance(raw_usage, Mapping):
+        raw_usage = {}
+    usage = ResponseUsage(
+        input_tokens=int(raw_usage.get("prompt_tokens", 0) or 0),
+        output_tokens=int(raw_usage.get("completion_tokens", 0) or 0),
         total_tokens=int(raw_usage.get("total_tokens", 0) or 0),
     )
     return SafeResponseMetadata(

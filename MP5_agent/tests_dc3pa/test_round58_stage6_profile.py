@@ -230,6 +230,50 @@ def test_legacy_chat_metadata_records_returned_model_without_content():
     assert "must not be inspected" not in repr(metadata)
 
 
+def test_traced_chat_model_captures_metadata_discarded_by_old_langchain():
+    import scripts_dc3pa.stage6_run_minecraft as launcher
+
+    class LegacyChatModel:
+        def _create_chat_result(self, response):
+            return SimpleNamespace(content="must not be inspected")
+
+        def __call__(self, messages):
+            return self._create_chat_result(
+                {
+                    "model": "provider-returned-model",
+                    "usage": {
+                        "prompt_tokens": 13,
+                        "completion_tokens": 5,
+                        "total_tokens": 18,
+                    },
+                    "choices": [{"message": {"content": "secret response"}}],
+                }
+            )
+
+    class TraceWriter:
+        def write(self, event_type, payload):
+            pass
+
+    observed = []
+    model = launcher.TracedChatModel(
+        LegacyChatModel(),
+        TraceWriter(),
+        "planning",
+        metadata_observer=observed.append,
+        requested_model="gpt-4-turbo",
+    )
+
+    result = model([SimpleNamespace(content="secret prompt")])
+
+    assert result.content == "must not be inspected"
+    assert len(observed) == 1
+    assert observed[0].returned_model == "provider-returned-model"
+    assert observed[0].usage.input_tokens == 13
+    assert observed[0].usage.output_tokens == 5
+    assert "secret prompt" not in repr(observed[0])
+    assert "secret response" not in repr(observed[0])
+
+
 @pytest.mark.parametrize(
     ("provider_alias_policy", "formal_bootstrap_enabled", "expected"),
     (
