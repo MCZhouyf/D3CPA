@@ -17,6 +17,7 @@ on:
       - "round59-*"
       - "round591-*"
       - "round592-*"
+      - "round593-*"
   pull_request:
 
 permissions:
@@ -120,6 +121,11 @@ jobs:
         run: >-
           python scripts_dc3pa/run_round592_gate.py
           --junit artifacts/round592.xml
+
+      - name: Round 5.9.3 Controller/fallback boundary gate
+        run: >-
+          python scripts_dc3pa/run_round593_gate.py
+          --junit artifacts/round593.xml
 
       - name: Print reports on failure
         if: failure()
