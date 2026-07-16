@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 from .final_taskset_release import FinalTasksetRelease
 from .model_epoch import ModelEpoch
+from .log_fallback import assert_readiness_receipts_are_natural
 
 
 def canonical(value: Any) -> bytes:
@@ -35,6 +36,9 @@ class SeedProviderSmokeReceipt:
     technical_failure_count: int
     dry_run_root_guard_passed: bool
     trace_sha256: str
+    fallback_enabled: bool = False
+    fallback_triggered: bool = False
+    total_injected_logs: int = 0
 
     def __post_init__(self):
         if not self.receipt_id or not self.task or not self.difficulty:
@@ -184,6 +188,22 @@ def audit_readiness(*, blueprint_id: str, source_commit: str,
         reasons.append("MineDojo marker gate failed")
     if not smoke_receipts:
         reasons.append("no smoke receipts")
+    try:
+        assert_readiness_receipts_are_natural(
+            [
+                {
+                    "entry_id": item.receipt_id,
+                    "fallback_metrics": {
+                        "fallback_enabled": item.fallback_enabled,
+                        "fallback_triggered": item.fallback_triggered,
+                        "total_injected_logs": item.total_injected_logs,
+                    },
+                }
+                for item in smoke_receipts
+            ]
+        )
+    except ValueError as exc:
+        reasons.append(str(exc))
     missing = set(required_difficulties) - {x.difficulty for x in smoke_receipts}
     if missing:
         reasons.append(f"missing smoke difficulties: {sorted(missing)}")
@@ -239,6 +259,9 @@ def audit_readiness(*, blueprint_id: str, source_commit: str,
 
 def load_receipt(path: str | Path):
     value = json.loads(Path(path).read_text(encoding="utf-8"))
+    fallback_metrics = value.get("fallback_metrics")
+    if not isinstance(fallback_metrics, Mapping):
+        raise ValueError("Readiness receipt is missing structured fallback metrics")
     selected = {
         "receipt_id": value.get("receipt_id") or value.get("truth_receipt_id", ""),
         "task": value.get("task", ""),
@@ -261,5 +284,14 @@ def load_receipt(path: str | Path):
         "technical_failure_count": value.get("technical_failure_count", 1),
         "dry_run_root_guard_passed": value.get("dry_run_root_guard_passed", False),
         "trace_sha256": value.get("trace_sha256", ""),
+        "fallback_enabled": bool(
+            fallback_metrics.get("fallback_enabled", False)
+        ),
+        "fallback_triggered": bool(
+            fallback_metrics.get("fallback_triggered", False)
+        ),
+        "total_injected_logs": int(
+            fallback_metrics.get("total_injected_logs", 0) or 0
+        ),
     }
     return SeedProviderSmokeReceipt(**selected)

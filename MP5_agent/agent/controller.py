@@ -520,7 +520,55 @@ class Controller:
             return self.memory.inventory.get(target, 0) >= int(required_quantity)
         return False
 
-    def _gather_logs(self, env, underground, target_logs, max_attempts=2):
+    def _apply_diagnostic_log_fallback(
+        self,
+        env,
+        *,
+        target_logs,
+        naturally_collected_count,
+        natural_collection_attempts,
+    ):
+        session = getattr(self, "_dc3pa_log_fallback_session", None)
+        if session is None:
+            return False
+
+        self._sync_memory(env)
+        inventory_before = dict(self.memory.inventory)
+
+        def apply_inventory(requested):
+            inventory_items = [
+                InventoryItem(
+                    slot=slot,
+                    name=("gold_ore" if name == "gold" else name.replace(" ", "_")),
+                    variant=None,
+                    quantity=quantity,
+                )
+                for slot, (name, quantity) in enumerate(requested.items())
+            ]
+            env.set_inventory(inventory_items)
+            self._sync_memory(env)
+            return dict(self.memory.inventory)
+
+        event = session.intervene(
+            target_item="log",
+            target_quantity=int(target_logs),
+            inventory_before=inventory_before,
+            naturally_collected_count=int(naturally_collected_count),
+            natural_collection_attempts=int(natural_collection_attempts),
+            bounded_attempts_exhausted=True,
+            apply_inventory=apply_inventory,
+        )
+        emit_execution_event(
+            self,
+            "log_fallback",
+            status="applied",
+            **event.to_dict(),
+        )
+        return self.memory.inventory.get("log", 0) >= target_logs
+
+    def _gather_logs(self, env, underground, target_logs, max_attempts=3):
+        self._sync_memory(env)
+        initial_logs = self.memory.inventory.get("log", 0)
         for attempt_idx in range(max_attempts):
             self._sync_memory(env)
             if self.memory.inventory.get("log", 0) >= target_logs:
@@ -560,6 +608,16 @@ class Controller:
                         break
                 if self.memory.inventory.get("log", 0) >= target_logs:
                     return True
+        if not underground and self.memory.inventory.get("log", 0) < target_logs:
+            naturally_collected = max(
+                0, self.memory.inventory.get("log", 0) - initial_logs
+            )
+            return self._apply_diagnostic_log_fallback(
+                env,
+                target_logs=target_logs,
+                naturally_collected_count=naturally_collected,
+                natural_collection_attempts=max_attempts,
+            )
         return self.memory.inventory.get("log", 0) >= target_logs
 
     def _craft_bootstrap_item(self, env, craft_name, use_crafting_table, craft_num=1):

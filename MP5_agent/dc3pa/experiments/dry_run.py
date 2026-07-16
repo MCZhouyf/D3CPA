@@ -308,6 +308,7 @@ class DryRunReceipt:
     truth_receipt_id: str = ""
     task: str = ""
     difficulty: str = ""
+    fallback_metrics: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.status not in DRY_RUN_STATUSES:
@@ -331,6 +332,7 @@ class DryRunReceipt:
         payload["errors"] = list(self.errors)
         payload["metadata"] = dict(self.metadata)
         payload["returned_models"] = list(self.returned_models)
+        payload["fallback_metrics"] = dict(self.fallback_metrics)
         return payload
 
 
@@ -485,6 +487,8 @@ def audit_dry_run(
                 f"{entry_id}: task was not completed, but task success is "
                 "not required for a pipeline dry run"
             )
+        if not receipt.fallback_metrics:
+            errors.append(f"{entry_id}: structured fallback metrics missing")
 
     return DryRunAuditReport(
         eligible=not errors,
@@ -506,6 +510,47 @@ def audit_dry_run(
             "total_label_joins": sum(
                 receipt.execution_label_join_count for receipt in receipts
             ),
+            "natural_completion_count": sum(
+                bool(receipt.fallback_metrics.get("natural_completion", False))
+                for receipt in receipts
+            ),
+            "fallback_assisted_completion_count": sum(
+                bool(
+                    receipt.fallback_metrics.get(
+                        "fallback_assisted_completion", False
+                    )
+                )
+                for receipt in receipts
+            ),
+            "fallback_trigger_count": sum(
+                int(receipt.fallback_metrics.get("fallback_trigger_count", 0) or 0)
+                for receipt in receipts
+            ),
+            "total_injected_logs": sum(
+                int(receipt.fallback_metrics.get("total_injected_logs", 0) or 0)
+                for receipt in receipts
+            ),
+            "total_natural_collection_attempts": sum(
+                int(
+                    receipt.fallback_metrics.get(
+                        "total_natural_collection_attempts", 0
+                    )
+                    or 0
+                )
+                for receipt in receipts
+            ),
+            "planner_calls": sum(
+                int(receipt.fallback_metrics.get("planner_calls", 0) or 0)
+                for receipt in receipts
+            ),
+            "reflection_calls": sum(
+                int(receipt.fallback_metrics.get("reflection_calls", 0) or 0)
+                for receipt in receipts
+            ),
+            "evaluation_chain_calls": sum(
+                int(receipt.fallback_metrics.get("evaluation_chain_calls", 0) or 0)
+                for receipt in receipts
+            ),
         },
     )
 
@@ -521,6 +566,7 @@ def receipt_from_stage6_result(
     formal_memory_used: bool,
     exception: Optional[BaseException] = None,
     truth_evidence: Optional[Mapping[str, Any]] = None,
+    fallback_metrics: Optional[Mapping[str, Any]] = None,
 ) -> DryRunReceipt:
     entry_ids = {entry.entry_id for entry in campaign.entries}
     if entry_id not in entry_ids:
@@ -604,6 +650,7 @@ def receipt_from_stage6_result(
         truth_receipt_id=truth_receipt_id,
         task=str(truth.get("task", "")),
         difficulty=str(truth.get("difficulty", "")),
+        fallback_metrics=dict(fallback_metrics or {}),
     )
 
 

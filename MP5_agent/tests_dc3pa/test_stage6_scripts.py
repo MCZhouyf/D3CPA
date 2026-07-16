@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -37,6 +39,34 @@ def test_minecraft_entrypoint_help_has_no_minedojo_import_requirement():
     assert "Stage-6 DC3PA closed loop" in result.stdout
     assert "--require-environment-score" in result.stdout
     assert "--real-experiment-blueprint" in result.stdout
+    assert "--enable-diagnostic-log-fallback" in result.stdout
+
+
+def test_diagnostic_log_fallback_is_rejected_outside_dry_run(tmp_path):
+    import scripts_dc3pa.stage6_run_minecraft as launcher
+
+    task_path = tmp_path / "task.json"
+    task_path.write_text(
+        json.dumps([{"task": "log", "quantity": 1}]), encoding="utf-8"
+    )
+    with pytest.raises(SystemExit, match="2"):
+        launcher.main(
+            [
+                "--mode",
+                "reasoning_only",
+                "--openai_key",
+                "test-key",
+                "--gpt_model_name",
+                "gpt-4-turbo",
+                "--task",
+                str(task_path),
+                "--enable-diagnostic-log-fallback",
+                "--log-fallback-policy",
+                str(tmp_path / "policy.json"),
+                "--paired-dry-run-protocol",
+                str(tmp_path / "protocol.json"),
+            ]
+        )
 
 
 def test_minecraft_entrypoint_rejects_missing_display_before_legacy_import(
@@ -432,6 +462,7 @@ def test_minecraft_entrypoint_writes_dry_run_receipt_without_formal_memory(
 
     assert rc == 0
     assert observed["runtime_config"].memory_mode == "disabled"
+    assert observed["runtime_config"].telemetry_enabled is True
     assert observed["runtime_config"].record_legacy_workflow_memory is False
     assert observed["runtime_config"].record_multimodal_memory is False
     assert observed["use_history_workflow"] is False

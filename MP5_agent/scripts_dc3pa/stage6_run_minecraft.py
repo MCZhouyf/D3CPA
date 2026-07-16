@@ -43,6 +43,15 @@ from dc3pa.experiments.dry_run import (  # noqa: E402
     receipt_from_stage6_result,
     save_receipt,
 )
+from dc3pa.experiments.log_fallback import (  # noqa: E402
+    DiagnosticLogFallbackSession,
+    LogFallbackPolicy,
+    load_log_fallback_policy,
+    receipt_metrics_from_events,
+)
+from dc3pa.experiments.paired_dry_run import (  # noqa: E402
+    load_paired_protocol,
+)
 from dc3pa.memory import (  # noqa: E402
     HashingTextEncoder,
     MultimodalMemory,
@@ -405,6 +414,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dry-run-output-root", type=Path)
     parser.add_argument("--dry-run-receipt", type=Path)
     parser.add_argument("--dry-run-max-explore-steps", type=int, default=16)
+    parser.add_argument(
+        "--enable-diagnostic-log-fallback", action="store_true"
+    )
+    parser.add_argument("--log-fallback-policy", type=Path)
+    parser.add_argument("--paired-dry-run-protocol", type=Path)
     return parser
 
 
@@ -461,6 +475,30 @@ def main(argv: Optional[list[str]] = None) -> int:
             args.dry_run_receipt,
         )
     )
+    fallback_arguments_present = any(
+        (
+            args.enable_diagnostic_log_fallback,
+            args.log_fallback_policy,
+            args.paired_dry_run_protocol,
+        )
+    )
+    if fallback_arguments_present and not dry_run_enabled:
+        parser.error("diagnostic log fallback is allowed only in dry-run receipt mode")
+    if not args.enable_diagnostic_log_fallback and (
+        args.log_fallback_policy or args.paired_dry_run_protocol
+    ):
+        parser.error("fallback policy/protocol require --enable-diagnostic-log-fallback")
+    if args.enable_diagnostic_log_fallback:
+        missing = [
+            name
+            for name, value in (
+                ("--log-fallback-policy", args.log_fallback_policy),
+                ("--paired-dry-run-protocol", args.paired_dry_run_protocol),
+            )
+            if not value
+        ]
+        if missing:
+            parser.error("diagnostic log fallback requires " + ", ".join(missing))
     if dry_run_enabled:
         missing = [
             name
@@ -478,6 +516,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         runtime_config = replace(
             runtime_config,
             memory_mode=MemoryMode.DISABLED.value,
+            telemetry_enabled=True,
             record_legacy_workflow_memory=False,
             record_multimodal_memory=False,
             acquisition_log_dir="",
@@ -505,6 +544,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     provider_metadata = []
     effective_environment_seed = None
     environment_started = False
+    fallback_policy = LogFallbackPolicy().with_id()
+    fallback_session = None
     if args.real_experiment_blueprint:
         real_experiment_blueprint = load_blueprint(args.real_experiment_blueprint)
         if dry_run_enabled:
@@ -554,6 +595,42 @@ def main(argv: Optional[list[str]] = None) -> int:
                 campaign_id=dry_run_campaign.campaign_id,
                 entry_id=dry_run_entry.entry_id,
             )
+            if args.enable_diagnostic_log_fallback:
+                try:
+                    fallback_policy = load_log_fallback_policy(
+                        args.log_fallback_policy
+                    )
+                    paired_protocol = load_paired_protocol(
+                        args.paired_dry_run_protocol
+                    )
+                    marker_path = dry_run_marker_for(args.dry_run_output_root)
+                    marker = (
+                        _load_json(marker_path) if marker_path is not None else {}
+                    )
+                    fallback_policy.assert_activation_allowed(
+                        scope="diagnostic_dry_run",
+                        explicit_cli_enable=True,
+                        dry_run_campaign_present=True,
+                        dry_run_output_marker_present=bool(marker_path),
+                    )
+                    if paired_protocol.fallback_policy_id != fallback_policy.policy_id:
+                        raise ValueError("paired protocol fallback policy ID mismatch")
+                    if dry_run_campaign.campaign_id != paired_protocol.diagnostic_campaign_id:
+                        raise ValueError("fallback requires the paired diagnostic campaign")
+                    if marker.get("campaign_id") != dry_run_campaign.campaign_id:
+                        raise ValueError("dry-run marker campaign ID mismatch")
+                    if marker.get("entry_id") != dry_run_entry.entry_id:
+                        raise ValueError("dry-run marker entry ID mismatch")
+                    if paired_protocol.source_commit != real_experiment_blueprint.source_commit:
+                        raise ValueError("paired protocol source commit mismatch")
+                    fallback_session = DiagnosticLogFallbackSession(
+                        policy=fallback_policy,
+                        source_commit=paired_protocol.source_commit,
+                        task=dry_run_entry.task,
+                        seed=dry_run_entry.seed,
+                    )
+                except (OSError, TypeError, ValueError) as exc:
+                    parser.error(str(exc))
             args.real_experiment_phase = "dry_run_completed"
             args.real_experiment_task = dry_run_entry.task
             args.real_experiment_seed = dry_run_entry.seed
@@ -640,6 +717,23 @@ def main(argv: Optional[list[str]] = None) -> int:
                 "task": dry_run_entry.task,
                 "difficulty": dry_run_difficulty,
             },
+            fallback_metrics=receipt_metrics_from_events(
+                policy=fallback_policy,
+                enabled=fallback_session is not None,
+                events=fallback_session.events if fallback_session is not None else (),
+                task_completed=bool(result is not None and result.success),
+                planner_calls=sum(
+                    item.purpose == "planning" for item in provider_metadata
+                ),
+                reflection_calls=sum(
+                    item.purpose == "reflection" for item in provider_metadata
+                ),
+                evaluation_chain_calls=(
+                    int(getattr(result, "evaluation_count", 0) or 0)
+                    if result is not None
+                    else 0
+                ),
+            ).to_dict(),
         )
         save_receipt(args.dry_run_receipt, receipt)
 
@@ -747,6 +841,8 @@ def main(argv: Optional[list[str]] = None) -> int:
                     planner_instance.llm, trace_writer, "planning"
                 )
             controller = legacy_runner.Controller(memory=memory, checker=reflexion)
+            if fallback_session is not None:
+                controller._dc3pa_log_fallback_session = fallback_session
             state_provider = build_legacy_state_provider(
                 env=evaluator.env,
                 legacy_memory=memory,
