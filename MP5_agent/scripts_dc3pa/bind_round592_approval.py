@@ -108,14 +108,18 @@ def main() -> int:
             raise ValueError("Controller revision/Log Fallback approval mismatch")
         if natural_campaign.get("source_commit") != blueprint.source_commit:
             raise ValueError("Natural campaign/Blueprint source commit mismatch")
-        if natural_campaign.get("campaign_kind") != "natural_readiness":
-            raise ValueError("Readiness campaign must be natural")
         if paired_protocol.get("source_commit") != blueprint.source_commit:
             raise ValueError("Paired protocol/Blueprint source commit mismatch")
         if paired_protocol.get("natural_campaign_id") != natural_campaign.get(
             "campaign_id"
         ):
             raise ValueError("Paired protocol/natural campaign mismatch")
+        if paired_protocol.get("natural_fallback_enabled") is not False:
+            raise ValueError("Natural readiness campaign must disable fallback")
+        if paired_protocol.get("natural_results_are_readiness_evidence") is not True:
+            raise ValueError("Natural campaign is not approved as readiness evidence")
+        if paired_protocol.get("diagnostic_results_are_readiness_evidence") is not False:
+            raise ValueError("Diagnostic campaign cannot be readiness evidence")
         if paired_protocol.get("fallback_policy_id") != fallback_policy.get(
             "policy_id"
         ):
