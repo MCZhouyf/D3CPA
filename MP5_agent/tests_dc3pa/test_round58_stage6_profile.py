@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import importlib.util
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -181,6 +182,52 @@ def test_stage6_legacy_model_profile_remains_default():
 
     assert launcher._resolve_model_profile("", {}) is None
     assert launcher._resolve_model_profile("legacy", {"model_profile": "gpt51_reference"}) is None
+
+
+def test_legacy_real_experiment_applies_seed_without_reference_profile(monkeypatch):
+    import scripts_dc3pa.stage6_run_minecraft as launcher
+
+    monkeypatch.delenv("DC3PA_WORLD_SEED", raising=False)
+    monkeypatch.delenv("DC3PA_SIM_SEED", raising=False)
+
+    result = launcher._configure_real_experiment_seed(
+        real_experiment_blueprint=object(), raw_seed="7654321"
+    )
+
+    assert result == 7654321
+    assert os.environ["DC3PA_WORLD_SEED"] == "7654321"
+    assert os.environ["DC3PA_SIM_SEED"] == "7654321"
+
+
+def test_legacy_chat_metadata_records_returned_model_without_content():
+    import scripts_dc3pa.stage6_run_minecraft as launcher
+
+    result = SimpleNamespace(
+        content="must not be inspected",
+        response_metadata={
+            "model_name": "provider-model-id",
+            "token_usage": {
+                "prompt_tokens": 11,
+                "completion_tokens": 7,
+                "total_tokens": 18,
+            },
+        },
+    )
+    metadata = launcher._legacy_response_metadata(
+        result,
+        requested_model="gpt-4-turbo",
+        purpose="planning",
+        request_started_at=datetime.now(timezone.utc).isoformat(),
+        request_duration_seconds=0.5,
+    )
+
+    assert metadata is not None
+    assert metadata.requested_model == "gpt-4-turbo"
+    assert metadata.returned_model == "provider-model-id"
+    assert metadata.purpose == "planning"
+    assert metadata.usage.input_tokens == 11
+    assert metadata.usage.output_tokens == 7
+    assert "must not be inspected" not in repr(metadata)
 
 
 @pytest.mark.parametrize(

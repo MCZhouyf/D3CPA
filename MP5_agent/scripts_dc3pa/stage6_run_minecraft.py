@@ -16,7 +16,9 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Mapping, Optional
@@ -98,6 +100,7 @@ from dc3pa.providers import (  # noqa: E402
     OpenAIResponsesChatAdapter,
     OpenAIResponsesModelProfile,
     ResponseUsage,
+    SafeResponseMetadata,
 )
 from dc3pa.reliability import (  # noqa: E402
     AdaptiveTriggerConfig,
@@ -116,11 +119,15 @@ class TracedChatModel:
         purpose: str,
         *,
         include_error_detail: bool = True,
+        metadata_observer=None,
+        requested_model: str = "",
     ):
         self._model = model
         self._trace_writer = trace_writer
         self._purpose = purpose
         self._include_error_detail = include_error_detail
+        self._metadata_observer = metadata_observer
+        self._requested_model = requested_model
 
     def _resolve_method(self, method_name: str) -> tuple[str, Any]:
         if hasattr(self._model, method_name):
@@ -148,6 +155,8 @@ class TracedChatModel:
                 "actual_method": actual_method_name,
             },
         )
+        started_at = datetime.now(timezone.utc).isoformat()
+        started = time.monotonic()
         try:
             result = method(*args, **kwargs)
         except Exception as exc:
@@ -161,6 +170,16 @@ class TracedChatModel:
                 payload["error"] = str(exc)
             self._trace_writer.write("llm_call_failed", payload)
             raise
+        if self._metadata_observer is not None:
+            metadata = _legacy_response_metadata(
+                result,
+                requested_model=self._requested_model,
+                purpose=self._purpose,
+                request_started_at=started_at,
+                request_duration_seconds=time.monotonic() - started,
+            )
+            if metadata is not None:
+                self._metadata_observer(metadata)
         self._trace_writer.write(
             "llm_call_completed",
             {
@@ -182,6 +201,71 @@ class TracedChatModel:
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._model, name)
+
+
+def _legacy_response_metadata(
+    result: Any,
+    *,
+    requested_model: str,
+    purpose: str,
+    request_started_at: str,
+    request_duration_seconds: float,
+) -> Optional[SafeResponseMetadata]:
+    """Extract only safe identity/usage fields from a LangChain AIMessage."""
+    response = getattr(result, "response_metadata", None)
+    if not isinstance(response, Mapping):
+        return None
+    returned_model = str(
+        response.get("model_name", response.get("model", ""))
+    ).strip()
+    if not returned_model:
+        return None
+    raw_usage = response.get("token_usage", {})
+    if not isinstance(raw_usage, Mapping):
+        raw_usage = {}
+    usage = ResponseUsage(
+        input_tokens=int(
+            raw_usage.get("prompt_tokens", raw_usage.get("input_tokens", 0)) or 0
+        ),
+        output_tokens=int(
+            raw_usage.get(
+                "completion_tokens", raw_usage.get("output_tokens", 0)
+            )
+            or 0
+        ),
+        total_tokens=int(raw_usage.get("total_tokens", 0) or 0),
+    )
+    return SafeResponseMetadata(
+        requested_model=requested_model,
+        returned_model=returned_model,
+        profile_id="legacy",
+        reasoning_effort="none",
+        purpose=purpose,
+        request_started_at=request_started_at,
+        request_duration_seconds=request_duration_seconds,
+        response_id_sha256="",
+        usage=usage,
+    )
+
+
+def _configure_real_experiment_seed(
+    *, real_experiment_blueprint: Any, raw_seed: Any
+) -> Optional[int]:
+    if real_experiment_blueprint is None:
+        return None
+    try:
+        requested_seed = int(raw_seed)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            "Real experiment runs require a positive integer experiment seed"
+        ) from exc
+    if requested_seed <= 0:
+        raise ValueError(
+            "Real experiment runs require a positive integer experiment seed"
+        )
+    os.environ["DC3PA_WORLD_SEED"] = str(requested_seed)
+    os.environ["DC3PA_SIM_SEED"] = str(requested_seed)
+    return requested_seed
 
 
 def _formal_acquisition_provenance(
@@ -1159,16 +1243,13 @@ def main(argv: Optional[list[str]] = None) -> int:
                 "to rerun Minecraft or create a duplicate"
             )
 
-    requested_environment_seed = None
-    if model_profile is not None and args.real_experiment_blueprint:
-        try:
-            requested_environment_seed = int(args.real_experiment_seed)
-        except (TypeError, ValueError):
-            parser.error("GPT-5.1 reference runs require a positive integer experiment seed")
-        if requested_environment_seed <= 0:
-            parser.error("GPT-5.1 reference runs require a positive integer experiment seed")
-        os.environ["DC3PA_WORLD_SEED"] = str(requested_environment_seed)
-        os.environ["DC3PA_SIM_SEED"] = str(requested_environment_seed)
+    try:
+        requested_environment_seed = _configure_real_experiment_seed(
+            real_experiment_blueprint=real_experiment_blueprint,
+            raw_seed=args.real_experiment_seed,
+        )
+    except ValueError as exc:
+        parser.error(str(exc))
 
     def write_dry_run_receipt(result=None, exception: Optional[BaseException] = None) -> None:
         if not dry_run_enabled or dry_run_campaign is None or dry_run_entry is None:
@@ -1502,15 +1583,27 @@ def main(argv: Optional[list[str]] = None) -> int:
                 )
             elif hasattr(memory, "llm"):
                 memory.llm = TracedChatModel(
-                    memory.llm, trace_writer, "dc3pa_confidence_and_evaluation"
+                    memory.llm,
+                    trace_writer,
+                    "dc3pa_confidence_and_evaluation",
+                    metadata_observer=provider_metadata.append,
+                    requested_model=args.gpt_model_name,
                 )
             if model_profile is None and hasattr(reflexion, "llm"):
                 reflexion.llm = TracedChatModel(
-                    reflexion.llm, trace_writer, "reflection"
+                    reflexion.llm,
+                    trace_writer,
+                    "reflection",
+                    metadata_observer=provider_metadata.append,
+                    requested_model=args.gpt_model_name,
                 )
             if model_profile is None and hasattr(planner_instance, "llm"):
                 planner_instance.llm = TracedChatModel(
-                    planner_instance.llm, trace_writer, "planning"
+                    planner_instance.llm,
+                    trace_writer,
+                    "planning",
+                    metadata_observer=provider_metadata.append,
+                    requested_model=args.gpt_model_name,
                 )
             controller = legacy_runner.Controller(memory=memory, checker=reflexion)
             active_log_session = formal_bootstrap_session or fallback_session
