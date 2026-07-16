@@ -183,6 +183,25 @@ def test_stage6_legacy_model_profile_remains_default():
     assert launcher._resolve_model_profile("legacy", {"model_profile": "gpt51_reference"}) is None
 
 
+@pytest.mark.parametrize(
+    ("provider_alias_policy", "formal_bootstrap_enabled", "expected"),
+    (
+        (None, False, ("strict_identity_match", True)),
+        (object(), False, ("approved_alias_policy", False)),
+        (None, True, ("formal_epoch_stability_policy", False)),
+    ),
+)
+def test_stage6_returned_model_validation_follows_approved_protocol(
+    provider_alias_policy, formal_bootstrap_enabled, expected
+):
+    import scripts_dc3pa.stage6_run_minecraft as launcher
+
+    assert launcher._returned_model_validation(
+        provider_alias_policy=provider_alias_policy,
+        formal_bootstrap_enabled=formal_bootstrap_enabled,
+    ) == expected
+
+
 @pytest.mark.minedojo
 def test_real_legacy_evaluator_passes_requested_seed_to_minedojo_make(
     monkeypatch, tmp_path

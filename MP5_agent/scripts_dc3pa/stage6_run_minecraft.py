@@ -305,6 +305,16 @@ def _profile_chat_model(
     )
 
 
+def _returned_model_validation(
+    *, provider_alias_policy, formal_bootstrap_enabled: bool
+) -> tuple[str, bool]:
+    if provider_alias_policy is not None:
+        return "approved_alias_policy", False
+    if formal_bootstrap_enabled:
+        return "formal_epoch_stability_policy", False
+    return "strict_identity_match", True
+
+
 @contextlib.contextmanager
 def _working_directory(path: Path):
     previous = Path.cwd()
@@ -1115,17 +1125,19 @@ def main(argv: Optional[list[str]] = None) -> int:
                     },
                 )
             if model_profile is not None:
+                returned_model_validation, verify_returned_model = (
+                    _returned_model_validation(
+                        provider_alias_policy=provider_alias_policy,
+                        formal_bootstrap_enabled=formal_bootstrap_enabled,
+                    )
+                )
                 trace_writer.write(
                     "model_profile_activated",
                     {
                         "profile_id": model_profile.profile_id,
                         "model": model_profile.model,
                         "reasoning_effort": model_profile.reasoning_effort,
-                        "returned_model_validation": (
-                            "approved_alias_policy"
-                            if provider_alias_policy is not None
-                            else "strict_identity_match"
-                        ),
+                        "returned_model_validation": returned_model_validation,
                         "provider_model_alias_policy_id": (
                             provider_alias_policy.policy_id
                             if provider_alias_policy is not None
@@ -1138,21 +1150,21 @@ def main(argv: Optional[list[str]] = None) -> int:
                     "dc3pa_confidence_and_evaluation",
                     trace_writer,
                     provider_metadata.append,
-                    verify_returned_model=provider_alias_policy is None,
+                    verify_returned_model=verify_returned_model,
                 )
                 reflexion.llm = _profile_chat_model(
                     model_profile,
                     "reflection",
                     trace_writer,
                     provider_metadata.append,
-                    verify_returned_model=provider_alias_policy is None,
+                    verify_returned_model=verify_returned_model,
                 )
                 planner_instance.llm = _profile_chat_model(
                     model_profile,
                     "planning",
                     trace_writer,
                     provider_metadata.append,
-                    verify_returned_model=provider_alias_policy is None,
+                    verify_returned_model=verify_returned_model,
                 )
             elif hasattr(memory, "llm"):
                 memory.llm = TracedChatModel(
