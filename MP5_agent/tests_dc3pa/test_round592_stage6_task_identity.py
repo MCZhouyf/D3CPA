@@ -34,5 +34,26 @@ def test_single_attempt_provider_calls_include_final_failure_reflection():
     ) == 2
 
 
+def test_reactive_success_provider_calls_include_planning_and_reflection_events():
+    event = lambda name: type("Event", (), {"event_type": name})()
+    result = type(
+        "Result",
+        (),
+        {
+            "success": True,
+            "events": (
+                event("planning_started"),
+                event("reflection_created"),
+                event("planning_started"),
+                event("controller_completed"),
+            ),
+        },
+    )()
+
+    assert _expected_reasoning_only_provider_calls(
+        task_count=1, result=result
+    ) == 3
+
+
 def test_formal_dry_run_has_bounded_exploration_default():
     assert build_parser().parse_args([]).dry_run_max_explore_steps == 16

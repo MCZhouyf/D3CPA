@@ -443,9 +443,20 @@ def _runtime_target_matches_catalog_task(
 def _expected_reasoning_only_provider_calls(
     *, task_count: int, result: Any
 ) -> int:
-    """Derive calls from the frozen single-attempt reasoning-only protocol."""
+    """Derive successful provider calls from independent runtime events."""
     if task_count < 0:
         raise ValueError("task_count cannot be negative")
+    events = tuple(getattr(result, "events", ()) or ()) if result is not None else ()
+    if events:
+        planning_calls = sum(
+            getattr(event, "event_type", "") == "planning_started"
+            for event in events
+        )
+        reflection_calls = sum(
+            getattr(event, "event_type", "") == "reflection_created"
+            for event in events
+        )
+        return planning_calls + reflection_calls
     final_failure_reflection = int(
         result is not None and not bool(getattr(result, "success", False))
     )
@@ -1330,7 +1341,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
             trace_sha256 = sha256_file(args.trace)
         expected_calls = expected_provider_call_count
-        if model_profile is not None and args.mode == "reasoning_only":
+        if args.mode == "reasoning_only":
             expected_calls = _expected_reasoning_only_provider_calls(
                 task_count=expected_provider_call_count,
                 result=result,
@@ -1402,7 +1413,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             len(set(returned_identities)) == 1
         )
         expected_calls = expected_provider_call_count
-        if model_profile is not None and args.mode == "reasoning_only":
+        if args.mode == "reasoning_only":
             expected_calls = _expected_reasoning_only_provider_calls(
                 task_count=expected_provider_call_count,
                 result=result,
