@@ -129,6 +129,7 @@ class Stage6ClosedLoopRunner:
         record_metadata_provider: Optional[
             Callable[[bool], Mapping[str, Any]]
         ] = None,
+        episode_id_provider: Optional[Callable[[int], str]] = None,
     ):
         config.validate()
         if config.mode == "dc3pa" and cognitive_planner is None:
@@ -152,6 +153,7 @@ class Stage6ClosedLoopRunner:
         self.passive_confidence_scorer = passive_confidence_scorer
         self.trace_writer = trace_writer
         self.record_metadata_provider = record_metadata_provider
+        self.episode_id_provider = episode_id_provider
         self.memory_mode = MemoryMode.parse(config.memory_mode)
         if config.model_confidence_collection == "passive_final_plan":
             if calibration_store is None:
@@ -825,7 +827,11 @@ class Stage6ClosedLoopRunner:
                     "unsafe_unresolved_execution": decision.unsafe_unresolved_execution,
                 },
             )
-            episode_id = new_episode_id(task, attempt_index)
+            episode_id = (
+                self.episode_id_provider(attempt_index)
+                if self.episode_id_provider is not None
+                else new_episode_id(task, attempt_index)
+            )
             self._collect_passive_final_plan_confidence(
                 plan=plan,
                 state=initial_snapshot.state,

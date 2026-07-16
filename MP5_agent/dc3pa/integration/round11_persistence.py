@@ -113,7 +113,7 @@ def commit_successful_acquisition(
     record = SuccessfulTrajectoryRecord(
         episode_id=episode_id,
         task_name=task,
-        seed=str(task_information.get("seed", "")),
+        seed=str(dict(metadata or {}).get("seed", task_information.get("seed", ""))),
         plan=plan.to_dict(),
         telemetry=tuple(telemetry_payload),
         scene_candidates=tuple(candidates),

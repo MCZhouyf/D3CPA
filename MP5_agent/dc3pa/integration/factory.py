@@ -105,6 +105,7 @@ def build_stage6_runtime(
     record_metadata_provider: Optional[
         Callable[[bool], Mapping[str, Any]]
     ] = None,
+    episode_id_provider: Optional[Callable[[int], str]] = None,
 ) -> Stage6RuntimeBundle:
     """Compose Stage 0–5 components into the Stage-6 closed loop.
 
@@ -218,6 +219,7 @@ def build_stage6_runtime(
         passive_confidence_scorer=passive_confidence_scorer,
         trace_writer=trace_writer,
         record_metadata_provider=record_metadata_provider,
+        episode_id_provider=episode_id_provider,
     )
     return Stage6RuntimeBundle(
         runtime=runtime,

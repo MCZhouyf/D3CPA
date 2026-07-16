@@ -63,6 +63,16 @@ from dc3pa.experiments.formal_log_bootstrap import (  # noqa: E402
     mark_formal_bootstrap_output_root,
     validate_events_for_receipt,
 )
+from dc3pa.experiments.acquisition_binding import (  # noqa: E402
+    AcquisitionRecordProvenance,
+    finalize_staged_acquisition,
+)
+from dc3pa.experiments.formal_acquisition_execution import (  # noqa: E402
+    FormalAcquisitionCampaign,
+    TechnicalRetryPolicy,
+    deterministic_attempt_id,
+    load_ledger,
+)
 from dc3pa.experiments.paired_dry_run import (  # noqa: E402
     load_paired_protocol,
 )
@@ -75,6 +85,10 @@ from dc3pa.memory import (  # noqa: E402
     RGBHistogramEncoder,
 )
 from dc3pa.memory.modes import MemoryMode  # noqa: E402
+from dc3pa.memory.acquisition import AcquisitionStore  # noqa: E402
+from dc3pa.memory.acquisition_scene_only import (  # noqa: E402
+    SceneOnlyDependencyExtractor,
+)
 from dc3pa.memory.snapshot import (  # noqa: E402
     MemorySnapshotManifest,
     resolve_snapshot_database,
@@ -118,6 +132,7 @@ class TracedChatModel:
         raise AttributeError(
             f"{type(self._model).__name__!r} object has no attribute {method_name!r}"
         )
+
 
     def _call(self, method_name: str, *args: Any, **kwargs: Any) -> Any:
         actual_method_name, method = self._resolve_method(method_name)
@@ -167,6 +182,48 @@ class TracedChatModel:
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._model, name)
+
+
+def _formal_acquisition_provenance(
+    *, campaign, entry: Mapping[str, Any], attempt_id: str, receipt
+) -> AcquisitionRecordProvenance:
+    def value(name: str):
+        if isinstance(receipt, Mapping):
+            return receipt[name]
+        return getattr(receipt, name)
+
+    return AcquisitionRecordProvenance(
+        campaign_id=campaign.campaign_id,
+        schedule_id=campaign.schedule_id,
+        formal_authorization_id=campaign.formal_authorization_id,
+        execution_tooling_binding_id=campaign.execution_tooling_binding_id,
+        episode_index=int(entry["episode_index"]),
+        run_id=attempt_id,
+        attempt_id=attempt_id,
+        stage6_receipt_id=str(value("receipt_id")),
+        source_commit=campaign.source_commit,
+        blueprint_id=campaign.blueprint_id,
+        bootstrap_policy_id=campaign.bootstrap_policy_id,
+        bootstrap_amendment_id=campaign.bootstrap_amendment_id,
+        bootstrap_data_binding_id=campaign.bootstrap_data_binding_id,
+        prompt_hash_bundle_id=campaign.prompt_hash_bundle_id,
+        model_profile_id=campaign.model_profile_id,
+        requested_model=str(value("requested_model")),
+        returned_model_identities=tuple(value("returned_model_identities")),
+        task=str(entry["task"]),
+        seed=str(entry["seed"]),
+        difficulty=str(entry["difficulty"]),
+        method_id=str(entry["method_id"]),
+        bootstrap_event_ids=tuple(value("event_ids")),
+        injected_log_count=int(value("total_injected_logs")),
+        naturally_collected_log_count=int(value("total_naturally_collected_logs")),
+        natural_completion=bool(value("natural_completion")),
+        bootstrap_assisted_completion=bool(value("bootstrap_assisted_completion")),
+        planner_calls=int(value("planner_calls")),
+        reflection_calls=int(value("reflection_calls")),
+        evaluation_chain_calls=int(value("evaluation_chain_calls")),
+        trace_sha256=str(value("trace_sha256")),
+    ).with_id()
 
 
 def _load_json(path: Path) -> Mapping[str, Any]:
@@ -458,6 +515,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--formal-bootstrap-method-id", default="")
     parser.add_argument("--formal-bootstrap-output-root", type=Path)
     parser.add_argument("--formal-bootstrap-receipt", type=Path)
+    parser.add_argument("--formal-acquisition-campaign", type=Path)
+    parser.add_argument("--formal-acquisition-entry", type=Path)
+    parser.add_argument("--formal-acquisition-ledger", type=Path)
+    parser.add_argument("--formal-acquisition-retry-policy", type=Path)
+    parser.add_argument("--formal-acquisition-attempt-index", type=int)
+    parser.add_argument("--formal-acquisition-root", type=Path)
     return parser
 
 
@@ -537,6 +600,31 @@ def main(argv: Optional[list[str]] = None) -> int:
         parser.error("diagnostic fallback and formal bootstrap are mutually exclusive")
     if formal_bootstrap_enabled and not args.real_experiment_blueprint:
         parser.error("formal log bootstrap requires a real experiment Blueprint")
+    formal_acquisition_arguments = (
+        args.formal_acquisition_campaign,
+        args.formal_acquisition_entry,
+        args.formal_acquisition_ledger,
+        args.formal_acquisition_retry_policy,
+        args.formal_acquisition_attempt_index,
+        args.formal_acquisition_root,
+    )
+    formal_acquisition_enabled = any(
+        value is not None for value in formal_acquisition_arguments
+    )
+    if formal_acquisition_enabled and not all(
+        value is not None for value in formal_acquisition_arguments
+    ):
+        parser.error("formal acquisition requires all formal acquisition arguments")
+    if formal_acquisition_enabled and not formal_bootstrap_enabled:
+        parser.error("formal acquisition requires formal Log Bootstrap")
+    if formal_acquisition_enabled and args.mode != "reasoning_only":
+        parser.error("formal acquisition requires single-chain reasoning_only mode")
+    if formal_acquisition_enabled and (
+        args.formal_bootstrap_scope != "formal_acquisition"
+        or args.formal_bootstrap_method_id
+        != "single_chain_reactive_acquisition"
+    ):
+        parser.error("formal acquisition scope/method is incorrect")
     if fallback_arguments_present and not dry_run_enabled:
         parser.error("diagnostic log fallback is allowed only in dry-run receipt mode")
     if not args.enable_diagnostic_log_fallback and (
@@ -628,6 +716,92 @@ def main(argv: Optional[list[str]] = None) -> int:
     formal_bootstrap_amendment = None
     formal_bootstrap_binding = None
     formal_bootstrap_session = None
+    formal_acquisition_campaign = None
+    formal_acquisition_entry = None
+    formal_acquisition_attempt_id = ""
+    formal_acquisition_staging_root = None
+    if formal_acquisition_enabled:
+        try:
+            campaign_payload = _load_json(args.formal_acquisition_campaign)
+            formal_acquisition_campaign = FormalAcquisitionCampaign(
+                **campaign_payload
+            )
+            formal_acquisition_entry = _load_json(
+                args.formal_acquisition_entry
+            )
+            retry_payload = _load_json(args.formal_acquisition_retry_policy)
+            retry_payload["allowed_categories"] = tuple(
+                retry_payload["allowed_categories"]
+            )
+            retry_payload["scientific_categories"] = tuple(
+                retry_payload["scientific_categories"]
+            )
+            retry_policy = TechnicalRetryPolicy(**retry_payload)
+            ledger = load_ledger(args.formal_acquisition_ledger)
+            attempt_index = int(args.formal_acquisition_attempt_index)
+            if formal_acquisition_campaign.retry_policy_id != retry_policy.policy_id:
+                raise ValueError("campaign/retry-policy ID mismatch")
+            if ledger.campaign_id != formal_acquisition_campaign.campaign_id:
+                raise ValueError("campaign/ledger ID mismatch")
+            if attempt_index != len(ledger.attempts):
+                raise ValueError("formal attempt index is not next in the ledger")
+            if ledger.resolved:
+                raise ValueError("formal schedule entry is already resolved")
+            if ledger.attempts:
+                if ledger.attempts[-1].status != "technical_failure":
+                    raise ValueError("only technical failures may be retried")
+                if ledger.technical_retry_count >= retry_policy.maximum_technical_retries_per_entry:
+                    raise ValueError("formal technical retry maximum exceeded")
+            expected_assignment = (
+                ledger.episode_index,
+                ledger.group_id,
+                ledger.task,
+                str(ledger.seed),
+            )
+            actual_assignment = (
+                int(formal_acquisition_entry["episode_index"]),
+                str(formal_acquisition_entry["group_id"]),
+                str(formal_acquisition_entry["task"]),
+                str(formal_acquisition_entry["seed"]),
+            )
+            if actual_assignment != expected_assignment:
+                raise ValueError("formal entry/ledger assignment mismatch")
+            current_commit = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=ROOT.parent,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            if current_commit != formal_acquisition_campaign.source_commit:
+                raise ValueError("current source commit/campaign mismatch")
+            formal_acquisition_attempt_id = deterministic_attempt_id(
+                formal_acquisition_campaign.campaign_id,
+                ledger.episode_index,
+                attempt_index,
+            )
+            formal_acquisition_staging_root = (
+                args.formal_bootstrap_output_root
+                / "staging_acquisition"
+                / formal_acquisition_attempt_id
+            ).resolve()
+            args.formal_acquisition_root = args.formal_acquisition_root.resolve()
+            runtime_config = replace(
+                runtime_config,
+                mode="reasoning_only",
+                max_execution_attempts=4,
+                memory_mode=MemoryMode.ACQUIRE.value,
+                telemetry_enabled=True,
+                record_legacy_workflow_memory=False,
+                record_multimodal_memory=True,
+                acquisition_log_dir=str(formal_acquisition_staging_root),
+                calibration_log_dir="",
+                model_confidence_collection="disabled",
+            )
+            os.environ["MP5_DISABLE_MEMORY"] = "1"
+            expected_provider_call_count = 1
+        except (KeyError, OSError, TypeError, ValueError) as exc:
+            parser.error(str(exc))
     if args.real_experiment_blueprint:
         real_experiment_blueprint = load_blueprint(args.real_experiment_blueprint)
         if formal_bootstrap_enabled:
@@ -676,6 +850,35 @@ def main(argv: Optional[list[str]] = None) -> int:
                     raise ValueError(
                         "Formal bootstrap binding mismatch: " + ", ".join(mismatches)
                     )
+                if formal_acquisition_campaign is not None:
+                    campaign_bindings = {
+                        "Blueprint": (
+                            formal_acquisition_campaign.blueprint_id,
+                            real_experiment_blueprint.blueprint_id,
+                        ),
+                        "policy": (
+                            formal_acquisition_campaign.bootstrap_policy_id,
+                            formal_bootstrap_policy.policy_id,
+                        ),
+                        "amendment": (
+                            formal_acquisition_campaign.bootstrap_amendment_id,
+                            formal_bootstrap_amendment.amendment_id,
+                        ),
+                        "data binding": (
+                            formal_acquisition_campaign.bootstrap_data_binding_id,
+                            formal_bootstrap_binding.binding_id,
+                        ),
+                    }
+                    bad_campaign_bindings = [
+                        name
+                        for name, (actual, expected) in campaign_bindings.items()
+                        if actual != expected
+                    ]
+                    if bad_campaign_bindings:
+                        raise ValueError(
+                            "Formal acquisition campaign mismatch: "
+                            + ", ".join(bad_campaign_bindings)
+                        )
                 mark_formal_bootstrap_output_root(
                     args.formal_bootstrap_output_root,
                     policy_id=formal_bootstrap_policy.policy_id,
@@ -818,6 +1021,22 @@ def main(argv: Optional[list[str]] = None) -> int:
                     parser.error(
                         "formal bootstrap scope does not match real experiment phase"
                     )
+            if formal_acquisition_campaign is not None:
+                if args.real_experiment_phase != "experience_acquisition":
+                    parser.error("formal acquisition requires experience_acquisition phase")
+                entry = formal_acquisition_entry
+                assert entry is not None
+                if (
+                    args.real_experiment_task != str(entry["task"])
+                    or str(args.real_experiment_seed) != str(entry["seed"])
+                ):
+                    parser.error("real experiment task/seed differs from schedule entry")
+                task_list = _load_task_list(args.task)
+                if len(task_list) != 1 or not _runtime_target_matches_catalog_task(
+                    runtime_target=str(task_list[0].get("task", "")),
+                    catalog_task=str(entry["task"]),
+                ):
+                    parser.error("task JSON differs from formal schedule entry")
             if alias_arguments_present:
                 try:
                     provider_alias_policy = load_provider_model_alias_policy(
@@ -855,12 +1074,73 @@ def main(argv: Optional[list[str]] = None) -> int:
             formal_bootstrap_session = FormalLogBootstrapSession(
                 policy=formal_bootstrap_policy,
                 amendment_id=formal_bootstrap_amendment.amendment_id,
-                source_commit=formal_bootstrap_binding.source_commit,
+                source_commit=(
+                    formal_acquisition_campaign.source_commit
+                    if formal_acquisition_campaign is not None
+                    else formal_bootstrap_binding.source_commit
+                ),
                 blueprint_id=real_experiment_blueprint.blueprint_id,
                 scope=args.formal_bootstrap_scope,
                 method_id=args.formal_bootstrap_method_id,
                 task=args.real_experiment_task,
                 seed=args.real_experiment_seed,
+            )
+
+    if formal_acquisition_campaign is not None:
+        receipt_path = args.formal_bootstrap_receipt
+        pending_receipt_path = receipt_path.with_suffix(
+            receipt_path.suffix + ".pending"
+        )
+        final_episode_path = AcquisitionStore(
+            args.formal_acquisition_root
+        ).episode_path(formal_acquisition_attempt_id)
+        staged_episode_path = AcquisitionStore(
+            formal_acquisition_staging_root
+        ).episode_path(formal_acquisition_attempt_id)
+        if receipt_path.exists():
+            existing = _load_json(receipt_path)
+            if bool(existing.get("task_completed")) and not final_episode_path.is_file():
+                raise RuntimeError(
+                    "successful formal receipt exists without its acquisition record"
+                )
+            print(json.dumps({
+                "resume": "formal attempt already has a raw receipt",
+                "attempt_id": formal_acquisition_attempt_id,
+                "receipt": str(receipt_path),
+            }, sort_keys=True))
+            return 0 if bool(existing.get("pipeline_pass")) else 1
+        if pending_receipt_path.exists():
+            pending = dict(_load_json(pending_receipt_path))
+            pending["returned_model_identities"] = tuple(
+                pending.get("returned_model_identities", ())
+            )
+            pending["event_ids"] = tuple(pending.get("event_ids", ()))
+            receipt = FormalBootstrapRunReceipt(**pending)
+            if not receipt.task_completed:
+                raise RuntimeError("pending formal receipt is not a successful run")
+            provenance = _formal_acquisition_provenance(
+                campaign=formal_acquisition_campaign,
+                entry=formal_acquisition_entry,
+                attempt_id=formal_acquisition_attempt_id,
+                receipt=receipt,
+            )
+            finalize_staged_acquisition(
+                staging_root=formal_acquisition_staging_root,
+                final_root=args.formal_acquisition_root,
+                episode_id=formal_acquisition_attempt_id,
+                provenance=provenance,
+            )
+            os.replace(pending_receipt_path, receipt_path)
+            print(json.dumps({
+                "resume": "reconciled staged successful acquisition without rerun",
+                "attempt_id": formal_acquisition_attempt_id,
+                "receipt": str(receipt_path),
+            }, sort_keys=True))
+            return 0
+        if staged_episode_path.exists():
+            raise RuntimeError(
+                "staged successful acquisition has no pending receipt; refusing "
+                "to rerun Minecraft or create a duplicate"
             )
 
     requested_environment_seed = None
@@ -939,11 +1219,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         )
         save_receipt(args.dry_run_receipt, receipt)
 
-    def write_formal_bootstrap_receipt(
+    def build_formal_bootstrap_receipt(
         result=None, exception: Optional[BaseException] = None
-    ) -> None:
+    ):
         if formal_bootstrap_session is None:
-            return
+            return None
         from dc3pa.experiments.dry_run import sha256_file
 
         trace_sha256 = sha256_file(args.trace) if args.trace.exists() else ""
@@ -980,7 +1260,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         )
         receipt = FormalBootstrapRunReceipt(
             run_id=(
-                dry_run_entry.entry_id
+                formal_acquisition_attempt_id
+                if formal_acquisition_attempt_id
+                else dry_run_entry.entry_id
                 if dry_run_entry is not None
                 else f"{args.real_experiment_task}:{args.real_experiment_seed}"
             ),
@@ -996,7 +1278,11 @@ def main(argv: Optional[list[str]] = None) -> int:
             method_id=args.formal_bootstrap_method_id,
             task=args.real_experiment_task,
             seed=args.real_experiment_seed,
-            source_commit=formal_bootstrap_binding.source_commit,
+            source_commit=(
+                formal_acquisition_campaign.source_commit
+                if formal_acquisition_campaign is not None
+                else formal_bootstrap_binding.source_commit
+            ),
             blueprint_id=real_experiment_blueprint.blueprint_id,
             model_profile_id=model_profile.profile_id if model_profile else "legacy",
             requested_model=model_profile.model if model_profile else args.gpt_model_name,
@@ -1043,15 +1329,47 @@ def main(argv: Optional[list[str]] = None) -> int:
             receipt=receipt,
             events=triggered,
         )
+        return receipt
+
+    def save_formal_bootstrap_receipt(receipt) -> None:
+        if receipt is None:
+            return
         output = args.formal_bootstrap_receipt
         if output.exists():
             raise FileExistsError(
                 f"Refusing to overwrite formal bootstrap receipt: {output}"
             )
         output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(
-            json.dumps(receipt.to_dict(), indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
+        pending = output.with_suffix(output.suffix + ".pending")
+        serialized = json.dumps(receipt.to_dict(), indent=2, sort_keys=True) + "\n"
+        if pending.exists():
+            if pending.read_text(encoding="utf-8") != serialized:
+                raise FileExistsError("pending formal receipt content mismatch")
+            os.replace(pending, output)
+            return
+        output.write_text(serialized, encoding="utf-8")
+
+    def stage_formal_bootstrap_receipt(receipt) -> None:
+        if receipt is None:
+            return
+        output = args.formal_bootstrap_receipt
+        pending = output.with_suffix(output.suffix + ".pending")
+        serialized = json.dumps(receipt.to_dict(), indent=2, sort_keys=True) + "\n"
+        output.parent.mkdir(parents=True, exist_ok=True)
+        if pending.exists():
+            if pending.read_text(encoding="utf-8") != serialized:
+                raise FileExistsError("pending formal receipt content mismatch")
+            return
+        with pending.open("x", encoding="utf-8") as handle:
+            handle.write(serialized)
+            handle.flush()
+            os.fsync(handle.fileno())
+
+    def write_formal_bootstrap_receipt(
+        result=None, exception: Optional[BaseException] = None
+    ) -> None:
+        save_formal_bootstrap_receipt(
+            build_formal_bootstrap_receipt(result, exception)
         )
 
     try:
@@ -1221,6 +1539,11 @@ def main(argv: Optional[list[str]] = None) -> int:
                     args.memory_root,
                     image_encoder=image_encoder,
                     text_encoder=text_encoder,
+                    dependency_extractor=(
+                        SceneOnlyDependencyExtractor()
+                        if formal_acquisition_enabled
+                        else None
+                    ),
                     readonly=memory_mode.requires_frozen_snapshot,
                 )
             )
@@ -1248,8 +1571,24 @@ def main(argv: Optional[list[str]] = None) -> int:
                             "bootstrap_data_binding_id": (
                                 formal_bootstrap_binding.binding_id
                             ),
+                            **(
+                                {
+                                    "campaign_id": formal_acquisition_campaign.campaign_id,
+                                    "schedule_id": formal_acquisition_campaign.schedule_id,
+                                    "attempt_id": formal_acquisition_attempt_id,
+                                    "seed": str(formal_acquisition_entry["seed"]),
+                                    "difficulty": str(formal_acquisition_entry["difficulty"]),
+                                }
+                                if formal_acquisition_campaign is not None
+                                else {}
+                            ),
                         }
                         if formal_bootstrap_session is not None
+                        else None
+                    ),
+                    episode_id_provider=(
+                        (lambda _attempt_index: formal_acquisition_attempt_id)
+                        if formal_acquisition_enabled
                         else None
                     ),
                 )
@@ -1268,13 +1607,40 @@ def main(argv: Optional[list[str]] = None) -> int:
                         all_succeeded = False
                         break
                 write_dry_run_receipt(last_result)
-                write_formal_bootstrap_receipt(last_result)
+                formal_receipt = build_formal_bootstrap_receipt(last_result)
+                if (
+                    formal_acquisition_campaign is not None
+                    and last_result is not None
+                    and last_result.success
+                ):
+                    entry = formal_acquisition_entry
+                    assert entry is not None
+                    assert formal_receipt is not None
+                    stage_formal_bootstrap_receipt(formal_receipt)
+                    provenance = _formal_acquisition_provenance(
+                        campaign=formal_acquisition_campaign,
+                        entry=entry,
+                        attempt_id=formal_acquisition_attempt_id,
+                        receipt=formal_receipt,
+                    )
+                    finalize_staged_acquisition(
+                        staging_root=formal_acquisition_staging_root,
+                        final_root=args.formal_acquisition_root,
+                        episode_id=formal_acquisition_attempt_id,
+                        provenance=provenance,
+                    )
+                save_formal_bootstrap_receipt(formal_receipt)
     except Exception as exc:
         if not dry_run_enabled or not args.dry_run_receipt.exists():
             write_dry_run_receipt(None, exc)
         if (
             not formal_bootstrap_enabled
-            or not args.formal_bootstrap_receipt.exists()
+            or (
+                not args.formal_bootstrap_receipt.exists()
+                and not args.formal_bootstrap_receipt.with_suffix(
+                    args.formal_bootstrap_receipt.suffix + ".pending"
+                ).exists()
+            )
         ):
             write_formal_bootstrap_receipt(None, exc)
         raise

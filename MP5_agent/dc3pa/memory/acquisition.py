@@ -96,6 +96,15 @@ class AcquisitionStore:
             default=_json_default,
         )
 
+        # Resume is idempotent, but an existing deterministic episode may never
+        # be replaced with different scientific data.
+        if target.exists():
+            if target.read_text(encoding="utf-8") != data:
+                raise FileExistsError(
+                    f"acquisition episode already exists with different content: {target}"
+                )
+            return target
+
         fd, temp_name = tempfile.mkstemp(
             dir=str(self.episodes_dir),
             prefix=f".{target.stem}.",
@@ -144,5 +153,21 @@ class AcquisitionStore:
         episode_dir.mkdir(parents=True, exist_ok=True)
         filename = f"{_safe_id(step_id)}_a{int(action_index):03d}.npy"
         path = episode_dir / filename
-        np.save(path, np.asarray(rgb), allow_pickle=False)
+        array = np.asarray(rgb)
+        if path.exists():
+            existing = np.load(path, allow_pickle=False)
+            if existing.dtype != array.dtype or existing.shape != array.shape or not np.array_equal(existing, array):
+                raise FileExistsError(
+                    f"acquisition image already exists with different content: {path}"
+                )
+            return str(path.relative_to(self.root))
+        temp = path.with_suffix(path.suffix + ".tmp")
+        try:
+            with temp.open("wb") as handle:
+                np.save(handle, array, allow_pickle=False)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temp, path)
+        finally:
+            temp.unlink(missing_ok=True)
         return str(path.relative_to(self.root))
