@@ -19,6 +19,7 @@ on:
       - "round592-*"
       - "round593-*"
       - "round594-*"
+      - "round510-*"
   pull_request:
 
 permissions:
@@ -132,6 +133,11 @@ jobs:
         run: >-
           python scripts_dc3pa/run_round594_gate.py
           --junit artifacts/round594.xml
+
+      - name: Round 5.10 formal acquisition and memory gate
+        run: >-
+          python scripts_dc3pa/run_round510_gate.py
+          --junit artifacts/round510.xml
 
       - name: Print reports on failure
         if: failure()
