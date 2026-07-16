@@ -440,6 +440,40 @@ def _runtime_target_matches_catalog_task(
     )
 
 
+def _validate_formal_task_spec(
+    *,
+    spec_path: Path,
+    catalog_task: str,
+    runtime_task_path: Path,
+    runtime_task: Mapping[str, Any],
+) -> None:
+    """Validate an explicitly approved catalog-to-runtime task mapping."""
+    spec_path = spec_path.resolve()
+    payload = _load_json(spec_path)
+    if str(payload.get("task_name", "")).strip() != catalog_task.strip():
+        raise ValueError("formal task spec task_name differs from schedule entry")
+    target = payload.get("target")
+    if not isinstance(target, Mapping):
+        raise ValueError("formal task spec target must be an object")
+    approved_target = str(target.get("candidate_item_name", "")).strip()
+    runtime_target = str(runtime_task.get("task", "")).strip()
+    if not approved_target or approved_target != runtime_target:
+        raise ValueError("formal task spec target differs from task JSON")
+    try:
+        approved_quantity = int(target.get("quantity"))
+        runtime_quantity = int(runtime_task.get("quantity"))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("formal task spec quantity must be an integer") from exc
+    if approved_quantity != runtime_quantity:
+        raise ValueError("formal task spec quantity differs from task JSON")
+    creative_task_file = Path(str(payload.get("creative_task_file", "")))
+    if not str(creative_task_file) or creative_task_file.is_absolute():
+        raise ValueError("formal task spec creative_task_file must be relative")
+    approved_task_path = (spec_path.parent.parent / creative_task_file).resolve()
+    if approved_task_path != runtime_task_path.resolve():
+        raise ValueError("formal task spec creative_task_file differs from --task")
+
+
 def _expected_reasoning_only_provider_calls(
     *, task_count: int, result: Any
 ) -> int:
@@ -683,6 +717,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--formal-bootstrap-receipt", type=Path)
     parser.add_argument("--formal-acquisition-campaign", type=Path)
     parser.add_argument("--formal-acquisition-entry", type=Path)
+    parser.add_argument("--formal-task-spec", type=Path)
     parser.add_argument("--formal-acquisition-ledger", type=Path)
     parser.add_argument("--formal-acquisition-retry-policy", type=Path)
     parser.add_argument("--formal-acquisition-attempt-index", type=int)
@@ -1213,11 +1248,27 @@ def main(argv: Optional[list[str]] = None) -> int:
                 ):
                     parser.error("real experiment task/seed differs from schedule entry")
                 task_list = _load_task_list(args.task)
-                if len(task_list) != 1 or not _runtime_target_matches_catalog_task(
-                    runtime_target=str(task_list[0].get("task", "")),
+                if len(task_list) != 1:
+                    parser.error("task JSON differs from formal schedule entry")
+                runtime_task = task_list[0]
+                if not _runtime_target_matches_catalog_task(
+                    runtime_target=str(runtime_task.get("task", "")),
                     catalog_task=str(entry["task"]),
                 ):
-                    parser.error("task JSON differs from formal schedule entry")
+                    if args.formal_task_spec is None:
+                        parser.error(
+                            "task JSON differs from formal schedule entry and "
+                            "--formal-task-spec was not provided"
+                        )
+                    try:
+                        _validate_formal_task_spec(
+                            spec_path=args.formal_task_spec,
+                            catalog_task=str(entry["task"]),
+                            runtime_task_path=Path(args.task),
+                            runtime_task=runtime_task,
+                        )
+                    except (OSError, TypeError, ValueError) as exc:
+                        parser.error(str(exc))
             if alias_arguments_present:
                 try:
                     provider_alias_policy = load_provider_model_alias_policy(
