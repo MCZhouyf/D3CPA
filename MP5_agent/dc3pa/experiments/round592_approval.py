@@ -54,6 +54,16 @@ class Round592ApprovalBinding:
     provider_model_alias_policy_id: str = ""
     provider_model_alias_approval_sha256: str = ""
     returned_model_identity_match_required: bool = True
+    experiment_approval_record_id: str = ""
+    controller_revision_id: str = ""
+    log_fallback_policy_id: str = ""
+    log_fallback_approval_sha256: str = ""
+    fallback_allowed_scopes: tuple[str, ...] = ()
+    fallback_forbidden_scopes: tuple[str, ...] = ()
+    natural_readiness_campaign_id: str = ""
+    paired_dry_run_protocol_id: str = ""
+    fallback_assisted_runs_excluded_from_readiness: bool = False
+    fallback_assisted_runs_excluded_from_paper_performance: bool = False
 
     def __post_init__(self) -> None:
         required = [
@@ -68,6 +78,16 @@ class Round592ApprovalBinding:
                 "provider_model_alias_policy_id",
                 "provider_model_alias_approval_sha256",
                 "returned_model_identity_match_required",
+                "experiment_approval_record_id",
+                "controller_revision_id",
+                "log_fallback_policy_id",
+                "log_fallback_approval_sha256",
+                "fallback_allowed_scopes",
+                "fallback_forbidden_scopes",
+                "natural_readiness_campaign_id",
+                "paired_dry_run_protocol_id",
+                "fallback_assisted_runs_excluded_from_readiness",
+                "fallback_assisted_runs_excluded_from_paper_performance",
             }
         ]
         if any(not str(value).strip() for value in required):
@@ -94,6 +114,48 @@ class Round592ApprovalBinding:
             or not self.returned_model_identity_match_required
         ):
             raise ValueError("Returned-model equality waiver is not policy-bound")
+        round593_values = (
+            self.experiment_approval_record_id,
+            self.controller_revision_id,
+            self.log_fallback_policy_id,
+            self.log_fallback_approval_sha256,
+            self.natural_readiness_campaign_id,
+            self.paired_dry_run_protocol_id,
+        )
+        if any(round593_values):
+            if not all(round593_values):
+                raise ValueError("Round 5.9.3 approval boundary is incomplete")
+            for label, value in (
+                ("Controller revision", self.controller_revision_id),
+                ("Log Fallback policy", self.log_fallback_policy_id),
+                ("Log Fallback approval", self.log_fallback_approval_sha256),
+                ("natural readiness campaign", self.natural_readiness_campaign_id),
+                ("paired dry-run protocol", self.paired_dry_run_protocol_id),
+            ):
+                if len(value) != 64:
+                    raise ValueError(f"{label} ID/SHA256 is invalid")
+            if set(self.fallback_allowed_scopes) != {"diagnostic_dry_run"}:
+                raise ValueError("Log Fallback allowed scope is invalid")
+            required_forbidden = {
+                "dev_holdout", "dev_train", "dev_tune", "final_evaluation",
+                "formal_acquisition", "fusion_fitting", "readiness_dry_run",
+                "task_semantic_smoke",
+            }
+            if set(self.fallback_forbidden_scopes) != required_forbidden:
+                raise ValueError("Log Fallback forbidden scopes are incomplete")
+            if not self.fallback_assisted_runs_excluded_from_readiness:
+                raise ValueError("Fallback-assisted runs must be excluded from readiness")
+            if not self.fallback_assisted_runs_excluded_from_paper_performance:
+                raise ValueError(
+                    "Fallback-assisted runs must be excluded from paper performance"
+                )
+        elif (
+            self.fallback_allowed_scopes
+            or self.fallback_forbidden_scopes
+            or self.fallback_assisted_runs_excluded_from_readiness
+            or self.fallback_assisted_runs_excluded_from_paper_performance
+        ):
+            raise ValueError("Round 5.9.3 fallback boundary is not revision-bound")
         if set(self.prompt_hashes) != {
             "planner", "confidence", "evaluation", "reflexion"
         } or any(len(value) != 64 for value in self.prompt_hashes.values()):
@@ -110,6 +172,27 @@ class Round592ApprovalBinding:
             payload.pop("provider_model_alias_policy_id", None)
             payload.pop("provider_model_alias_approval_sha256", None)
             payload.pop("returned_model_identity_match_required", None)
+        if not self.controller_revision_id:
+            for key in (
+                "experiment_approval_record_id",
+                "controller_revision_id",
+                "log_fallback_policy_id",
+                "log_fallback_approval_sha256",
+                "fallback_allowed_scopes",
+                "fallback_forbidden_scopes",
+                "natural_readiness_campaign_id",
+                "paired_dry_run_protocol_id",
+                "fallback_assisted_runs_excluded_from_readiness",
+                "fallback_assisted_runs_excluded_from_paper_performance",
+            ):
+                payload.pop(key, None)
+        else:
+            payload["fallback_allowed_scopes"] = sorted(
+                self.fallback_allowed_scopes
+            )
+            payload["fallback_forbidden_scopes"] = sorted(
+                self.fallback_forbidden_scopes
+            )
         return payload
 
     def compute_id(self) -> str:
@@ -169,6 +252,10 @@ def validate_round592_blueprint(
     controller_config: str | Path,
     evaluator_source: str | Path,
     evaluator_config: str | Path,
+    controller_revision: Mapping[str, Any] | None = None,
+    log_fallback_policy: Mapping[str, Any] | None = None,
+    natural_readiness_campaign: Mapping[str, Any] | None = None,
+    paired_dry_run_protocol: Mapping[str, Any] | None = None,
 ) -> Round592BlueprintValidationReport:
     errors: list[str] = []
     checks = {
@@ -192,6 +279,38 @@ def validate_round592_blueprint(
         "semantic smoke eligible": bool(semantic_smoke.get("eligible")),
         "final taskset eligible": final_taskset.eligible,
     }
+    if binding.controller_revision_id:
+        checks.update(
+            {
+                "Controller revision": bool(controller_revision)
+                and controller_revision.get("revision_id")
+                == binding.controller_revision_id,
+                "Controller revision source": bool(controller_revision)
+                and controller_revision.get("source_commit")
+                == binding.source_commit,
+                "Log Fallback policy": bool(log_fallback_policy)
+                and log_fallback_policy.get("policy_id")
+                == binding.log_fallback_policy_id,
+                "natural readiness campaign": bool(natural_readiness_campaign)
+                and natural_readiness_campaign.get("campaign_id")
+                == binding.natural_readiness_campaign_id,
+                "natural readiness source": bool(natural_readiness_campaign)
+                and natural_readiness_campaign.get("source_commit")
+                == binding.source_commit,
+                "paired dry-run protocol": bool(paired_dry_run_protocol)
+                and paired_dry_run_protocol.get("protocol_id")
+                == binding.paired_dry_run_protocol_id,
+                "paired protocol source": bool(paired_dry_run_protocol)
+                and paired_dry_run_protocol.get("source_commit")
+                == binding.source_commit,
+                "paired protocol natural campaign": bool(paired_dry_run_protocol)
+                and paired_dry_run_protocol.get("natural_campaign_id")
+                == binding.natural_readiness_campaign_id,
+                "paired protocol fallback policy": bool(paired_dry_run_protocol)
+                and paired_dry_run_protocol.get("fallback_policy_id")
+                == binding.log_fallback_policy_id,
+            }
+        )
     errors.extend(f"{name} mismatch" for name, passed in checks.items() if not passed)
     return Round592BlueprintValidationReport(
         source_commit=binding.source_commit,

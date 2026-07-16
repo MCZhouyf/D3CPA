@@ -43,6 +43,11 @@ def main() -> int:
         parser.add_argument("--" + name, required=True)
     parser.add_argument("--provider-model-alias-policy")
     parser.add_argument("--provider-model-alias-approval")
+    parser.add_argument("--controller-revision")
+    parser.add_argument("--log-fallback-policy")
+    parser.add_argument("--log-fallback-approval")
+    parser.add_argument("--natural-readiness-campaign")
+    parser.add_argument("--paired-dry-run-protocol")
     args = parser.parse_args()
     alias_arguments = (
         args.provider_model_alias_policy,
@@ -61,6 +66,18 @@ def main() -> int:
         if all(alias_arguments)
         else None
     )
+    round593_arguments = (
+        args.controller_revision,
+        args.log_fallback_policy,
+        args.log_fallback_approval,
+        args.natural_readiness_campaign,
+        args.paired_dry_run_protocol,
+    )
+    if any(round593_arguments) and not all(round593_arguments):
+        parser.error(
+            "Round 5.9.3 binding requires Controller revision, Log Fallback "
+            "policy/approval, natural campaign and paired protocol"
+        )
 
     amendment = load(args.author_amendment)
     blueprint = load_blueprint(args.blueprint)
@@ -72,8 +89,37 @@ def main() -> int:
     prompts = load(args.prompt_identity)
     if amendment.get("approved_by") != "ZYF":
         raise ValueError("Taskset amendment is not ZYF approved")
-    if amendment.get("source_commit") != blueprint.source_commit:
+    if amendment.get("source_commit") != blueprint.source_commit and not all(
+        round593_arguments
+    ):
         raise ValueError("Author amendment/Blueprint source commit mismatch")
+    revision = load(args.controller_revision) if all(round593_arguments) else None
+    fallback_policy = load(args.log_fallback_policy) if revision else None
+    natural_campaign = load(args.natural_readiness_campaign) if revision else None
+    paired_protocol = load(args.paired_dry_run_protocol) if revision else None
+    if revision:
+        if revision.get("source_commit") != blueprint.source_commit:
+            raise ValueError("Controller revision/Blueprint source commit mismatch")
+        if fallback_policy.get("policy_id") != revision.get("fallback_policy_id"):
+            raise ValueError("Controller revision/Log Fallback policy mismatch")
+        if sha256_file(args.log_fallback_approval) != revision.get(
+            "fallback_approval_sha256"
+        ):
+            raise ValueError("Controller revision/Log Fallback approval mismatch")
+        if natural_campaign.get("source_commit") != blueprint.source_commit:
+            raise ValueError("Natural campaign/Blueprint source commit mismatch")
+        if natural_campaign.get("campaign_kind") != "natural_readiness":
+            raise ValueError("Readiness campaign must be natural")
+        if paired_protocol.get("source_commit") != blueprint.source_commit:
+            raise ValueError("Paired protocol/Blueprint source commit mismatch")
+        if paired_protocol.get("natural_campaign_id") != natural_campaign.get(
+            "campaign_id"
+        ):
+            raise ValueError("Paired protocol/natural campaign mismatch")
+        if paired_protocol.get("fallback_policy_id") != fallback_policy.get(
+            "policy_id"
+        ):
+            raise ValueError("Paired protocol/Log Fallback policy mismatch")
 
     binding = Round592ApprovalBinding(
         approval_record_id=str(amendment["approval_record_id"]),
@@ -112,6 +158,30 @@ def main() -> int:
             else ""
         ),
         returned_model_identity_match_required=alias_policy is None,
+        experiment_approval_record_id=(
+            blueprint.author_approval.approval_record_id if revision else ""
+        ),
+        controller_revision_id=(str(revision["revision_id"]) if revision else ""),
+        log_fallback_policy_id=(
+            str(fallback_policy["policy_id"]) if revision else ""
+        ),
+        log_fallback_approval_sha256=(
+            sha256_file(args.log_fallback_approval) if revision else ""
+        ),
+        fallback_allowed_scopes=(
+            tuple(revision["fallback_allowed_scopes"]) if revision else ()
+        ),
+        fallback_forbidden_scopes=(
+            tuple(revision["fallback_forbidden_scopes"]) if revision else ()
+        ),
+        natural_readiness_campaign_id=(
+            str(natural_campaign["campaign_id"]) if revision else ""
+        ),
+        paired_dry_run_protocol_id=(
+            str(paired_protocol["protocol_id"]) if revision else ""
+        ),
+        fallback_assisted_runs_excluded_from_readiness=bool(revision),
+        fallback_assisted_runs_excluded_from_paper_performance=bool(revision),
     ).with_id()
     save_immutable(args.output, binding.to_dict())
     print(json.dumps(binding.to_dict(), indent=2, sort_keys=True))

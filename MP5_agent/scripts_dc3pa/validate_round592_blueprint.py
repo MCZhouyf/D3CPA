@@ -39,7 +39,20 @@ def main() -> int:
         "controller-config", "evaluator-source", "evaluator-config", "output",
     ):
         parser.add_argument("--" + name, required=True)
+    for name in (
+        "controller-revision", "log-fallback-policy",
+        "natural-readiness-campaign", "paired-dry-run-protocol",
+    ):
+        parser.add_argument("--" + name)
     args = parser.parse_args()
+    round593_paths = (
+        args.controller_revision,
+        args.log_fallback_policy,
+        args.natural_readiness_campaign,
+        args.paired_dry_run_protocol,
+    )
+    if any(round593_paths) and not all(round593_paths):
+        parser.error("Round 5.9.3 Blueprint validation inputs must be complete")
     report = validate_round592_blueprint(
         blueprint=load_blueprint(args.blueprint),
         binding=load_round592_approval(args.approval_binding),
@@ -53,6 +66,18 @@ def main() -> int:
         controller_config=args.controller_config,
         evaluator_source=args.evaluator_source,
         evaluator_config=args.evaluator_config,
+        controller_revision=(
+            load(args.controller_revision) if all(round593_paths) else None
+        ),
+        log_fallback_policy=(
+            load(args.log_fallback_policy) if all(round593_paths) else None
+        ),
+        natural_readiness_campaign=(
+            load(args.natural_readiness_campaign) if all(round593_paths) else None
+        ),
+        paired_dry_run_protocol=(
+            load(args.paired_dry_run_protocol) if all(round593_paths) else None
+        ),
     )
     save_immutable(args.output, report.to_dict())
     print(json.dumps(report.to_dict(), indent=2, sort_keys=True))
