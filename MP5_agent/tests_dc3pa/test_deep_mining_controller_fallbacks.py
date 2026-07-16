@@ -116,7 +116,7 @@ def test_gold_fallback_uses_valid_minedojo_item_name():
     assert controller.memory.inventory["gold"] == 1.0
 
 
-def test_gather_logs_falls_back_after_bounded_failed_attempts(monkeypatch):
+def test_gather_logs_does_not_inject_without_diagnostic_session(monkeypatch):
     controller = _controller()
     env = FakeEnv(controller.memory)
 
@@ -126,9 +126,11 @@ def test_gather_logs_falls_back_after_bounded_failed_attempts(monkeypatch):
         "controller.explore_above_ground_none", lambda *args, **kwargs: None
     )
 
-    assert controller._gather_logs(env, underground=False, target_logs=2, max_attempts=1)
-    assert controller.memory.inventory["log"] == 2.0
-    assert env.set_inventory_calls
+    assert not controller._gather_logs(
+        env, underground=False, target_logs=2, max_attempts=1
+    )
+    assert controller.memory.inventory.get("log", 0) == 0
+    assert not env.set_inventory_calls
 
 
 def test_wooden_bootstrap_uses_deterministic_craft_fallbacks(monkeypatch):
