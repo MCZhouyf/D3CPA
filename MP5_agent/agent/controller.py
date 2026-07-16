@@ -988,7 +988,7 @@ class Controller:
                             emit_action_finished(step, step_index, action_index, action, "success", check_result)
                             continue
                         
-                        obj = args["obj"]
+                        obj = normalize_inventory_name(args["obj"])
                         find_obj = update_find_obj_name(obj)
                         print(f"find_obj is {find_obj}")
                         explore_above_ground(env=env,args=args, object=find_obj, performer=self, memory=self.memory, task_information=task_information, underground=underground)
@@ -999,7 +999,7 @@ class Controller:
                         if not check_result["success"]:
                             return finish_failure(step, step_index, action_index, action, check_result, underground)
 
-                        obj = args["obj"]
+                        obj = normalize_inventory_name(args["obj"])
                         move_success = approach(env=env, memory=self.memory,object=obj, underground=underground)
                         if not move_success:
                             if (
@@ -1007,7 +1007,9 @@ class Controller:
                                 and step_contains_mine
                                 and any(
                                     later_action["name"] == "mine"
-                                    and later_action["args"].get("obj") == "log"
+                                    and normalize_inventory_name(
+                                        later_action["args"].get("obj")
+                                    ) == "log"
                                     for later_action in step["actions"]
                                 )
                             ):
@@ -1163,13 +1165,17 @@ class Controller:
                         if not check_result["success"]:
                             return finish_failure(step, step_index, action_index, action, check_result, underground)
 
-                        obj = args["obj"]
+                        obj = normalize_inventory_name(args["obj"])
                         #print(f"mine----old_inventory_obj is {self.memory.inventory}")
                         inventory_obj = update_inventory_obj_name(obj)
                         #print(f"mine----inventory_obj is {inventory_obj}")
                         old_quantity = self.memory.inventory.get(inventory_obj, 0)
 
-                        tool = "" if args["tool"] is None else args["tool"]
+                        tool = (
+                            ""
+                            if args["tool"] is None
+                            else normalize_inventory_name(args["tool"])
+                        )
 
                         inventory_name_list, inventory_num_list = mine(env=env, memory=self.memory, target=obj, equipment=tool, underground=underground)
                         #print(f"mine----inventory_name_list is {inventory_name_list}")
@@ -1298,7 +1304,7 @@ class Controller:
         if action_name == "mine" or action_name == "fight" or action_name == "dig_down" or action_name == "dig_up" or action_name == "apply":
             events,_,_,_ = env.step([0,0,0,12,12,0,0,0])  
             share_memory(self.memory,events)
-            tool = args_dict["tool"]
+            tool = normalize_inventory_name(args_dict["tool"])
             if action_name == "mine":
                 obj = update_inventory_obj_name(args_dict["obj"])
                 required_tools = {
@@ -1336,7 +1342,7 @@ class Controller:
         elif action_name == "equip":
             events,_,_,_ = env.step([0,0,0,12,12,0,0,0])  
             share_memory(self.memory,events)
-            obj = args_dict["obj"]
+            obj = normalize_inventory_name(args_dict["obj"])
             if obj:
                 if obj not in self.memory.inventory or self.memory.inventory[obj] <= 0:
                     check_dict = {
@@ -1353,15 +1359,13 @@ class Controller:
             return check_dict
         
         elif action_name == "find":
-            obj = args_dict["obj"]
-            if obj == "wood":
+            obj = normalize_inventory_name(args_dict["obj"])
+            if obj in {"wood", "tree", "log"}:
                 target_object = "log"
             elif obj == "stone":
                 target_object = "cobblestone"
-            elif obj in {"diamond ore", "redstone ore", "gold ore"}:
-                target_object = update_inventory_obj_name(obj)
             else:
-                target_object = obj
+                target_object = update_inventory_obj_name(obj)
 
             old_inventory = self.memory.inventory
             #print(f"old inventory is {old_inventory}")
@@ -1371,7 +1375,8 @@ class Controller:
             print(f"my inventory is {new_inventory}")
 
             if target_object:
-                if (target_object not in self.memory.inventory or self.memory.inventory[target_object]<= 0) and (task_information['task']not in self.memory.inventory or self.memory.inventory[task_information['task']]<= 0):
+                normalized_task = normalize_inventory_name(task_information['task'])
+                if (target_object not in self.memory.inventory or self.memory.inventory[target_object]<= 0) and (normalized_task not in self.memory.inventory or self.memory.inventory[normalized_task]<= 0):
                    # print(f"false{target_object},{task_information['task']}")
                     #print(f"inventory:{inventory}")
                     if target_object == "cobblestone":

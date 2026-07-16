@@ -54,7 +54,7 @@ def share_memory(memory, events):
     memory.update_inventory(count_inventory(inventory_name_list, inventory_num_list))
 
 def update_find_obj_name(obj_name):
-    normalized = obj_name.lower().strip() if isinstance(obj_name, str) else obj_name
+    normalized = normalize_inventory_name(obj_name)
 
     if normalized in {"log", "oak log", "birch log", "spruce log", "jungle log", "acacia log", "dark oak log", "planks", "tree"}:
         return "wood"
@@ -67,7 +67,7 @@ def update_find_obj_name(obj_name):
     elif normalized == "gold":
         return "gold ore"
     else:
-        return obj_name
+        return normalized
         
 
 def normalize_inventory_name(obj_name):

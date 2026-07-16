@@ -118,6 +118,28 @@ def test_provider_item_names_normalize_to_controller_registry(
     assert structured_actions.normalize_inventory_name(provider_name) == registry_name
 
 
+def test_provider_log_alias_maps_to_world_wood_target():
+    assert structured_actions.update_find_obj_name("oak_log") == "wood"
+
+
+def test_find_preparation_recognizes_provider_log_alias_in_inventory():
+    events = _events(inventory={"log": 1})
+
+    class FakeEnv:
+        def step(self, _action):
+            return events, 0, False, {}
+
+    result = _controller().check_action_preparation(
+        FakeEnv(),
+        "find",
+        {"obj": "oak_log"},
+        {"task": "crafting_table"},
+        events,
+    )
+
+    assert result["success"] is True
+
+
 def test_craft_execution_uses_normalized_target_and_platform(monkeypatch):
     controller = _controller({"planks": 4, "crafting table": 1})
     controller._sync_memory = lambda env: None
