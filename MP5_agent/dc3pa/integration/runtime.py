@@ -1000,11 +1000,15 @@ class Stage6ClosedLoopRunner:
             failure_reason = (
                 "goal_not_achieved" if execution.success else "controller_reported_failure"
             )
-            check_result = dict(execution.raw) or {
+            check_result = {
                 "success": execution.success,
                 "feedback": execution.feedback,
                 "suggestion": execution.suggestion,
             }
+            check_result.update(dict(execution.raw))
+            check_result.setdefault("success", execution.success)
+            check_result.setdefault("feedback", execution.feedback)
+            check_result.setdefault("suggestion", execution.suggestion)
             reflection = self._reflect(
                 task_information=task_information,
                 plan=plan,

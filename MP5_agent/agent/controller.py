@@ -606,7 +606,9 @@ class Controller:
             inventory_items = [
                 InventoryItem(
                     slot=item["slot"],
-                    name=item["name"],
+                    # MineDojo observations use display names, while
+                    # InventoryItem requires registry-style identifiers.
+                    name=str(item["name"]).replace(" ", "_"),
                     variant=item["variant"],
                     quantity=item["quantity"],
                 )

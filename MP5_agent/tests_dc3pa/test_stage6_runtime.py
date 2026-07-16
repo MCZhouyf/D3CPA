@@ -202,14 +202,21 @@ def test_planner_failure_can_return_clean_failure_without_controller_call():
 
 
 def test_controller_exception_is_structured_and_can_replan():
+    reasoning = StaticPlanSource(simple_plan())
     runtime = build_runtime(
         controller_results=(RuntimeError("boom"), True),
         goal_values=(True,),
+        reasoning=reasoning,
     )
     result = runtime.run_task({"task": "log"})
     assert result.success
     assert result.reactive_replan_count == 1
     assert any(event.event_type == "controller_exception" for event in result.events)
+    replanning_context = reasoning.calls[1][2]
+    assert replanning_context["check_result"]["feedback"].startswith(
+        "Controller exception: RuntimeError"
+    )
+    assert replanning_context["check_result"]["suggestion"]
 
 
 def test_controller_success_without_goal_is_not_task_success_and_writes_no_memory():

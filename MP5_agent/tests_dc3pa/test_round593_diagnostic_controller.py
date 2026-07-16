@@ -204,6 +204,46 @@ def test_formal_controller_uses_plan_target_instead_of_local_target(monkeypatch)
     assert session.events[0].injected_logs == 2
 
 
+def test_formal_log_bootstrap_preserves_display_named_crafting_table(monkeypatch):
+    controller = _controller({"crafting table": 1})
+    env = FakeEnv(controller.memory)
+    session = FormalLogBootstrapSession(
+        policy=FormalLogBootstrapPolicy().with_id(),
+        amendment_id="amendment",
+        source_commit="commit",
+        blueprint_id="blueprint",
+        scope="formal_acquisition",
+        method_id="single_chain_reactive_acquisition",
+        task="craft wooden pressure plate",
+        seed="29",
+    )
+    session.bind_plan(
+        Plan(
+            task="craft wooden pressure plate",
+            plan_id="plan",
+            version=1,
+            steps=[
+                PlanStep(
+                    times=1,
+                    actions=[
+                        Action(name="mine", args={"obj": "log", "tool": ""})
+                    ],
+                )
+            ],
+        )
+    )
+    controller._dc3pa_log_fallback_session = session
+    monkeypatch.setattr("controller.check_find", lambda *args, **kwargs: False)
+    monkeypatch.setattr("controller.approach", lambda *args, **kwargs: False)
+    monkeypatch.setattr(
+        "controller.explore_above_ground_none", lambda *args, **kwargs: None
+    )
+
+    assert controller._gather_logs(env, False, target_logs=1, max_attempts=3)
+    assert controller.memory.inventory == {"crafting table": 1.0, "log": 1.0}
+    assert session.events[0].injected_logs == 1
+
+
 @pytest.mark.parametrize("action_name", ("find", "move_to", "mine"))
 def test_formal_log_step_detection_supports_split_workflows(action_name):
     step = {
