@@ -9,9 +9,15 @@ import torch
 import json
 from scipy.spatial.distance import cosine
 
-os.environ["OPENAI_API_KEY"]= 'sk-yby7EXO2V6fMUo4sCc9749A1F64e4d5fB99c3484A49d332d'
+openai_api_key = os.environ.get("OPENAI_API_KEY")
+if not openai_api_key:
+    raise RuntimeError("OPENAI_API_KEY is required")
+openai_api_base = os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1")
 vdb = Chroma(collection_name="test",
-             embedding_function=OpenAIEmbeddings(openai_api_base="https://api.xiaoai.plus/v1"),
+             embedding_function=OpenAIEmbeddings(
+                 openai_api_key=openai_api_key,
+                 openai_api_base=openai_api_base,
+             ),
              persist_directory='testdb')
 
 tasks = [

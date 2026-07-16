@@ -9,9 +9,15 @@ import torch
 import json
 from scipy.spatial.distance import cosine
 
-os.environ["OPENAI_API_KEY"]= 'sk-yby7EXO2V6fMUo4sCc9749A1F64e4d5fB99c3484A49d332d'
+openai_api_key = os.environ.get("OPENAI_API_KEY")
+if not openai_api_key:
+    raise RuntimeError("OPENAI_API_KEY is required")
+openai_api_base = os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1")
 vdb = Chroma(collection_name="test",
-             embedding_function=OpenAIEmbeddings(openai_api_base="https://api.xiaoai.plus/v1"),
+             embedding_function=OpenAIEmbeddings(
+                 openai_api_key=openai_api_key,
+                 openai_api_base=openai_api_base,
+             ),
              persist_directory='testdb')
 
 tasks = [
@@ -19,7 +25,10 @@ tasks = [
     {"task_name": "Task 2", "plan": "Plan for Task 2", "tips": "Tips for Task 2", "image_path": "bicycle_s_000017.png"}
     ]
 
-encoder_ckpt_path = '/home/zzz/MP5/LAMM/model_zoo/mineclip_ckpt/mineclip_image_encoder_vit-B_196tokens.pth'
+encoder_ckpt_path = os.environ.get(
+    "MINECLIP_ENCODER_CKPT",
+    "model_zoo/mineclip_ckpt/mineclip_image_encoder_vit-B_196tokens.pth",
+)
 device = torch.device("cuda")
 num_vision_token = 196
 vision_hidden_size = 768
