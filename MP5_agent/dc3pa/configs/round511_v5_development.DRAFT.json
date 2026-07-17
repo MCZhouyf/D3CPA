@@ -1,0 +1,15 @@
+{
+  "draft_only": true,
+  "parent_source_commit": "30d455add0ef302d9ac967da083a82426a16187c",
+  "active_taskset_release_id": "REPLACE_FULL_ID",
+  "paper_memory_v5_release_id": "REPLACE_FULL_ID",
+  "development_protocol_id": "REPLACE",
+  "development_tooling_binding_id": "REPLACE",
+  "analysis_policy_id": "REPLACE",
+  "development_input_release_id": "REPLACE",
+  "collection_id": "REPLACE",
+  "confidence_calibration_release_id": "REPLACE",
+  "environment_evidence_release_id": "REPLACE",
+  "fusion_feature_dataset_release_id": "REPLACE",
+  "holdout_status": "sealed_unobserved"
+}
