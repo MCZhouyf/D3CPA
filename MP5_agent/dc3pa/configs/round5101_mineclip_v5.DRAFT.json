@@ -1,0 +1,12 @@
+{
+  "draft_only": true,
+  "base_release_commit": "e9e86a2b17fb01c86dca024d011da01f2091d408",
+  "acquisition_source_commit": "bb7469681509968b46e717c777ee782602087968",
+  "v4_release_id": "92bf4512d473addb4beec9a7909428215008ca624d6b802c055b00c15ecea5ce",
+  "active_task": "craft wooden pressure plate",
+  "mineclip_policy_id": "REPLACE",
+  "mineclip_checkpoint_manifest_id": "REPLACE",
+  "active_taskset_release_id": "REPLACE",
+  "v5_rebuild_contract_id": "REPLACE",
+  "paper_memory_v5_release_id": "REPLACE"
+}

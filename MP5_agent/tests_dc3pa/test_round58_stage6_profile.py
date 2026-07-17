@@ -199,6 +199,23 @@ def test_legacy_real_experiment_applies_seed_without_reference_profile(monkeypat
     assert os.environ["DC3PA_SIM_SEED"] == "7654321"
 
 
+def test_dry_run_symbolic_seed_does_not_mutate_simulator_seed(monkeypatch):
+    import scripts_dc3pa.stage6_run_minecraft as launcher
+
+    monkeypatch.delenv("DC3PA_WORLD_SEED", raising=False)
+    monkeypatch.delenv("DC3PA_SIM_SEED", raising=False)
+
+    result = launcher._configure_real_experiment_seed(
+        real_experiment_blueprint=object(),
+        raw_seed="dev-train",
+        allow_symbolic=True,
+    )
+
+    assert result is None
+    assert "DC3PA_WORLD_SEED" not in os.environ
+    assert "DC3PA_SIM_SEED" not in os.environ
+
+
 def test_legacy_chat_metadata_records_returned_model_without_content():
     import scripts_dc3pa.stage6_run_minecraft as launcher
 

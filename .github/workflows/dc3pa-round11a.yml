@@ -20,6 +20,7 @@ on:
       - "round593-*"
       - "round594-*"
       - "round510-*"
+      - "round5101-*"
   pull_request:
 
 permissions:
@@ -138,6 +139,11 @@ jobs:
         run: >-
           python scripts_dc3pa/run_round510_gate.py
           --junit artifacts/round510.xml
+
+      - name: Round 5.10.1 pressure-plate and MineCLIP V5 gate
+        run: >-
+          python scripts_dc3pa/run_round5101_gate.py
+          --junit artifacts/round5101.xml
 
       - name: Print reports on failure
         if: failure()

@@ -319,13 +319,15 @@ def _legacy_raw_response_metadata(
 
 
 def _configure_real_experiment_seed(
-    *, real_experiment_blueprint: Any, raw_seed: Any
+    *, real_experiment_blueprint: Any, raw_seed: Any, allow_symbolic: bool = False
 ) -> Optional[int]:
     if real_experiment_blueprint is None:
         return None
     try:
         requested_seed = int(raw_seed)
     except (TypeError, ValueError) as exc:
+        if allow_symbolic and str(raw_seed).strip():
+            return None
         raise ValueError(
             "Real experiment runs require a positive integer experiment seed"
         ) from exc
@@ -1411,6 +1413,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         requested_environment_seed = _configure_real_experiment_seed(
             real_experiment_blueprint=real_experiment_blueprint,
             raw_seed=args.real_experiment_seed,
+            allow_symbolic=args.real_experiment_phase == "dry_run_completed",
         )
     except ValueError as exc:
         parser.error(str(exc))
