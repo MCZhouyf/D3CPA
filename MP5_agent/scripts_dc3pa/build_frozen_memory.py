@@ -136,7 +136,12 @@ def _load_scene(
         raise ValueError(f"scene image escapes acquisition root: {path}") from exc
     if not path.is_file():
         raise FileNotFoundError(path)
-    return path, np.load(path, allow_pickle=False)
+    image = np.load(path, allow_pickle=False)
+    if image.ndim == 3 and image.shape[0] == 3 and image.shape[-1] != 3:
+        image = np.transpose(image, (1, 2, 0))
+    if image.ndim != 3 or image.shape[-1] != 3:
+        raise ValueError(f"scene image is not RGB: {path} has shape {image.shape}")
+    return path, np.ascontiguousarray(image)
 
 
 def _delete_low_support_edges(memory: MultimodalMemory, min_support: int) -> int:

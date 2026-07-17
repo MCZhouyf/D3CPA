@@ -1,6 +1,7 @@
 import hashlib
 import json
 
+import numpy as np
 import pytest
 
 from dc3pa.experiments.mineclip_memory_v5 import MineCLIPV5RebuildContract
@@ -8,6 +9,7 @@ from scripts_dc3pa.build_mineclip_memory_v5 import (
     build_encoder_config,
     verify_acquisition,
 )
+from scripts_dc3pa.build_frozen_memory import _load_scene
 
 def test_rebuild_contract_uses_same_acquisition_and_no_new_episodes():
  c=MineCLIPV5RebuildContract(
@@ -49,3 +51,12 @@ def test_builder_config_populates_both_encoder_namespaces(tmp_path):
  assert config["image"]=={
   "checkpoint_path":str(checkpoint.resolve()),"device":"cuda"
  }
+
+def test_offline_builder_normalizes_acquisition_chw_to_persistable_rgb(tmp_path):
+ root=tmp_path/"acquisition";root.mkdir()
+ image=np.arange(3*4*5,dtype=np.uint8).reshape(3,4,5)
+ path=root/"scene.npy";np.save(path,image)
+ loaded_path,loaded=_load_scene(root,{"image_path":"scene.npy"})
+ assert loaded_path==path
+ assert loaded.shape==(4,5,3)
+ assert np.array_equal(loaded,np.transpose(image,(1,2,0)))
