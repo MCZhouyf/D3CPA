@@ -43,6 +43,10 @@ def _task_path(task_root: Path, task: str) -> Path:
     return path
 
 
+def _formal_task_spec_path(spec_root: Path, task: str) -> Path:
+    return _task_path(spec_root, task)
+
+
 def _write_exclusive(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("x", encoding="utf-8") as handle:
@@ -110,6 +114,12 @@ def _stage6_command(
         os.environ.get("OPENAI_BASE_URL", ""),
         "--task",
         str(_task_path(args.task_root, str(assignment["task"]))),
+        "--formal-task-spec",
+        str(
+            _formal_task_spec_path(
+                args.formal_task_spec_root, str(assignment["task"])
+            )
+        ),
         "--config",
         str(args.stage6_config),
         "--memory-root",
@@ -175,6 +185,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--memory-root", required=True, type=Path)
     parser.add_argument("--mineclip-checkpoint", required=True, type=Path)
     parser.add_argument("--task-root", required=True, type=Path)
+    parser.add_argument("--formal-task-spec-root", required=True, type=Path)
     parser.add_argument("--output-root", required=True, type=Path)
     parser.add_argument(
         "--stage6-config",

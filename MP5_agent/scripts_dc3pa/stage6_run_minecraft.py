@@ -2026,7 +2026,17 @@ def main(argv: Optional[list[str]] = None) -> int:
                         runtime_target=runtime_target,
                         catalog_task=round511_binding.task,
                     ):
-                        raise ValueError("Round 5.11 task JSON/binding mismatch")
+                        if args.formal_task_spec is None:
+                            raise ValueError(
+                                "Round 5.11 task JSON/binding mismatch and no "
+                                "formal task spec was provided"
+                            )
+                        _validate_formal_task_spec(
+                            spec_path=args.formal_task_spec,
+                            catalog_task=round511_binding.task,
+                            runtime_task_path=Path(args.task),
+                            runtime_task=task_list[0],
+                        )
                     if str(args.real_experiment_seed) != round511_binding.seed:
                         raise ValueError("Round 5.11 launch/binding seed mismatch")
                     if args.formal_bootstrap_scope != round511_binding.role:

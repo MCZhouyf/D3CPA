@@ -1,5 +1,6 @@
 from argparse import Namespace
 from pathlib import Path
+import re
 
 import pytest
 
@@ -34,9 +35,13 @@ def test_stage6_command_never_mounts_blueprint_or_credentials(tmp_path: Path):
     task_root = tmp_path / "tasks"
     task_root.mkdir()
     (task_root / "craft_button.json").write_text("[]\n", encoding="utf-8")
+    spec_root = tmp_path / "specs"
+    spec_root.mkdir()
+    (spec_root / "craft_button.json").write_text("{}\n", encoding="utf-8")
     args = Namespace(
         python=Path("/usr/bin/python3"),
         task_root=task_root,
+        formal_task_spec_root=spec_root,
         stage6_config=Path("stage6.json"),
         memory_root=Path("memory"),
         mineclip_checkpoint=Path("mineclip.ckpt"),
@@ -58,6 +63,7 @@ def test_stage6_command_never_mounts_blueprint_or_credentials(tmp_path: Path):
 
     rendered = " ".join(command)
     assert "--real-experiment-blueprint" not in command
+    assert "--formal-task-spec" in command
     assert "dev_holdout" not in rendered
     assert "OPENAI_API_KEY" not in rendered
-    assert "sk-" not in rendered
+    assert re.search(r"sk-[A-Za-z0-9]{10,}", rendered) is None
