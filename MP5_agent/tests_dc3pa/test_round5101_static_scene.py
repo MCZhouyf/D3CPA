@@ -4,6 +4,7 @@ from contextlib import nullcontext
 from types import ModuleType, SimpleNamespace
 from dc3pa.memory.mineclip_scene_encoder import (
  MineCLIPEncoderPolicy,MineCLIPStaticSceneEncoder,
+ build_mineclip_image_encoder,build_mineclip_text_encoder,
  prepare_rgb_chw_uint8,prepare_static_video_numpy,l2_normalize
 )
 
@@ -47,3 +48,19 @@ def test_text_encoder_tokenizes_with_official_clip_context(monkeypatch):
  assert observed["device"]=="cuda"
  assert observed["tokens"] is not None
  assert np.isclose(np.linalg.norm(result),1.0)
+
+def test_builder_factories_match_plugin_loader_and_encoder_protocol(monkeypatch):
+ class SceneEncoder:
+  def encode_image(self,image): return ("image",image)
+  def encode_text(self,text): return ("text",text)
+ observed={}
+ def load(config):
+  observed.update(config);return SceneEncoder()
+ monkeypatch.setattr(
+  "dc3pa.memory.mineclip_scene_encoder._encoder_from_config",load
+ )
+ image=build_mineclip_image_encoder(checkpoint_path="checkpoint",device="cuda")
+ text=build_mineclip_text_encoder(checkpoint_path="checkpoint",device="cuda")
+ assert image.encode_image("pixels")==("image","pixels")
+ assert text.encode_text("context")==("text","context")
+ assert observed=={"checkpoint_path":"checkpoint","device":"cuda"}

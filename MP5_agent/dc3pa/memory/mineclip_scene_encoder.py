@@ -479,7 +479,7 @@ class MineCLIPImageEncoder:
     def __init__(self, scene_encoder: MineCLIPStaticSceneEncoder):
         self.scene_encoder = scene_encoder
 
-    def encode(self, image: np.ndarray) -> np.ndarray:
+    def encode_image(self, image: np.ndarray) -> np.ndarray:
         return self.scene_encoder.encode_image(image)
 
 
@@ -487,7 +487,7 @@ class MineCLIPTextEncoder:
     def __init__(self, scene_encoder: MineCLIPStaticSceneEncoder):
         self.scene_encoder = scene_encoder
 
-    def encode(self, text: str) -> np.ndarray:
+    def encode_text(self, text: str) -> np.ndarray:
         return self.scene_encoder.encode_text(text)
 
 
@@ -515,9 +515,17 @@ def _encoder_from_config(config: Mapping[str, Any]) -> MineCLIPStaticSceneEncode
     return _MODEL_CACHE[cache_key]
 
 
-def build_mineclip_image_encoder(config: Mapping[str, Any]) -> MineCLIPImageEncoder:
-    return MineCLIPImageEncoder(_encoder_from_config(config))
+def build_mineclip_image_encoder(
+    *, checkpoint_path: str, device: Optional[str] = None
+) -> MineCLIPImageEncoder:
+    return MineCLIPImageEncoder(
+        _encoder_from_config({"checkpoint_path": checkpoint_path, "device": device})
+    )
 
 
-def build_mineclip_text_encoder(config: Mapping[str, Any]) -> MineCLIPTextEncoder:
-    return MineCLIPTextEncoder(_encoder_from_config(config))
+def build_mineclip_text_encoder(
+    *, checkpoint_path: str, device: Optional[str] = None
+) -> MineCLIPTextEncoder:
+    return MineCLIPTextEncoder(
+        _encoder_from_config({"checkpoint_path": checkpoint_path, "device": device})
+    )
