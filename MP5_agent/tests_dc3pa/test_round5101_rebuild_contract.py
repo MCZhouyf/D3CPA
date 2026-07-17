@@ -4,7 +4,10 @@ import json
 import pytest
 
 from dc3pa.experiments.mineclip_memory_v5 import MineCLIPV5RebuildContract
-from scripts_dc3pa.build_mineclip_memory_v5 import verify_acquisition
+from scripts_dc3pa.build_mineclip_memory_v5 import (
+    build_encoder_config,
+    verify_acquisition,
+)
 
 def test_rebuild_contract_uses_same_acquisition_and_no_new_episodes():
  c=MineCLIPV5RebuildContract(
@@ -38,3 +41,11 @@ def test_acquisition_verification_rejects_file_drift(tmp_path):
  episode.write_text('{"changed":true}')
  with pytest.raises(ValueError,match="Acquisition files differ"):
   verify_acquisition(root,manifest,h.hexdigest())
+
+def test_builder_config_populates_both_encoder_namespaces(tmp_path):
+ checkpoint=tmp_path/"mineclip.ckpt"
+ config=build_encoder_config(checkpoint,"cuda")
+ assert config["image"]==config["text"]
+ assert config["image"]=={
+  "checkpoint_path":str(checkpoint.resolve()),"device":"cuda"
+ }

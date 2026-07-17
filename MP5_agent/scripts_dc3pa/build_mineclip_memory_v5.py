@@ -24,6 +24,9 @@ def verify_acquisition(root,manifest,expected_root):
   actual[path.relative_to(base).as_posix()]=sha(path)
  if actual!=expected:
   raise ValueError("Acquisition files differ from the bound manifest")
+def build_encoder_config(checkpoint,device):
+ shared={"checkpoint_path":str(Path(checkpoint).resolve()),"device":device}
+ return {"image":dict(shared),"text":dict(shared)}
 def main():
  p=argparse.ArgumentParser()
  for n in ("contract","acquisition-root","acquisition-manifest",
@@ -40,7 +43,7 @@ def main():
  output=Path(a.output_root)
  if output.exists() and any(output.iterdir()): raise ValueError("Output root must be empty")
  encoder_config=json.dumps(
-  {"checkpoint_path":str(Path(a.checkpoint).resolve()),"device":a.device},
+  build_encoder_config(a.checkpoint,a.device),
   sort_keys=True,separators=(",",":")
  )
  snapshot_metadata=json.dumps({
