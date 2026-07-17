@@ -1,6 +1,7 @@
 from scripts_dc3pa.stage6_run_minecraft import (
     _apply_formal_acquisition_execution_budget,
     _expected_reasoning_only_provider_calls,
+    _provider_call_contract_passed,
     _runtime_target_matches_catalog_task,
     _validate_formal_task_spec,
     build_parser,
@@ -136,6 +137,53 @@ def test_reactive_success_provider_calls_include_planning_and_reflection_events(
     assert _expected_reasoning_only_provider_calls(
         task_count=1, result=result
     ) == 3
+
+
+def test_provider_contract_accepts_fully_traced_planner_parse_retry():
+    metadata = [
+        type(
+            "Metadata",
+            (),
+            {
+                "requested_model": "gpt-5.1",
+                "returned_model": "glm-5.2",
+                "purpose": "planning",
+            },
+        )()
+        for _ in range(4)
+    ]
+
+    assert _provider_call_contract_passed(
+        expected_minimum=3, provider_metadata=metadata
+    )
+
+
+def test_provider_contract_rejects_missing_or_incomplete_call_metadata():
+    complete = type(
+        "Metadata",
+        (),
+        {
+            "requested_model": "gpt-5.1",
+            "returned_model": "glm-5.2",
+            "purpose": "planning",
+        },
+    )()
+    incomplete = type(
+        "Metadata",
+        (),
+        {
+            "requested_model": "gpt-5.1",
+            "returned_model": "",
+            "purpose": "planning",
+        },
+    )()
+
+    assert not _provider_call_contract_passed(
+        expected_minimum=2, provider_metadata=[complete]
+    )
+    assert not _provider_call_contract_passed(
+        expected_minimum=2, provider_metadata=[complete, incomplete]
+    )
 
 
 def test_formal_dry_run_has_bounded_exploration_default():

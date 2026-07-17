@@ -88,6 +88,16 @@ def test_consecutive_table_recipe_is_detected_without_inventory_fabrication():
     assert "crafting table" not in memory.inventory
 
 
+def test_table_returned_to_inventory_invalidates_stale_placement_marker():
+    memory = FakeMemory({"crafting table": 1, "planks": 4, "stick": 2})
+    memory._dc3pa_crafting_table_placed = True
+    events = _events(inventory=memory.inventory)
+    events["nearby_tools"] = {"table": False}
+
+    assert not structured_actions._tracked_crafting_table_available(events, memory)
+    assert memory._dc3pa_crafting_table_placed is False
+
+
 def test_inventory_count_normalizes_recipe_item_names():
     events = _events(inventory={"wooden pickaxe": 1, "oak_log": 2})
 
@@ -101,6 +111,100 @@ def test_table_inventory_decrease_proves_placement_when_nearby_sensor_is_false()
 
     assert structured_actions._crafting_table_placement_accepted(events, 1)
     assert not structured_actions._crafting_table_placement_accepted(events, 0)
+
+
+def test_voxel_table_is_recognized_when_nearby_sensor_lags():
+    events = _events(
+        blocks=[((1, 0, 0), "crafting_table")],
+        inventory={"planks": 4},
+    )
+    events["nearby_tools"] = {"table": False}
+
+    assert structured_actions._crafting_table_observed(events)
+    assert structured_actions._tracked_crafting_table_available(
+        events, FakeMemory({"planks": 4})
+    )
+
+
+def test_table_placement_repositions_once_then_tracks_success(monkeypatch):
+    memory = FakeMemory({"crafting table": 1, "planks": 4})
+
+    class FakeEnv:
+        def __init__(self):
+            self.events = _events(inventory=memory.inventory)
+            self.actions = []
+            self.repositioned = False
+
+        def step(self, action):
+            self.actions.append(list(action))
+            if action[0] == 2:
+                self.repositioned = True
+                self.events = _events(
+                    position=(-0.7, 60.0, 0.0),
+                    inventory={"crafting table": 1, "planks": 4},
+                )
+            elif action[5] == 6 and self.repositioned:
+                self.events = _events(
+                    position=(-0.7, 60.0, 0.0),
+                    blocks=[((1, 0, 0), "crafting_table")],
+                    inventory={"planks": 4},
+                )
+                self.events["nearby_tools"] = {"table": True}
+            return self.events, 0, False, {}
+
+    env = FakeEnv()
+    monkeypatch.setattr(structured_actions, "sleep", lambda current_env: current_env.events)
+    monkeypatch.setattr(structured_actions, "share_memory", lambda current_memory, obs: None)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda obs: None)
+
+    returned, ready = structured_actions._place_crafting_table(
+        env, env.events, memory, max_attempts=1
+    )
+
+    assert ready
+    assert structured_actions._crafting_table_observed(returned)
+    assert any(action[0] == 2 for action in env.actions)
+    assert memory._dc3pa_crafting_table_placed is True
+    assert memory._dc3pa_crafting_table_position == [-0.7, 60.0, 0.0]
+
+
+def test_failed_table_craft_reclaims_table_before_retry(monkeypatch):
+    events = _events(inventory={"planks": 4, "stick": 2})
+    memory = FakeMemory({"planks": 4, "stick": 2})
+    reclaimed = []
+
+    class FakeEnv:
+        def step(self, _action):
+            return events, 0, False, {}
+
+    monkeypatch.setattr(
+        structured_actions,
+        "_place_crafting_table",
+        lambda env, current, current_memory: (current, True),
+    )
+    monkeypatch.setattr(structured_actions, "sleep", lambda env: events)
+    monkeypatch.setattr(structured_actions, "share_memory", lambda memory, obs: None)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda obs: None)
+
+    def fake_reclaim(env, current, current_memory):
+        reclaimed.append(True)
+        return current, True
+
+    monkeypatch.setattr(
+        structured_actions, "_reclaim_crafting_table", fake_reclaim
+    )
+
+    structured_actions.action_craft(
+        FakeEnv(),
+        "fence",
+        memory,
+        use_crafting_table=True,
+        use_furnace=False,
+        craft_num=1,
+        reclaim_crafting_table=True,
+    )
+
+    assert reclaimed == [True]
 
 
 @pytest.mark.parametrize(
@@ -179,6 +283,108 @@ def test_craft_execution_uses_normalized_target_and_platform(monkeypatch):
         "use_crafting_table": True,
         "use_furnace": False,
     }
+
+
+def test_stick_ignores_unnecessary_crafting_table_platform(monkeypatch):
+    controller = _controller({"planks": 2, "crafting table": 1})
+    controller._sync_memory = lambda env: None
+    observed = {}
+
+    def fake_action_craft(
+        env,
+        item,
+        memory,
+        use_crafting_table,
+        use_furnace,
+        craft_num,
+        reclaim_crafting_table,
+    ):
+        observed["use_crafting_table"] = use_crafting_table
+        return ["stick", "crafting table"], [4.0, 1.0]
+
+    monkeypatch.setattr("controller.action_craft", fake_action_craft)
+
+    assert controller._execute_craft_with_retries(
+        object(),
+        {
+            "obj": {"stick": 4},
+            "materials": {"planks": 2},
+            "platform": "crafting table",
+        },
+        "stick",
+        4,
+        max_attempts=1,
+    )
+    assert observed["use_crafting_table"] is False
+
+
+def test_table_is_kept_across_hand_craft_for_later_table_recipe():
+    workflow = [
+        {
+            "actions": [
+                {
+                    "name": "craft",
+                    "args": {"obj": {"stick": 4}, "platform": None},
+                }
+            ]
+        },
+        {
+            "actions": [
+                {
+                    "name": "craft",
+                    "args": {
+                        "obj": {"wooden axe": 1},
+                        "platform": "crafting table",
+                    },
+                }
+            ]
+        },
+    ]
+
+    assert Controller._should_keep_crafting_table_placed(workflow, 0, -1)
+
+
+def test_normal_workflow_reports_failed_craft_instead_of_success(monkeypatch):
+    events = _events(inventory={"planks": 3, "stick": 2, "crafting table": 1})
+    controller = _controller({"planks": 3, "stick": 2, "crafting table": 1})
+    controller._sync_memory = lambda env: events
+    controller.check_action_preparation = lambda *args, **kwargs: {
+        "feedback": "",
+        "success": True,
+        "suggestion": "",
+    }
+    controller._execute_craft_with_retries = lambda *args, **kwargs: False
+
+    class FakeEnv:
+        def step(self, _action):
+            return events, 0, False, {}
+
+    monkeypatch.setattr("controller.share_memory", lambda memory, obs: None)
+    workflow = {
+        "workflow": [
+            {
+                "times": "1",
+                "actions": [
+                    {
+                        "name": "craft",
+                        "args": {
+                            "obj": {"wooden axe": 1},
+                            "materials": {"planks": 3, "stick": 2},
+                            "platform": "crafting table",
+                        },
+                    }
+                ],
+            }
+        ]
+    }
+
+    result, underground = controller.check_and_execute_workflow(
+        FakeEnv(), workflow, {"task": "wooden axe"}, False
+    )
+
+    assert result["success"] is False
+    assert "not added to inventory" in result["feedback"]
+    assert underground is False
 
 
 def test_craft_preparation_accepts_provider_material_and_platform_names():

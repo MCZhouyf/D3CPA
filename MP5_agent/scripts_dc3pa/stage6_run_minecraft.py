@@ -530,6 +530,20 @@ def _expected_reasoning_only_provider_calls(
     return task_count + final_failure_reflection
 
 
+def _provider_call_contract_passed(
+    *, expected_minimum: int, provider_metadata: Sequence[Any]
+) -> bool:
+    """Accept fully traced parser retries beyond the event-derived minimum."""
+    if expected_minimum < 0 or len(provider_metadata) < expected_minimum:
+        return False
+    return all(
+        str(getattr(item, "requested_model", "")).strip()
+        and str(getattr(item, "returned_model", "")).strip()
+        and str(getattr(item, "purpose", "")).strip()
+        for item in provider_metadata
+    )
+
+
 def _resolve_model_profile(
     cli_value: str, payload: Mapping[str, Any]
 ) -> Optional[OpenAIResponsesModelProfile]:
@@ -1609,7 +1623,10 @@ def main(argv: Optional[list[str]] = None) -> int:
                 result=result,
                 include_passive_confidence=round511_enabled,
             )
-        provider_contract = expected_calls == len(provider_metadata)
+        provider_contract = _provider_call_contract_passed(
+            expected_minimum=expected_calls,
+            provider_metadata=provider_metadata,
+        )
         event_items = formal_bootstrap_session.events
         triggered = tuple(
             item for item in event_items if item.intervention_triggered

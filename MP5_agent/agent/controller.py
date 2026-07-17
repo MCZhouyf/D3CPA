@@ -828,11 +828,13 @@ class Controller:
             actions = workflow[candidate_step_index]["actions"]
             first_action_index = action_index + 1 if candidate_step_index == step_index else 0
             for candidate in actions[first_action_index:]:
-                return (
-                    candidate["name"] == "craft"
-                    and normalize_inventory_name(candidate["args"].get("platform"))
+                if candidate["name"] != "craft":
+                    return False
+                if (
+                    normalize_inventory_name(candidate["args"].get("platform"))
                     == "crafting table"
-                )
+                ):
+                    return True
         return False
 
     def _execute_craft_with_retries(
@@ -849,6 +851,9 @@ class Controller:
         target_quantity = int(list(args["obj"].values())[0])
         expected_quantity = self._inventory_count(target_name) + target_quantity
         adjusted_craft_num = update_craft_num(craft_name, craft_num)
+        use_crafting_table = (
+            normalized_platform == "crafting table" and target_name != "stick"
+        )
 
         for craft_attempt_idx in range(max_attempts):
             print(
@@ -860,7 +865,7 @@ class Controller:
                     env,
                     craft_name,
                     self.memory,
-                    normalized_platform == "crafting table",
+                    use_crafting_table,
                     normalized_platform == "furnace",
                     craft_num=adjusted_craft_num,
                     reclaim_crafting_table=reclaim_crafting_table,
@@ -1268,6 +1273,30 @@ class Controller:
                             print(
                                 f"Craft did not reach requested inventory for {crafted_obj}, "
                                 "continuing deep mining workflow so reflection can adjust within finite attempts."
+                            )
+                        if not craft_success and not self._is_deep_mining_task(task_information):
+                            platform = normalize_inventory_name(args.get("platform"))
+                            suggestion = f"Verify the recipe materials and retry crafting {crafted_obj}."
+                            if platform == "crafting table":
+                                suggestion = (
+                                    "Place or approach a reachable crafting table, then retry "
+                                    f"crafting {crafted_obj}."
+                                )
+                            check_result = {
+                                "feedback": (
+                                    f"You failed to craft {crafted_obj}; the target item was "
+                                    "not added to inventory after the bounded retries."
+                                ),
+                                "success": False,
+                                "suggestion": suggestion,
+                            }
+                            return finish_failure(
+                                step,
+                                step_index,
+                                action_index,
+                                action,
+                                check_result,
+                                underground,
                             )
                         emit_action_finished(step, step_index, action_index, action, "success", check_result)
 

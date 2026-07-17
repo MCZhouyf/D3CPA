@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -14,6 +15,7 @@ from typing import Any, Mapping
 
 ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = ROOT.parent
+DEVELOPMENT_MAX_EXPLORE_STEPS = 60
 
 
 def _load(path: Path) -> Mapping[str, Any]:
@@ -32,6 +34,50 @@ def _sha(value: Any) -> str:
             separators=(",", ":"),
         ).encode("utf-8")
     ).hexdigest()
+
+
+def _stage6_environment(
+    *, seed: str | int, base: Mapping[str, str] | None = None
+) -> dict[str, str]:
+    """Bind legacy exploration to the frozen development episode budget."""
+    env = dict(os.environ if base is None else base)
+    env["PYTHONHASHSEED"] = str(seed)
+    env["DC3PA_WORLD_SEED"] = str(seed)
+    env["DC3PA_SIM_SEED"] = str(seed)
+    env["DC3PA_MAX_EXPLORE_STEPS"] = str(DEVELOPMENT_MAX_EXPLORE_STEPS)
+    env["MP5_DISABLE_MEMORY"] = "1"
+    env["DC3PA_LEGACY_TASK_HACKS"] = "0"
+    return env
+
+
+def _run_stage6_process(
+    command: list[str],
+    *,
+    cwd: Path,
+    env: Mapping[str, str],
+    output: Any,
+    timeout_seconds: float,
+) -> int:
+    """Run one episode and terminate its complete Unix process group on timeout."""
+    process = subprocess.Popen(
+        command,
+        cwd=cwd,
+        env=dict(env),
+        stdout=output,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+    )
+    try:
+        return process.wait(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired:
+        # SIGINT gives Stage 6 and MineDojo a chance to run their normal cleanup.
+        os.killpg(process.pid, signal.SIGINT)
+        try:
+            process.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            os.killpg(process.pid, signal.SIGKILL)
+            process.wait()
+        return 124
 
 
 def _task_path(task_root: Path, task: str) -> Path:
@@ -296,26 +342,15 @@ def main() -> int:
                 receipt=receipt,
                 bootstrap_output=bootstrap_output,
             )
-            env = dict(os.environ)
-            env["PYTHONHASHSEED"] = str(assignment["seed"])
-            env["DC3PA_WORLD_SEED"] = str(assignment["seed"])
-            env["DC3PA_SIM_SEED"] = str(assignment["seed"])
-            env["MP5_DISABLE_MEMORY"] = "1"
-            env["DC3PA_LEGACY_TASK_HACKS"] = "0"
-            try:
-                with console.open("ab") as handle:
-                    completed_process = subprocess.run(
-                        command,
-                        cwd=ROOT,
-                        env=env,
-                        stdout=handle,
-                        stderr=subprocess.STDOUT,
-                        timeout=args.timeout_seconds,
-                        check=False,
-                    )
-                returncode = completed_process.returncode
-            except subprocess.TimeoutExpired:
-                returncode = 124
+            env = _stage6_environment(seed=assignment["seed"])
+            with console.open("ab") as handle:
+                returncode = _run_stage6_process(
+                    command,
+                    cwd=ROOT,
+                    env=env,
+                    output=handle,
+                    timeout_seconds=args.timeout_seconds,
+                )
             receipt_payload = _load(receipt) if receipt.is_file() else {}
             accepted_attempt = bool(
                 receipt_payload.get("pipeline_pass") and records.is_file()

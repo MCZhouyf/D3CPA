@@ -2083,12 +2083,66 @@ def _nearby_tool(events, tool):
         return False
 
 
+def _crafting_table_observed(events):
+    if _nearby_tool(events, "table"):
+        return True
+    if not isinstance(events, dict):
+        return False
+    try:
+        blocks = np.asarray(events["voxels"]["block_name"], dtype=object)
+    except (KeyError, TypeError, ValueError):
+        return False
+    if blocks.ndim != 3:
+        return False
+    center = tuple(size // 2 for size in blocks.shape)
+    nearby = blocks[
+        max(0, center[0] - 3):center[0] + 4,
+        max(0, center[1] - 3):center[1] + 4,
+        max(0, center[2] - 3):center[2] + 4,
+    ].reshape(-1)
+    return any(
+        normalize_inventory_name(block) == "crafting table"
+        for block in nearby
+    )
+
+
 def _crafting_table_placement_tracked(memory):
     return bool(getattr(memory, "_dc3pa_crafting_table_placed", False))
 
 
-def _track_crafting_table_placement(memory, placed):
+def _track_crafting_table_placement(memory, placed, events=None):
     setattr(memory, "_dc3pa_crafting_table_placed", bool(placed))
+    if not placed:
+        setattr(memory, "_dc3pa_crafting_table_position", None)
+        return
+    if isinstance(events, dict):
+        try:
+            position = np.asarray(events["location_stats"]["pos"], dtype=float)
+            setattr(memory, "_dc3pa_crafting_table_position", position.tolist())
+        except (KeyError, TypeError, ValueError):
+            pass
+
+
+def _tracked_crafting_table_available(events, memory):
+    if _crafting_table_observed(events):
+        _track_crafting_table_placement(memory, True, events)
+        return True
+    if not _crafting_table_placement_tracked(memory):
+        return False
+    if _inventory_item_count(events, "crafting table") > 0:
+        # The table has returned to inventory, so an earlier placement marker is stale.
+        _track_crafting_table_placement(memory, False)
+        return False
+    tracked_position = getattr(memory, "_dc3pa_crafting_table_position", None)
+    if tracked_position is not None:
+        try:
+            current_position = np.asarray(events["location_stats"]["pos"], dtype=float)
+            if np.linalg.norm(current_position - np.asarray(tracked_position, dtype=float)) > 3.5:
+                _track_crafting_table_placement(memory, False)
+                return False
+        except (KeyError, TypeError, ValueError):
+            return False
+    return True
 
 
 def _inventory_item_count(events, item):
@@ -2108,20 +2162,20 @@ def _camera_action_index(delta_degrees):
 
 def _crafting_table_placement_accepted(events, before_count):
     return (
-        _nearby_tool(events, "table")
+        _crafting_table_observed(events)
         or _inventory_item_count(events, "crafting table") < before_count
     )
 
 
 def _place_crafting_table(env, events, memory, max_attempts=4):
-    if _nearby_tool(events, "table") or _crafting_table_placement_tracked(memory):
-        _track_crafting_table_placement(memory, True)
+    if _tracked_crafting_table_available(events, memory):
         return events, True
 
     # Place directly from the inventory slot. MineDojo's NN action 6 is the
     # place action; equipping followed by use does not place the table reliably.
     # Camera movement must happen on an earlier frame because the place handler
     # ray-traces the view that was active before the current action is applied.
+    target_pitches = (50.0, 65.0)
     for recovery_round in range(2):
         for attempt_idx in range(max_attempts):
             inventory = events['inventory']['name'].tolist()
@@ -2133,36 +2187,38 @@ def _place_crafting_table(env, events, memory, max_attempts=4):
                 f"Crafting-table placement attempt {attempt_idx + 1}/{max_attempts} "
                 f"(round {recovery_round + 1}/2)"
             )
-            current_pitch = float(np.asarray(events['location_stats']['pitch']).reshape(-1)[0])
-            pitch_action = _camera_action_index(60.0 - current_pitch)
-            yaw_action = 12 if attempt_idx == 0 else 18
-            events,_,_,_ = env.step([0,0,0,pitch_action,yaw_action,0,0,0]); save_rgb_for_video(events)
-            events = sleep(env)
-            inventory = events['inventory']['name'].tolist()
-            if 'crafting table' not in inventory:
-                break
-            table_index = inventory.index('crafting table')
-            events,_,_,_ = env.step([0,0,0,12,12,6,0,table_index]); save_rgb_for_video(events)
-            events = sleep(env)
-            share_memory(memory, events)
-            if _crafting_table_placement_accepted(events, before_count):
-                _track_crafting_table_placement(memory, True)
-                return events, True
+            for pitch_idx, target_pitch in enumerate(target_pitches):
+                current_pitch = float(np.asarray(events['location_stats']['pitch']).reshape(-1)[0])
+                pitch_action = _camera_action_index(target_pitch - current_pitch)
+                yaw_action = 18 if attempt_idx > 0 and pitch_idx == 0 else 12
+                events,_,_,_ = env.step([0,0,0,pitch_action,yaw_action,0,0,0]); save_rgb_for_video(events)
+                events = sleep(env)
+                inventory = events['inventory']['name'].tolist()
+                if 'crafting table' not in inventory:
+                    break
+                table_index = inventory.index('crafting table')
+                events,_,_,_ = env.step([0,0,0,12,12,6,0,table_index]); save_rgb_for_video(events)
+                events = sleep(env)
+                share_memory(memory, events)
+                if _crafting_table_placement_accepted(events, before_count):
+                    _track_crafting_table_placement(memory, True, events)
+                    return events, True
 
         if recovery_round == 0 and 'crafting table' in events['inventory']['name'].tolist():
-            print("No valid table surface found; clearing one bounded placement niche.")
-            current_pitch = float(np.asarray(events['location_stats']['pitch']).reshape(-1)[0])
-            pitch_action = _camera_action_index(-current_pitch)
-            events,_,_,_ = env.step([0,0,0,pitch_action,12,0,0,0]); save_rgb_for_video(events)
-            events = sleep(env)
-            mine_ahead(env, memory)
+            print("No valid table surface found; making one bounded backward reposition.")
+            start_position = np.asarray(events['location_stats']['pos'], dtype=float)
+            for _ in range(8):
+                events,_,_,_ = env.step([2,0,0,12,12,0,0,0]); save_rgb_for_video(events)
+                current_position = np.asarray(events['location_stats']['pos'], dtype=float)
+                if np.linalg.norm(current_position - start_position) >= 0.6:
+                    break
             events = sleep(env)
 
     return events, False
 
 
 def _reclaim_crafting_table(env, events, memory, max_attacks=12):
-    if not _nearby_tool(events, "table") and _inventory_item_count(events, 'crafting table') > 0:
+    if not _crafting_table_observed(events) and _inventory_item_count(events, 'crafting table') > 0:
         _track_crafting_table_placement(memory, False)
         return events, True
 
@@ -2187,7 +2243,11 @@ def _reclaim_crafting_table(env, events, memory, max_attacks=12):
     events = sleep(env)
     share_memory(memory, events)
     reclaimed = _inventory_item_count(events, 'crafting table') > 0
-    _track_crafting_table_placement(memory, not reclaimed and _nearby_tool(events, "table"))
+    _track_crafting_table_placement(
+        memory,
+        not reclaimed and _crafting_table_observed(events),
+        events,
+    )
     return events, reclaimed
 
 
@@ -2330,8 +2390,19 @@ def action_craft(
             if not table_reclaimed:
                 print("crafted item, but crafting table recovery did not complete")
         elif reclaim_crafting_table:
-            _track_crafting_table_placement(memory, True)
-            print("craft did not produce the target; keeping placed table for retry")
+            events, table_reclaimed = _reclaim_crafting_table(
+                env, events, memory
+            )
+            if table_reclaimed:
+                print(
+                    "craft did not produce the target; reclaimed table for "
+                    "a fresh placement retry"
+                )
+            else:
+                print(
+                    "craft did not produce the target; table recovery did not "
+                    "complete"
+                )
         else:
             _track_crafting_table_placement(memory, True)
             print("leaving placed crafting table available for the next table craft")
