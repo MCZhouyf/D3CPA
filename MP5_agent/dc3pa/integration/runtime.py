@@ -130,6 +130,7 @@ class Stage6ClosedLoopRunner:
             Callable[[bool], Mapping[str, Any]]
         ] = None,
         episode_id_provider: Optional[Callable[[int], str]] = None,
+        development_shadow_observer: Any = None,
     ):
         config.validate()
         if config.mode == "dc3pa" and cognitive_planner is None:
@@ -154,12 +155,9 @@ class Stage6ClosedLoopRunner:
         self.trace_writer = trace_writer
         self.record_metadata_provider = record_metadata_provider
         self.episode_id_provider = episode_id_provider
+        self.development_shadow_observer = development_shadow_observer
         self.memory_mode = MemoryMode.parse(config.memory_mode)
         if config.model_confidence_collection == "passive_final_plan":
-            if calibration_store is None:
-                raise ValueError(
-                    "passive_final_plan confidence collection requires calibration_store"
-                )
             if confidence_observer is None or passive_confidence_scorer is None:
                 raise ValueError(
                     "passive_final_plan confidence collection requires an observation "
@@ -832,6 +830,25 @@ class Stage6ClosedLoopRunner:
                 if self.episode_id_provider is not None
                 else new_episode_id(task, attempt_index)
             )
+            if self.development_shadow_observer is not None:
+                try:
+                    self.development_shadow_observer.prepare_attempt(
+                        plan=plan,
+                        state=initial_snapshot.state,
+                        context=reliability_context,
+                        episode_id=episode_id,
+                        attempt=attempt_index,
+                    )
+                except Exception as exc:
+                    self.development_shadow_observer.errors.append(
+                        f"prepare attempt {attempt_index}: {type(exc).__name__}: {exc}"
+                    )
+                    self._emit(
+                        events,
+                        "development_shadow_prepare_failed",
+                        attempt_index,
+                        {"error_type": type(exc).__name__, "error": str(exc)},
+                    )
             self._collect_passive_final_plan_confidence(
                 plan=plan,
                 state=initial_snapshot.state,
@@ -908,6 +925,26 @@ class Stage6ClosedLoopRunner:
                     "underground": underground,
                 },
             )
+            if self.development_shadow_observer is not None:
+                try:
+                    self.development_shadow_observer.finalize_attempt(
+                        plan=plan,
+                        episode_id=episode_id,
+                        execution_telemetry=execution.telemetry,
+                        confidence_observations=confidence_observations,
+                        task_completed=goal_success,
+                        attempt=attempt_index,
+                    )
+                except Exception as exc:
+                    self.development_shadow_observer.errors.append(
+                        f"finalize attempt {attempt_index}: {type(exc).__name__}: {exc}"
+                    )
+                    self._emit(
+                        events,
+                        "development_shadow_finalize_failed",
+                        attempt_index,
+                        {"error_type": type(exc).__name__, "error": str(exc)},
+                    )
             self._record_calibration_episode(
                 task=task,
                 task_information=task_information,

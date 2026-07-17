@@ -82,6 +82,10 @@ from dc3pa.experiments.paired_dry_run import (  # noqa: E402
 from dc3pa.experiments.provider_model_alias import (  # noqa: E402
     load_provider_model_alias_policy,
 )
+from dc3pa.experiments.development_shadow import (  # noqa: E402
+    Round511RunBinding,
+    Round511ShadowCollector,
+)
 from dc3pa.memory import (  # noqa: E402
     HashingTextEncoder,
     MultimodalMemory,
@@ -94,6 +98,7 @@ from dc3pa.memory.acquisition_scene_only import (  # noqa: E402
 )
 from dc3pa.memory.snapshot import (  # noqa: E402
     MemorySnapshotManifest,
+    assert_snapshot_unchanged,
     resolve_snapshot_database,
 )
 from dc3pa.observability.trace import JsonlTraceWriter  # noqa: E402
@@ -496,7 +501,7 @@ def _validate_formal_task_spec(
 
 
 def _expected_reasoning_only_provider_calls(
-    *, task_count: int, result: Any
+    *, task_count: int, result: Any, include_passive_confidence: bool = False
 ) -> int:
     """Derive successful provider calls from independent runtime events."""
     if task_count < 0:
@@ -511,7 +516,14 @@ def _expected_reasoning_only_provider_calls(
             getattr(event, "event_type", "") == "reflection_created"
             for event in events
         )
-        return planning_calls + reflection_calls
+        confidence_calls = 0
+        if include_passive_confidence:
+            confidence_calls = sum(
+                int(getattr(event, "payload", {}).get("observation_count", 0) or 0)
+                for event in events
+                if getattr(event, "event_type", "") == "passive_confidence_collected"
+            )
+        return planning_calls + reflection_calls + confidence_calls
     final_failure_reflection = int(
         result is not None and not bool(getattr(result, "success", False))
     )
@@ -743,6 +755,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--formal-acquisition-retry-policy", type=Path)
     parser.add_argument("--formal-acquisition-attempt-index", type=int)
     parser.add_argument("--formal-acquisition-root", type=Path)
+    parser.add_argument(
+        "--round511-development-run",
+        type=Path,
+        help="External immutable binding for one Round 5.11 train/tune run.",
+    )
+    parser.add_argument(
+        "--round511-development-records",
+        type=Path,
+        help="Exclusive JSONL output for one Round 5.11 run.",
+    )
     return parser
 
 
@@ -762,6 +784,42 @@ def main(argv: Optional[list[str]] = None) -> int:
     args.task = str(Path(args.task).resolve())
     args.memory_root = args.memory_root.resolve()
     args.trace = args.trace.resolve()
+
+    round511_enabled = any(
+        (args.round511_development_run, args.round511_development_records)
+    )
+    round511_binding = None
+    if round511_enabled:
+        if not all((args.round511_development_run, args.round511_development_records)):
+            parser.error(
+                "Round 5.11 development requires both --round511-development-run "
+                "and --round511-development-records"
+            )
+        try:
+            round511_binding = Round511RunBinding.from_mapping(
+                _load_json(args.round511_development_run)
+            )
+        except (KeyError, OSError, TypeError, ValueError) as exc:
+            parser.error(str(exc))
+        current_commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=ROOT.parent,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        if round511_binding.source_commit != current_commit:
+            parser.error("Round 5.11 run binding/source commit mismatch")
+        if args.mode != "reasoning_only":
+            parser.error("Round 5.11 development requires reasoning_only mode")
+        if args.model_profile != "gpt51_reference":
+            parser.error("Round 5.11 development requires the gpt51_reference profile")
+        if args.formal_acquisition_campaign:
+            parser.error("Round 5.11 development cannot enable AcquisitionStore")
+        if not args.formal_log_bootstrap_policy:
+            parser.error("Round 5.11 development requires formal Log Bootstrap")
+        if not (args.image_encoder_factory and args.text_encoder_factory):
+            parser.error("Round 5.11 development requires explicit MineCLIP encoders")
 
     payload = _load_json(args.config)
     try:
@@ -791,6 +849,21 @@ def main(argv: Optional[list[str]] = None) -> int:
         runtime_config = replace(
             runtime_config, planner_failure_policy=args.planner_failure_policy
         )
+    if round511_enabled:
+        runtime_config = replace(
+            runtime_config,
+            mode="reasoning_only",
+            memory_mode=MemoryMode.EVALUATE_READONLY.value,
+            memory_snapshot_manifest=str(args.memory_root / "snapshot_manifest.json"),
+            telemetry_enabled=True,
+            record_legacy_workflow_memory=False,
+            record_multimodal_memory=False,
+            acquisition_log_dir="",
+            calibration_log_dir="",
+            model_confidence_collection="passive_final_plan",
+            capture_final_scene=False,
+        )
+        os.environ["MP5_DISABLE_MEMORY"] = "1"
     dry_run_enabled = any(
         (
             args.dry_run_campaign,
@@ -820,7 +893,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         parser.error("formal log bootstrap requires all formal bootstrap arguments")
     if formal_bootstrap_enabled and fallback_arguments_present:
         parser.error("diagnostic fallback and formal bootstrap are mutually exclusive")
-    if formal_bootstrap_enabled and not args.real_experiment_blueprint:
+    if (
+        formal_bootstrap_enabled
+        and not args.real_experiment_blueprint
+        and not round511_enabled
+    ):
         parser.error("formal log bootstrap requires a real experiment Blueprint")
     formal_acquisition_arguments = (
         args.formal_acquisition_campaign,
@@ -920,6 +997,13 @@ def main(argv: Optional[list[str]] = None) -> int:
     hybrid_config = HybridProbabilityConfig.from_mapping(
         payload.get("hybrid_probability", {})
     )
+    if round511_enabled:
+        hybrid_config = replace(
+            hybrid_config,
+            model_confidence_model_id="gpt-5.1",
+            model_confidence_prompt_version="ordinal-v1",
+            model_failure_mode="raise",
+        )
     dual_config = DualChainConfig.from_mapping(payload.get("dual_chain", {}))
     trigger_config = AdaptiveTriggerConfig.from_mapping(
         payload.get("adaptive_trigger", {})
@@ -1027,8 +1111,17 @@ def main(argv: Optional[list[str]] = None) -> int:
             expected_provider_call_count = 1
         except (KeyError, OSError, TypeError, ValueError) as exc:
             parser.error(str(exc))
-    if args.real_experiment_blueprint:
-        real_experiment_blueprint = load_blueprint(args.real_experiment_blueprint)
+    if args.real_experiment_blueprint or round511_enabled:
+        if round511_enabled:
+            assert round511_binding is not None
+            # The frozen protocol ID replaces the full Blueprint identity here so
+            # protected holdout assignments never enter the collection process.
+            real_experiment_blueprint = SimpleNamespace(
+                blueprint_id=round511_binding.development_protocol_id,
+                source_commit=round511_binding.source_commit,
+            )
+        else:
+            real_experiment_blueprint = load_blueprint(args.real_experiment_blueprint)
         if formal_bootstrap_enabled:
             try:
                 formal_bootstrap_policy = load_formal_log_bootstrap_policy(
@@ -1319,23 +1412,33 @@ def main(argv: Optional[list[str]] = None) -> int:
                     )
                 except (OSError, TypeError, ValueError) as exc:
                     parser.error(str(exc))
-        real_experiment_trace_payload = validate_real_experiment_launch(
-            blueprint=real_experiment_blueprint,
-            binding=load_binding(args.real_experiment_binding)
-            if args.real_experiment_binding
-            else None,
-            phase_state=load_state(args.real_experiment_phase_state)
-            if args.real_experiment_phase_state
-            else None,
-            phase=args.real_experiment_phase,
-            task=args.real_experiment_task,
-            seed=args.real_experiment_seed,
-            max_execution_attempts=runtime_config.max_execution_attempts,
-            run_manifest_ids=_parse_key_values(
-                args.real_experiment_run_manifest_id,
-                "--real-experiment-run-manifest-id",
-            ),
-        ).to_trace_payload()
+        if round511_enabled:
+            real_experiment_trace_payload = {
+                "development_protocol_id": round511_binding.development_protocol_id,
+                "role": round511_binding.role,
+                "group_id": round511_binding.group_id,
+                "task": round511_binding.task,
+                "seed": round511_binding.seed,
+                "holdout_mounted": False,
+            }
+        else:
+            real_experiment_trace_payload = validate_real_experiment_launch(
+                blueprint=real_experiment_blueprint,
+                binding=load_binding(args.real_experiment_binding)
+                if args.real_experiment_binding
+                else None,
+                phase_state=load_state(args.real_experiment_phase_state)
+                if args.real_experiment_phase_state
+                else None,
+                phase=args.real_experiment_phase,
+                task=args.real_experiment_task,
+                seed=args.real_experiment_seed,
+                max_execution_attempts=runtime_config.max_execution_attempts,
+                run_manifest_ids=_parse_key_values(
+                    args.real_experiment_run_manifest_id,
+                    "--real-experiment-run-manifest-id",
+                ),
+            ).to_trace_payload()
         if formal_bootstrap_enabled:
             formal_bootstrap_session = FormalLogBootstrapSession(
                 policy=formal_bootstrap_policy,
@@ -1431,6 +1534,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             expected_calls = _expected_reasoning_only_provider_calls(
                 task_count=expected_provider_call_count,
                 result=result,
+                include_passive_confidence=round511_enabled,
             )
         receipt = receipt_from_stage6_result(
             campaign=dry_run_campaign,
@@ -1503,6 +1607,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             expected_calls = _expected_reasoning_only_provider_calls(
                 task_count=expected_provider_call_count,
                 result=result,
+                include_passive_confidence=round511_enabled,
             )
         provider_contract = expected_calls == len(provider_metadata)
         event_items = formal_bootstrap_session.events
@@ -1819,7 +1924,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                 manifest = MemorySnapshotManifest.from_json(
                     runtime_config.memory_snapshot_manifest
                 )
-                if formal_bootstrap_binding is not None:
+                if formal_bootstrap_binding is not None and not round511_enabled:
                     assert_bootstrap_snapshot_binding(
                         manifest.metadata,
                         expected_policy_id=formal_bootstrap_policy.policy_id,
@@ -1846,6 +1951,27 @@ def main(argv: Optional[list[str]] = None) -> int:
                 )
             )
             with memory_context as multimodal_memory:
+                development_shadow_observer = None
+                if round511_enabled:
+                    assert round511_binding is not None
+                    if multimodal_memory is None or not multimodal_memory.readonly:
+                        raise RuntimeError(
+                            "Round 5.11 requires Paper Memory V5 opened read-only"
+                        )
+                    manifest = MemorySnapshotManifest.from_json(
+                        runtime_config.memory_snapshot_manifest
+                    )
+                    if (
+                        manifest.snapshot_root_sha256
+                        != round511_binding.snapshot_root_sha256
+                    ):
+                        raise ValueError(
+                            "Round 5.11 run binding/snapshot root mismatch"
+                        )
+                    development_shadow_observer = Round511ShadowCollector(
+                        memory=multimodal_memory,
+                        binding=round511_binding,
+                    )
                 bundle = build_stage6_runtime(
                     env=evaluator.env,
                     runtime_config=runtime_config,
@@ -1889,8 +2015,22 @@ def main(argv: Optional[list[str]] = None) -> int:
                         if formal_acquisition_enabled
                         else None
                     ),
+                    development_shadow_observer=development_shadow_observer,
                 )
                 task_list = _load_task_list(args.task)
+                if round511_enabled:
+                    if len(task_list) != 1:
+                        raise ValueError("Round 5.11 requires exactly one task JSON")
+                    runtime_target = str(task_list[0].get("task", ""))
+                    if not _runtime_target_matches_catalog_task(
+                        runtime_target=runtime_target,
+                        catalog_task=round511_binding.task,
+                    ):
+                        raise ValueError("Round 5.11 task JSON/binding mismatch")
+                    if str(args.real_experiment_seed) != round511_binding.seed:
+                        raise ValueError("Round 5.11 launch/binding seed mismatch")
+                    if args.formal_bootstrap_scope != round511_binding.role:
+                        raise ValueError("Round 5.11 bootstrap scope/role mismatch")
                 underground = False
                 all_succeeded = True
                 last_result = None
@@ -1904,6 +2044,68 @@ def main(argv: Optional[list[str]] = None) -> int:
                     if not result.success:
                         all_succeeded = False
                         break
+                if round511_enabled:
+                    assert development_shadow_observer is not None
+                    assert last_result is not None
+                    manifest = MemorySnapshotManifest.from_json(
+                        runtime_config.memory_snapshot_manifest
+                    )
+                    assert_snapshot_unchanged(manifest)
+                    result_events = tuple(last_result.events or ())
+                    acquisition_writes = sum(
+                        event.event_type == "acquisition_record_committed"
+                        for event in result_events
+                    )
+                    bootstrap_events = tuple(formal_bootstrap_session.events)
+                    records = development_shadow_observer.build_records(
+                        task_completed=last_result.success,
+                        planner_calls=sum(
+                            item.purpose == "planning" for item in provider_metadata
+                        ),
+                        reflection_calls=sum(
+                            item.purpose == "reflection" for item in provider_metadata
+                        ),
+                        evaluation_chain_calls=int(last_result.evaluation_count or 0),
+                        controller_calls=int(last_result.controller_execution_count or 0),
+                        bootstrap_event_count=len(bootstrap_events),
+                        injected_log_count=sum(
+                            item.injected_logs for item in bootstrap_events
+                        ),
+                        input_tokens=sum(
+                            item.usage.input_tokens for item in provider_metadata
+                        ),
+                        output_tokens=sum(
+                            item.usage.output_tokens for item in provider_metadata
+                        ),
+                        reasoning_tokens=sum(
+                            item.usage.reasoning_tokens for item in provider_metadata
+                        ),
+                        latency_ms=(
+                            1000.0
+                            * sum(item.duration_seconds for item in last_result.attempts)
+                        ),
+                        returned_model_identities=tuple(
+                            item.returned_model for item in provider_metadata
+                        ),
+                        snapshot_root_sha256_after=manifest.snapshot_root_sha256,
+                        formal_memory_write_count=int(last_result.memory_recorded),
+                        acquisition_write_count=acquisition_writes,
+                    )
+                    output = args.round511_development_records.resolve()
+                    if output.exists():
+                        raise FileExistsError(output)
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    with output.open("x", encoding="utf-8") as handle:
+                        for record in records:
+                            handle.write(
+                                json.dumps(
+                                    record.to_dict(),
+                                    sort_keys=True,
+                                    ensure_ascii=False,
+                                    separators=(",", ":"),
+                                )
+                                + "\n"
+                            )
                 write_dry_run_receipt(last_result)
                 formal_receipt = build_formal_bootstrap_receipt(last_result)
                 if (

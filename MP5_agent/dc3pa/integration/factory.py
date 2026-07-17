@@ -49,6 +49,7 @@ class Stage6RuntimeBundle:
     cognitive_planner: Optional[AdaptiveCognitiveControlPlanner]
     multimodal_memory: Optional[MultimodalMemory]
     confidence_observer: Optional[ConfidenceObservationCollector] = None
+    development_shadow_observer: Any = None
 
 
 def build_legacy_state_provider(
@@ -106,6 +107,7 @@ def build_stage6_runtime(
         Callable[[bool], Mapping[str, Any]]
     ] = None,
     episode_id_provider: Optional[Callable[[int], str]] = None,
+    development_shadow_observer: Any = None,
 ) -> Stage6RuntimeBundle:
     """Compose Stage 0–5 components into the Stage-6 closed loop.
 
@@ -220,6 +222,7 @@ def build_stage6_runtime(
         trace_writer=trace_writer,
         record_metadata_provider=record_metadata_provider,
         episode_id_provider=episode_id_provider,
+        development_shadow_observer=development_shadow_observer,
     )
     return Stage6RuntimeBundle(
         runtime=runtime,
@@ -227,4 +230,5 @@ def build_stage6_runtime(
         cognitive_planner=cognitive_planner,
         multimodal_memory=multimodal_memory,
         confidence_observer=confidence_observer,
+        development_shadow_observer=development_shadow_observer,
     )
