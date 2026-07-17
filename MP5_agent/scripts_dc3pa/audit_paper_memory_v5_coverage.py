@@ -15,11 +15,15 @@ def load_jsonl_root(root):
  for p in sorted((Path(root)/"episodes").glob("*.json")):
   records.append(load(p))
  return records
+def task_entries(payload):
+ exclusion=payload.get("final_test_exclusion",payload)
+ if not isinstance(exclusion,dict): raise ValueError("Final exclusion must be an object")
+ tasks=exclusion.get("tasks",exclusion.get("covered_tasks",[]))
+ if not isinstance(tasks,list): raise ValueError("Final exclusion tasks must be a list")
+ return tasks
 def covered_tasks(payload):
- tasks=payload.get("tasks",payload.get("covered_tasks",[]))
- if not isinstance(tasks,list): raise ValueError("Covered tasks must be a list")
  return [
-  task for task in tasks
+  task for task in task_entries(payload)
   if not task.get("goal_status") or task.get("goal_status")=="experience_covered"
  ]
 def main():
@@ -32,7 +36,7 @@ def main():
  covered=covered_tasks(load(a.covered_tasks))
  exclusion=load(a.final_exclusion)
  heldout=[]; final_pairs=[]
- for task in exclusion.get("tasks",[]):
+ for task in task_entries(exclusion):
   if task.get("goal_status")=="final_heldout_terminal_goal": heldout.append(task["task"])
   for seed in task.get("test_seeds",[]): final_pairs.append((task["task"],str(seed)))
  conn=sqlite3.connect(f"file:{Path(a.database).resolve()}?mode=ro",uri=True)

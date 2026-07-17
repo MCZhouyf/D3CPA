@@ -1,4 +1,7 @@
-from scripts_dc3pa.audit_paper_memory_v5_coverage import covered_tasks
+from scripts_dc3pa.audit_paper_memory_v5_coverage import (
+    covered_tasks,
+    task_entries,
+)
 
 from dc3pa.experiments.memory_coverage_audit import build_coverage_audit
 
@@ -31,6 +34,14 @@ def test_final_exclusion_input_keeps_only_experience_covered_tasks():
         item["goal_status"] == "experience_covered"
         for item in covered_tasks(payload)
     )
+
+
+def test_executed_blueprint_supplies_the_frozen_exclusion_split():
+    tasks = _tasks()
+    blueprint = {"final_test_exclusion": {"tasks": tasks}}
+
+    assert task_entries(blueprint) == tasks
+    assert covered_tasks(blueprint) == tasks
 
 
 def test_coverage_audit_reads_dependency_success_count():
