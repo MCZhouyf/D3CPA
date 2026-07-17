@@ -74,7 +74,7 @@ def build_descriptors(root: Path) -> tuple[ActiveArtifactDescriptor, ...]:
             "acquisition audit",
             "formal_acquisition_audit.json",
             "acquisition_audit",
-            True,
+            False,
         ),
         ActiveArtifactDescriptor(
             "active results report", "ROUND510_ACTIVE_RESULTS.md", "documentation", True

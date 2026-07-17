@@ -21,4 +21,8 @@ def test_active_builder_describes_all_runtime_and_formal_assets(tmp_path):
         if item.path == "formal_task_specs/craft_wooden_pressure_plate.json"
     )
     assert pressure_spec.required_new_task_presence is True
+    acquisition_audit = next(
+        item for item in descriptors if item.artifact_kind == "acquisition_audit"
+    )
+    assert acquisition_audit.required_new_task_presence is False
     json.dumps([item.to_dict() for item in descriptors])
