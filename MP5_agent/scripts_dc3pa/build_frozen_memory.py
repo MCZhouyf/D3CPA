@@ -284,10 +284,17 @@ def build_snapshot(args: argparse.Namespace) -> Dict[str, Any]:
         encoding="utf-8",
     )
 
+    snapshot_metadata = json.loads(args.snapshot_metadata_json or "{}")
+    if not isinstance(snapshot_metadata, Mapping):
+        raise ValueError("--snapshot-metadata-json must decode to an object")
+    if "offline_build_stats" in snapshot_metadata:
+        raise ValueError(
+            "--snapshot-metadata-json cannot replace offline_build_stats"
+        )
     manifest = create_snapshot_manifest(
         db_path,
         source_commit=args.source_commit,
-        metadata={"offline_build_stats": stats},
+        metadata={"offline_build_stats": stats, **dict(snapshot_metadata)},
         snapshot_root=output_root,
         acquisition_manifest_path=acquisition_manifest_path,
         checkpoint_wal=False,
@@ -319,6 +326,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--image-encoder-factory", default="")
     parser.add_argument("--text-encoder-factory", default="")
     parser.add_argument("--encoder-config-json", default="{}")
+    parser.add_argument("--snapshot-metadata-json", default="{}")
     parser.add_argument("--development-encoders", action="store_true")
     parser.add_argument("--require-encoders", action="store_true")
     return parser

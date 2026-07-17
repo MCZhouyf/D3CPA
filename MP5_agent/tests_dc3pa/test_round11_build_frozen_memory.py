@@ -87,6 +87,8 @@ def test_build_frozen_memory_cli_creates_readonly_snapshot(tmp_path):
             "--min-dependency-support",
             "1",
             "--development-encoders",
+            "--snapshot-metadata-json",
+            json.dumps({"paper_memory_generation": "v5-test"}),
             "--reset-output",
         ],
         cwd=root,
@@ -99,6 +101,7 @@ def test_build_frozen_memory_cli_creates_readonly_snapshot(tmp_path):
     stats = json.loads((output_root / "build_stats.json").read_text())
     assert manifest["schema_version"] == 2
     assert manifest["asset_files"]
+    assert manifest["metadata"]["paper_memory_generation"] == "v5-test"
     assert stats["structured_action_key_scenes"] == 1
     assert stats["structured_action_key_coverage"] == 1.0
     with sqlite3.connect(output_root / "memory.sqlite3") as connection:
