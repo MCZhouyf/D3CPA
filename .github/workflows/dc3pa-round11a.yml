@@ -24,6 +24,7 @@ on:
       - "round511-*"
       - "round512-*"
       - "round5121-*"
+      - "round5122-*"
   pull_request:
 
 permissions:
@@ -162,6 +163,11 @@ jobs:
         run: >-
           python scripts_dc3pa/run_round5121_gate.py
           --junit artifacts/round5121.xml
+
+      - name: Round 5.12.2 Path B prelaunch gate
+        run: >-
+          python scripts_dc3pa/run_round5122_gate.py
+          --junit artifacts/round5122.xml
 
       - name: Print reports on failure
         if: failure()
