@@ -25,14 +25,31 @@ from dc3pa.experiments.round511_reconciliation import (
     Round511ReconciliationPolicy,
 )
 from dc3pa.experiments.round511_remediation import (
-    MAXIMUM_TECHNICAL_RETRIES,
-    approved_execution_budget,
     classify_failure_at_source,
     materialize_accepted_datasets,
     next_attempt_index,
-    persist_budget_snapshot,
     recover_accepted_marker,
-    validate_retry_limit,
+)
+from dc3pa.experiments.round5122_pathb import (
+    ACTIVE_TASKSET_RELEASE_ID,
+    ANALYSIS_POLICY_ID,
+    BOOTSTRAP_AMENDMENT_ID,
+    BOOTSTRAP_POLICY_ID,
+    DEVELOPMENT_INPUT_RELEASE_ID,
+    DEVELOPMENT_PROTOCOL_ID,
+    PAPER_MEMORY_SNAPSHOT_ROOT,
+    PAPER_MEMORY_V5_RELEASE_ID,
+    PROMPT_HASH_BUNDLE_ID,
+    CompleteExecutionBudgetContract,
+    FreshDevelopmentCampaignAuthorization,
+    PathBRemediationApproval,
+    ensure_fresh_campaign_ledgers,
+    initialize_fresh_campaign_root,
+    persist_complete_budget_contract,
+    prelaunch_attempt_gate,
+    validate_campaign_authorization,
+    validate_fresh_assignments,
+    validate_runtime_source_hashes,
 )
 
 DEVELOPMENT_MAX_EXECUTION_ATTEMPTS = 4
@@ -99,6 +116,52 @@ def _run_stage6_process(
             os.killpg(process.pid, signal.SIGKILL)
             process.wait()
         return 124
+
+
+def _run_authorized_stage6_process(
+    command: list[str],
+    *,
+    approval: PathBRemediationApproval,
+    authorization: FreshDevelopmentCampaignAuthorization,
+    budget: CompleteExecutionBudgetContract,
+    assignment: Mapping[str, Any],
+    expected_assignment: Mapping[str, Any],
+    current_source_sha: str,
+    group_root: Path,
+    attempt_index: int,
+    budget_snapshot_path: Path,
+    cwd: Path,
+    env: Mapping[str, str],
+    output: Any,
+) -> int:
+    """Perform the final fail-closed check immediately before process creation."""
+    live_source_sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if live_source_sha != current_source_sha:
+        raise ValueError("Source commit changed after campaign initialization")
+    prelaunch_attempt_gate(
+        approval=approval,
+        authorization=authorization,
+        budget=budget,
+        assignment=assignment,
+        expected_assignment=expected_assignment,
+        current_source_sha=live_source_sha,
+        group_root=group_root,
+        attempt_index=attempt_index,
+        budget_snapshot_path=budget_snapshot_path,
+    )
+    return _run_stage6_process(
+        command,
+        cwd=cwd,
+        env=env,
+        output=output,
+        timeout_seconds=budget.episode_timeout_seconds,
+    )
 
 
 def _task_path(task_root: Path, task: str) -> Path:
@@ -262,6 +325,11 @@ def _stage6_command(
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("--assignments", required=True, type=Path)
+    parser.add_argument("--path-b-approval", required=True, type=Path)
+    parser.add_argument("--fresh-campaign-authorization", required=True, type=Path)
+    parser.add_argument(
+        "--complete-execution-budget-contract", required=True, type=Path
+    )
     parser.add_argument("--development-input-release", required=True, type=Path)
     parser.add_argument("--bootstrap-policy", required=True, type=Path)
     parser.add_argument("--bootstrap-amendment", required=True, type=Path)
@@ -283,28 +351,41 @@ def build_parser() -> argparse.ArgumentParser:
         "--python", type=Path, default=Path(sys.executable).resolve()
     )
     parser.add_argument("--mineclip-device", default="cuda")
-    parser.add_argument("--maximum-technical-retries", type=int, default=2)
-    parser.add_argument("--timeout-seconds", type=int, default=1800)
-    parser.add_argument("--limit", type=int, default=0)
     return parser
 
 
 def main() -> int:
     args = build_parser().parse_args()
-    validate_retry_limit(args.maximum_technical_retries)
-    if args.timeout_seconds <= 0:
-        raise ValueError("Retry and timeout limits are invalid")
-    if not os.environ.get("OPENAI_API_KEY", ""):
-        raise ValueError("OPENAI_API_KEY is required in the environment")
-    if not os.environ.get("OPENAI_BASE_URL", ""):
-        raise ValueError("OPENAI_BASE_URL is required in the environment")
     assignments = _validate_assignments(_load(args.assignments))
-    if args.limit > 0:
-        assignments = assignments[: args.limit]
+    validate_fresh_assignments(assignments)
+    approval = PathBRemediationApproval.from_mapping(
+        _load(args.path_b_approval)
+    ).with_id()
+    authorization = FreshDevelopmentCampaignAuthorization.from_mapping(
+        _load(args.fresh_campaign_authorization)
+    ).with_id()
+    budget = CompleteExecutionBudgetContract.from_mapping(
+        _load(args.complete_execution_budget_contract)
+    ).with_id()
     release = _load(args.development_input_release)
     if not bool(release.get("eligible")):
         raise ValueError("Development Input Release is not eligible")
-    source_commit = str(release["source_commit"])
+    protected_release_fields = {
+        "release_id": DEVELOPMENT_INPUT_RELEASE_ID,
+        "development_protocol_id": DEVELOPMENT_PROTOCOL_ID,
+        "active_taskset_release_id": ACTIVE_TASKSET_RELEASE_ID,
+        "paper_memory_v5_release_id": PAPER_MEMORY_V5_RELEASE_ID,
+        "paper_memory_snapshot_root_sha256": PAPER_MEMORY_SNAPSHOT_ROOT,
+        "prompt_hash_bundle_id": PROMPT_HASH_BUNDLE_ID,
+        "analysis_policy_id": ANALYSIS_POLICY_ID,
+        "formal_bootstrap_policy_id": BOOTSTRAP_POLICY_ID,
+        "formal_bootstrap_amendment_id": BOOTSTRAP_AMENDMENT_ID,
+    }
+    for field_name, expected_value in protected_release_fields.items():
+        if release.get(field_name) != expected_value:
+            raise ValueError(
+                f"Protected Development Input Release field changed: {field_name}"
+            )
     current_commit = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=REPO_ROOT,
@@ -312,24 +393,36 @@ def main() -> int:
         capture_output=True,
         text=True,
     ).stdout.strip()
-    if source_commit != current_commit:
-        raise ValueError("Development Input Release/source commit mismatch")
-    protocol_id = str(release["development_protocol_id"])
-    collection_id = _sha(
-        {
-            "source_commit": source_commit,
-            "development_input_release_id": release["release_id"],
-            "development_protocol_id": protocol_id,
-            "assignment_manifest": _sha(assignments),
-        }
-    )
+    validate_runtime_source_hashes(ROOT)
     output_root = args.output_root.resolve()
-    output_root.mkdir(parents=True, exist_ok=True)
-    budget_snapshot = approved_execution_budget(
-        max_execution_attempts=DEVELOPMENT_MAX_EXECUTION_ATTEMPTS,
-        max_explore_steps=DEVELOPMENT_MAX_EXPLORE_STEPS,
-        episode_timeout_seconds=args.timeout_seconds,
+    validate_campaign_authorization(
+        approval=approval,
+        authorization=authorization,
+        budget=budget,
+        assignments=assignments,
+        current_source_sha=current_commit,
+        output_root=output_root,
     )
+    if not output_root.exists() or not any(output_root.iterdir()):
+        initialize_fresh_campaign_root(
+            output_root=output_root,
+            approval=approval,
+            authorization=authorization,
+            budget=budget,
+            assignments=assignments,
+        )
+    else:
+        ensure_fresh_campaign_ledgers(
+            output_root=output_root,
+            assignments=assignments,
+        )
+    if not os.environ.get("OPENAI_API_KEY", ""):
+        raise ValueError("OPENAI_API_KEY is required in the environment")
+    if not os.environ.get("OPENAI_BASE_URL", ""):
+        raise ValueError("OPENAI_BASE_URL is required in the environment")
+    source_commit = current_commit
+    protocol_id = DEVELOPMENT_PROTOCOL_ID
+    collection_id = authorization.campaign_id
     reconciliation_policy = Round511ReconciliationPolicy().with_id()
     completed = 0
     technical_failures = 0
@@ -380,12 +473,16 @@ def main() -> int:
             console = attempt_root / "console.log"
             bootstrap_output = attempt_root / "bootstrap"
             budget_path = attempt_root / "execution_budget_snapshot.json"
-            persist_budget_snapshot(budget_path, budget_snapshot)
+            persist_complete_budget_contract(budget_path, budget)
             if not binding_path.exists():
                 _write_exclusive(
                     binding_path,
                     {
                         "collection_id": collection_id,
+                        "fresh_campaign_authorization_id": (
+                            authorization.authorization_id
+                        ),
+                        "path_b_approval_id": approval.approval_id,
                         "development_input_release_id": release["release_id"],
                         "development_protocol_id": protocol_id,
                         "role": assignment["role"],
@@ -393,6 +490,7 @@ def main() -> int:
                         "task": assignment["task"],
                         "seed": str(assignment["seed"]),
                         "difficulty": assignment["difficulty"],
+                        "sequence_index": int(assignment["sequence_index"]),
                         "run_id": run_id,
                         "source_commit": source_commit,
                         "paper_memory_v5_release_id": release[
@@ -406,7 +504,7 @@ def main() -> int:
                         ],
                         "prompt_hash_bundle_id": release["prompt_hash_bundle_id"],
                         "requested_model_name": "gpt-5.1",
-                        "execution_budget_snapshot_id": budget_snapshot.snapshot_id,
+                        "execution_budget_snapshot_id": budget.contract_id,
                     },
                 )
             command = _stage6_command(
@@ -420,12 +518,20 @@ def main() -> int:
             )
             env = _stage6_environment(seed=assignment["seed"])
             with console.open("ab") as handle:
-                returncode = _run_stage6_process(
+                returncode = _run_authorized_stage6_process(
                     command,
+                    approval=approval,
+                    authorization=authorization,
+                    budget=budget,
+                    assignment=assignment,
+                    expected_assignment=assignment,
+                    current_source_sha=current_commit,
+                    group_root=group_root,
+                    attempt_index=attempt,
+                    budget_snapshot_path=budget_path,
                     cwd=ROOT,
                     env=env,
                     output=handle,
-                    timeout_seconds=args.timeout_seconds,
                 )
             receipt_payload = _load(receipt) if receipt.is_file() else {}
             accepted_attempt = bool(
@@ -462,7 +568,7 @@ def main() -> int:
                     ),
                     "structured_failure_signal": dict(structured_failure_signal),
                     "classification_policy_id": reconciliation_policy.policy_id,
-                    "execution_budget_snapshot_id": budget_snapshot.snapshot_id,
+                    "execution_budget_snapshot_id": budget.contract_id,
                 },
             )
             if accepted_attempt:
@@ -491,6 +597,9 @@ def main() -> int:
     )
     summary = {
         "collection_id": collection_id,
+        "fresh_campaign_authorization_id": authorization.authorization_id,
+        "path_b_approval_id": approval.approval_id,
+        "complete_execution_budget_contract_id": budget.contract_id,
         "assignment_count": len(assignments),
         "completed_assignment_count": completed,
         "technical_failure_attempt_count": technical_failures,
