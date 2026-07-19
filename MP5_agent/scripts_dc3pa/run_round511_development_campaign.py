@@ -87,7 +87,10 @@ def _stage6_environment(
     env["PYTHONHASHSEED"] = str(seed)
     env["DC3PA_WORLD_SEED"] = str(seed)
     env["DC3PA_SIM_SEED"] = str(seed)
-    env["DC3PA_MAX_EXPLORE_STEPS"] = str(max_explore_steps)
+    if max_explore_steps == DEVELOPMENT_MAX_EXPLORE_STEPS:
+        env["DC3PA_MAX_EXPLORE_STEPS"] = str(DEVELOPMENT_MAX_EXPLORE_STEPS)
+    else:
+        env["DC3PA_MAX_EXPLORE_STEPS"] = str(max_explore_steps)
     env["MP5_DISABLE_MEMORY"] = "1"
     env["DC3PA_LEGACY_TASK_HACKS"] = "0"
     return env
