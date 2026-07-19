@@ -75,14 +75,19 @@ def _sha(value: Any) -> str:
 
 
 def _stage6_environment(
-    *, seed: str | int, base: Mapping[str, str] | None = None
+    *,
+    seed: str | int,
+    base: Mapping[str, str] | None = None,
+    max_explore_steps: int = DEVELOPMENT_MAX_EXPLORE_STEPS,
 ) -> dict[str, str]:
     """Bind legacy exploration to the frozen development episode budget."""
+    if max_explore_steps <= 0:
+        raise ValueError("max_explore_steps must be positive")
     env = dict(os.environ if base is None else base)
     env["PYTHONHASHSEED"] = str(seed)
     env["DC3PA_WORLD_SEED"] = str(seed)
     env["DC3PA_SIM_SEED"] = str(seed)
-    env["DC3PA_MAX_EXPLORE_STEPS"] = str(DEVELOPMENT_MAX_EXPLORE_STEPS)
+    env["DC3PA_MAX_EXPLORE_STEPS"] = str(max_explore_steps)
     env["MP5_DISABLE_MEMORY"] = "1"
     env["DC3PA_LEGACY_TASK_HACKS"] = "0"
     return env
