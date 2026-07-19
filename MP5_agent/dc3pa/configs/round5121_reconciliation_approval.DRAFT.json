@@ -1,0 +1,16 @@
+{
+  "approval_id": "AUTHOR_MUST_COMPUTE_FROM_FINAL_PAYLOAD",
+  "approval_kind": "policy_freeze",
+  "approval_name": "ZYF_ROUND5121_RECONCILIATION_POLICY_APPROVAL",
+  "approved_at": "AUTHOR_MUST_SUPPLY_TIME_WITH_TIMEZONE",
+  "approved_by": "ZYF",
+  "closeout_id": "4c168032881eda6def4235001bcf43e576e8c1f80601f3e5127acb09237e2e8f",
+  "holdout_access_forbidden": true,
+  "original_retry_limit_preserved": true,
+  "originals_remain_immutable": true,
+  "outcome_selection_forbidden": true,
+  "reconciliation_policy_id": "eac84b1daf8f3ec07ccb769a65e6064849d34960cef59b96730066250149c75c",
+  "remediation_path": "none",
+  "round512_closeout_sha": "469c98ad085e2b8d68acbd92208d7a635492ebe6",
+  "schema_version": 1
+}
