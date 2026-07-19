@@ -523,6 +523,25 @@ class Controller:
         return False
 
     @staticmethod
+    def _execution_attempt_count(step, required_quantity):
+        mine_actions = [
+            action
+            for action in step.get("actions", ())
+            if action.get("name") == "mine"
+        ]
+        if not mine_actions:
+            return int(required_quantity)
+        attempts = max(int(required_quantity), 3)
+        for action in mine_actions:
+            source = normalize_inventory_name(action.get("args", {}).get("obj"))
+            if update_inventory_obj_name(source) != source:
+                # Some source blocks have probabilistic inventory drops. Keep
+                # retries finite while avoiding an unnecessary LLM replan after
+                # only a few valid source interactions.
+                attempts = max(attempts, 12)
+        return attempts
+
+    @staticmethod
     def _inventory_slots(events):
         inventory = events.get("inventory", {}) if isinstance(events, dict) else {}
 
@@ -1042,7 +1061,7 @@ class Controller:
             times = int(step['times'])
             mine_finish = False
             step_contains_mine = any(action["name"] == "mine" for action in step["actions"])
-            execution_attempts = max(times, 3) if step_contains_mine else times
+            execution_attempts = self._execution_attempt_count(step, times)
             
             for attempt_idx in range(execution_attempts):
                 if mine_finish:
@@ -1142,7 +1161,32 @@ class Controller:
                         obj = normalize_inventory_name(args["obj"])
                         find_obj = update_find_obj_name(obj)
                         print(f"find_obj is {find_obj}")
-                        explore_above_ground(env=env,args=args, object=find_obj, performer=self, memory=self.memory, task_information=task_information, underground=underground)
+                        find_success = explore_above_ground(
+                            env=env,
+                            args=args,
+                            object=find_obj,
+                            performer=self,
+                            memory=self.memory,
+                            task_information=task_information,
+                            underground=underground,
+                        )
+                        if not find_success:
+                            check_result = {
+                                "feedback": (
+                                    f"You failed to find {obj} within the bounded "
+                                    "exploration budget."
+                                ),
+                                "success": False,
+                                "suggestion": f"Try a different bounded search for {obj}.",
+                            }
+                            return finish_failure(
+                                step,
+                                step_index,
+                                action_index,
+                                action,
+                                check_result,
+                                underground,
+                            )
                         emit_action_finished(step, step_index, action_index, action, "success")
                     
                     elif name == "move_to":
@@ -1681,9 +1725,15 @@ class Controller:
 
     def check_done (self,task_information, memory):
         print(f"inventory name is{memory.inventory}")
-        for item in memory.inventory:
-            print(f"task is {task_information['task']},item is {item}. task quantity is {task_information['quantity']}, quantity is{math.ceil(memory.inventory[item])} ")
-            if task_information["task"]==item and task_information["quantity"]<=math.ceil(memory.inventory[item]):
-                print(f"task is {item},quantity is {memory.inventory[item]}")
+        task_name = normalize_inventory_name(task_information["task"])
+        required_quantity = int(task_information["quantity"])
+        for item in task_completion_inventory_names(task_name):
+            quantity = memory.inventory.get(item, 0)
+            print(
+                f"task is {task_name},item is {item}. task quantity is "
+                f"{required_quantity}, quantity is {math.ceil(quantity)} "
+            )
+            if required_quantity <= math.ceil(quantity):
+                print(f"task is {task_name},inventory item is {item},quantity is {quantity}")
                 return True
         return False

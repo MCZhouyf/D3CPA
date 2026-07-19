@@ -168,6 +168,88 @@ def test_table_placement_repositions_once_then_tracks_success(monkeypatch):
     assert memory._dc3pa_crafting_table_position == [-0.7, 60.0, 0.0]
 
 
+def test_table_placement_clears_bounded_side_alcove_after_floor_scan(monkeypatch):
+    memory = FakeMemory({"crafting table": 1, "cobblestone": 8})
+
+    class FakeEnv:
+        def __init__(self):
+            self.events = _events(
+                blocks=[((1, 0, 0), "stone")],
+                inventory=memory.inventory,
+            )
+            self.actions = []
+            self.alcove_cleared = False
+
+        def step(self, action):
+            self.actions.append(list(action))
+            if action[5] == 3:
+                self.alcove_cleared = True
+                self.events = _events(inventory=memory.inventory)
+            elif action[5] == 6 and self.alcove_cleared:
+                self.events = _events(
+                    blocks=[((1, 0, 0), "crafting_table")],
+                    inventory={"cobblestone": 8},
+                )
+                self.events["nearby_tools"] = {"table": True}
+            return self.events, 0, False, {}
+
+    env = FakeEnv()
+    monkeypatch.setattr(structured_actions, "sleep", lambda current_env: current_env.events)
+    monkeypatch.setattr(structured_actions, "share_memory", lambda current_memory, obs: None)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda obs: None)
+
+    returned, ready = structured_actions._place_crafting_table(
+        env, env.events, memory, max_attempts=1
+    )
+
+    assert ready
+    assert structured_actions._crafting_table_observed(returned)
+    assert any(action[5] == 3 for action in env.actions)
+    assert memory._dc3pa_crafting_table_placed is True
+
+
+def test_table_inventory_slot_accepts_minedojo_underscore_name():
+    events = _events(inventory={"crafting_table": 1, "planks": 4})
+
+    assert structured_actions._inventory_item_slot(events, "crafting table") == 0
+
+
+def test_table_reclaim_sweeps_laterally_for_dropped_item(monkeypatch):
+    memory = FakeMemory({"planks": 3, "stick": 2})
+
+    class FakeEnv:
+        def __init__(self):
+            self.events = _events(
+                blocks=[((1, 0, 0), "crafting_table")],
+                inventory=memory.inventory,
+            )
+            self.actions = []
+
+        def step(self, action):
+            self.actions.append(list(action))
+            if action[5] == 3:
+                self.events = _events(inventory=memory.inventory)
+            elif action[1] == 1:
+                self.events = _events(
+                    inventory={"planks": 3, "stick": 2, "crafting table": 1}
+                )
+            return self.events, 0, False, {}
+
+    env = FakeEnv()
+    monkeypatch.setattr(structured_actions, "sleep", lambda current_env: current_env.events)
+    monkeypatch.setattr(structured_actions, "share_memory", lambda current_memory, obs: None)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda obs: None)
+
+    returned, reclaimed = structured_actions._reclaim_crafting_table(
+        env, env.events, memory, max_attacks=1
+    )
+
+    assert reclaimed
+    assert structured_actions._inventory_item_count(returned, "crafting table") == 1
+    assert any(action[1] == 1 for action in env.actions)
+    assert memory._dc3pa_crafting_table_placed is False
+
+
 def test_failed_table_craft_reclaims_table_before_retry(monkeypatch):
     events = _events(inventory={"planks": 4, "stick": 2})
     memory = FakeMemory({"planks": 4, "stick": 2})
@@ -224,6 +306,13 @@ def test_provider_item_names_normalize_to_controller_registry(
 
 def test_provider_log_alias_maps_to_world_wood_target():
     assert structured_actions.update_find_obj_name("oak_log") == "wood"
+
+
+def test_coal_ore_goal_accepts_survival_coal_drop_without_broad_aliasing():
+    controller = _controller({"coal": 1})
+
+    assert controller.check_done({"task": "coal ore", "quantity": 1}, controller.memory)
+    assert not controller.check_done({"task": "iron ore", "quantity": 1}, controller.memory)
 
 
 def test_find_preparation_recognizes_provider_log_alias_in_inventory():
@@ -440,6 +529,126 @@ def test_navigation_tracks_selected_world_coordinate_without_retargeting(block_n
 
     assert tracked["world_x"] == selected["world_x"]
     assert tracked["forward_offset"] == 2
+
+
+def test_tall_grass_uses_minedojo_block_and_seed_inventory_names():
+    assert structured_actions.update_find_obj_name("tall grass") == "grass"
+    assert structured_actions.update_find_obj_name("tallgrass") == "grass"
+    assert structured_actions.update_inventory_obj_name("tall grass") == "wheat seeds"
+    assert structured_actions.update_inventory_obj_name("tallgrass") == "wheat seeds"
+    assert structured_actions.update_inventory_obj_name("grass") == "wheat seeds"
+
+
+def test_approach_normalizes_planner_resource_name(monkeypatch):
+    events = _events(blocks=[((1, 0, 0), "grass")])
+    seen = []
+
+    monkeypatch.setattr(structured_actions, "sleep", lambda *args, **kwargs: events)
+    original_select = structured_actions.select_target_block
+    monkeypatch.setattr(
+        structured_actions,
+        "select_target_block",
+        lambda current_events, name: seen.append(name)
+        or original_select(current_events, name),
+    )
+
+    assert structured_actions.approach(
+        object(), FakeMemory(), "tall grass", underground=False
+    )
+    assert seen == ["grass"]
+
+
+def test_approach_reacquires_visible_target_after_old_coordinate_disappears(monkeypatch):
+    initial = _events(blocks=[((2, 0, 0), "grass")])
+    replacement = _events(blocks=[((1, 0, 0), "grass")])
+    observations = iter((initial, initial, initial, replacement))
+    selected = []
+    original_select = structured_actions.select_target_block
+
+    monkeypatch.setattr(
+        structured_actions,
+        "sleep",
+        lambda *args, **kwargs: next(observations),
+    )
+    monkeypatch.setattr(
+        structured_actions,
+        "select_target_block",
+        lambda events, name: selected.append(name) or original_select(events, name),
+    )
+    monkeypatch.setattr(
+        structured_actions,
+        "try_forward",
+        lambda *args, **kwargs: True,
+    )
+
+    assert structured_actions.approach(
+        object(), FakeMemory(), "tall grass", underground=False
+    )
+    assert selected == ["grass", "grass"]
+
+
+def test_aboveground_clearance_requires_obstacle_and_safe_footing():
+    clear_path = _events(blocks=[((1, -1, 0), "grass block")])
+    obstacle = _events(
+        blocks=[((1, -1, 0), "grass block"), ((1, 0, 0), "wood")]
+    )
+    no_footing = _events(blocks=[((1, 0, 0), "wood")])
+
+    assert not structured_actions._aboveground_clearance_is_safe(clear_path)
+    assert structured_actions._aboveground_clearance_is_safe(obstacle)
+    assert not structured_actions._aboveground_clearance_is_safe(no_footing)
+
+
+def test_fresh_aboveground_clearance_does_not_trust_stale_observation(monkeypatch):
+    stale_obstacle = _events(
+        blocks=[((1, -1, 0), "grass block"), ((1, 0, 0), "wood")]
+    )
+    current_clear_path = _events(blocks=[((1, -1, 0), "grass block")])
+
+    assert structured_actions._aboveground_clearance_is_safe(stale_obstacle)
+    monkeypatch.setattr(
+        structured_actions,
+        "sleep",
+        lambda *args, **kwargs: current_clear_path,
+    )
+    assert not structured_actions._fresh_aboveground_clearance_is_safe(object())
+
+
+def test_approach_forward_propagates_failed_movement(monkeypatch):
+    events = _events(blocks=[((1, -1, 0), "grass block")])
+
+    monkeypatch.setattr(structured_actions, "sleep", lambda *args, **kwargs: events)
+    monkeypatch.setattr(
+        structured_actions,
+        "move_one_block",
+        lambda *args, **kwargs: False,
+    )
+
+    assert not structured_actions.try_forward(
+        object(), FakeMemory(), underground=False, approach=1
+    )
+
+
+def test_surface_target_mining_does_not_clear_an_extra_tunnel_block():
+    assert not structured_actions._clear_tunnel_after_target_mining(False)
+    assert structured_actions._clear_tunnel_after_target_mining(True)
+
+
+def test_probabilistic_drop_source_gets_bounded_extra_attempts():
+    controller = _controller({})
+    grass_step = {
+        "actions": [
+            {"name": "mine", "args": {"obj": "tall grass", "tool": None}}
+        ]
+    }
+    log_step = {
+        "actions": [
+            {"name": "mine", "args": {"obj": "log", "tool": None}}
+        ]
+    }
+
+    assert controller._execution_attempt_count(grass_step, 1) == 12
+    assert controller._execution_attempt_count(log_step, 1) == 3
 
 
 def test_underground_state_reaches_approach_forward_movement(monkeypatch):

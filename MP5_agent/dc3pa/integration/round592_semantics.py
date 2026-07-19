@@ -37,7 +37,12 @@ def _sha(value: Any) -> str:
 
 
 def _inventory_item_for_target(target: str) -> str:
-    return str(target).strip().lower().replace(" ", "_")
+    normalized = str(target).strip().lower()
+    # The coal-ore task is completed by its survival drop, not by carrying the
+    # source block itself. Other controlled fixtures retain their exact item.
+    if normalized == "coal ore":
+        return "coal"
+    return normalized.replace(" ", "_")
 
 
 def _spawned_block_for(environment_target: str) -> str:
@@ -154,7 +159,10 @@ def collect_task_semantic_receipt(
             evaluator_success = LegacyGoalChecker(
                 controller, memory
             ).is_done(task_information)
-            success_observed = inventory.get(target, 0) >= quantity
+            success_inventory_name = inventory_item.replace("_", " ")
+            success_observed = (
+                inventory.get(success_inventory_name, 0) >= quantity
+            )
 
             observation_payload: Mapping[str, Any] = {
                 "inventory": {

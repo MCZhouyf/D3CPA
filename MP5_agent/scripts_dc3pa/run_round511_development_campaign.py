@@ -106,6 +106,20 @@ def _attempt_id(collection_id: str, group_id: str, attempt: int) -> str:
     )[:24]
 
 
+def _load_existing_attempt_summary(
+    path: Path, *, run_id: str, attempt: int
+) -> Mapping[str, Any] | None:
+    """Validate a completed attempt so interrupted campaigns can resume safely."""
+    if not path.is_file():
+        return None
+    payload = _load(path)
+    if str(payload.get("run_id", "")) != run_id:
+        raise ValueError(f"Existing attempt summary/run ID mismatch: {path}")
+    if payload.get("attempt") != attempt:
+        raise ValueError(f"Existing attempt summary/index mismatch: {path}")
+    return payload
+
+
 def _validate_assignments(payload: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     assignments = payload.get("assignments", ())
     if not isinstance(assignments, list) or not assignments:
@@ -156,6 +170,10 @@ def _stage6_command(
         "reasoning_only",
         "--model-profile",
         "gpt51_reference",
+        "--provider-model-alias-policy",
+        str(args.provider_model_alias_policy),
+        "--provider-model-alias-approval",
+        str(args.provider_model_alias_approval),
         "--mllm_url",
         os.environ.get("OPENAI_BASE_URL", ""),
         "--task",
@@ -232,6 +250,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--mineclip-checkpoint", required=True, type=Path)
     parser.add_argument("--task-root", required=True, type=Path)
     parser.add_argument("--formal-task-spec-root", required=True, type=Path)
+    parser.add_argument("--provider-model-alias-policy", required=True, type=Path)
+    parser.add_argument("--provider-model-alias-approval", required=True, type=Path)
     parser.add_argument("--output-root", required=True, type=Path)
     parser.add_argument(
         "--stage6-config",
@@ -300,6 +320,17 @@ def main() -> int:
             run_id = _attempt_id(collection_id, str(assignment["group_id"]), attempt)
             attempt_root = group_root / f"attempt-{attempt}"
             attempt_root.mkdir(parents=True, exist_ok=True)
+            summary_path = attempt_root / "attempt_summary.json"
+            existing_summary = _load_existing_attempt_summary(
+                summary_path, run_id=run_id, attempt=attempt
+            )
+            if existing_summary is not None:
+                if bool(existing_summary.get("accepted")):
+                    raise FileNotFoundError(
+                        f"Accepted attempt is missing group marker: {accepted}"
+                    )
+                technical_failures += 1
+                continue
             binding_path = attempt_root / "run_binding.json"
             records = attempt_root / "development_decisions.jsonl"
             trace = attempt_root / "trace.jsonl"
@@ -356,7 +387,7 @@ def main() -> int:
                 receipt_payload.get("pipeline_pass") and records.is_file()
             )
             _write_exclusive(
-                attempt_root / "attempt_summary.json",
+                summary_path,
                 {
                     "run_id": run_id,
                     "attempt": attempt,

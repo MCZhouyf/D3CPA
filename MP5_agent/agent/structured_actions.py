@@ -455,17 +455,17 @@ def action_mine(env,object,equipment,underground,goal_num):
 # Only to be used when agent is within mining distance of the target.
 # Note that the target parameter in this function and the object parameter in action_mine may not be the same!(difference between wood and log)
 # Target parameter is the object's name in the voxel array, object parameter is the object's name in inventory.
+def _clear_tunnel_after_target_mining(underground):
+    """Only underground mining may clear an extra block for passage."""
+    return bool(underground)
+
+
 def mine(target,equipment,underground,env,memory):
     print(f"executing mining of {target} with {equipment}")
     events  = sleep(env)
     global dontstop
     old_target = target
-    if(target=="log"):
-        target="wood"
-    elif target == "cobblestone":
-        target = "stone"
-    elif target =="diamond":
-        target = "diamond ore"
+    target = update_find_obj_name(target)
 
     # cb_inventory_index = events['inventory']['name'].tolist().index(equipment)  #################for debug, could be changed
     # events,_,_,_ = env.step([0,0,0,12,12,5,0,cb_inventory_index]); save_rgb_for_video(events)
@@ -517,12 +517,16 @@ def mine(target,equipment,underground,env,memory):
             ((vradius+1, vradius+1, vradius-1), (10, 6)),
             ((vradius+1, vradius, vradius-1), (15, 6)),
             ((vradius+1, vradius+2, vradius-1), (6, 6)),
+            ((vradius, vradius+1, vradius), (12, 12)),
+            ((vradius, vradius, vradius), (18, 12)),
             ((vradius, vradius+2, vradius), (6, 12)),
             ((vradius, vradius-1, vradius), (18, 12)),
         ]
+        attempted = False
         for (x_idx, y_idx, z_idx), (pitch, yaw) in adjacent_offsets:
             if events['voxels']['block_name'][x_idx][y_idx][z_idx] != block_name:
                 continue
+            attempted = True
             events,_,_,_ = env.step([0,0,0,pitch,yaw,0,0,0]); save_rgb_for_video(events)
             success = False
             for _ in range(6):
@@ -530,16 +534,18 @@ def mine(target,equipment,underground,env,memory):
                 if np.isin(old_target, events["delta_inv"]["inc_name_by_other"]) or inventory_quantity(events, inventory_target_name) > initial_target_quantity:
                     success = True
                     break
+                if events['voxels']['block_name'][x_idx][y_idx][z_idx] != block_name:
+                    break
             if success:
                 print("mining successful via adjacent voxel")
-                return events, True
-        return events, False
+                return events, True, attempted
+        return events, False, attempted
 
     def mine_local_target(events, block_name):
         candidate_offsets = []
-        for x_idx in range(vradius - 1, vradius + 3):
+        for x_idx in range(vradius - 2, vradius + 3):
             for y_idx in range(vradius - 1, vradius + 3):
-                for z_idx in range(vradius - 1, vradius + 3):
+                for z_idx in range(vradius - 2, vradius + 3):
                     if not (0 <= x_idx < events['voxels']['block_name'].shape[0]):
                         continue
                     if not (0 <= y_idx < events['voxels']['block_name'].shape[1]):
@@ -563,7 +569,9 @@ def mine(target,equipment,underground,env,memory):
                     ))
 
         candidate_offsets.sort()
+        attempted = False
         for _, _, _, _, x_idx, y_idx, z_idx in candidate_offsets[:8]:
+            attempted = True
             pitch = int(np.clip(12 - 3 * (y_idx - (vradius + 1)), 6, 18))
             yaw = int(np.clip(12 + 6 * (z_idx - vradius), 0, 24))
             events,_,_,_ = env.step([0,0,0,pitch,yaw,0,0,0]); save_rgb_for_video(events)
@@ -573,22 +581,33 @@ def mine(target,equipment,underground,env,memory):
                 if np.isin(old_target, events["delta_inv"]["inc_name_by_other"]) or inventory_quantity(events, inventory_target_name) > initial_target_quantity:
                     success = True
                     break
+                if events['voxels']['block_name'][x_idx][y_idx][z_idx] != block_name:
+                    # The selected source was consumed without its probabilistic
+                    # drop. Continue with another source, not its support block.
+                    break
             if success:
                 print("mining successful via local voxel targeting")
-                return events, True
-        return events, False
+                return events, True, attempted
+        return events, False, attempted
 
     if not underground:
-        events, close_success = mine_adjacent_target(events, target)
+        events, close_success, close_attempted = mine_adjacent_target(events, target)
         if close_success:
             print(f"Present inventory:{events['inventory']['name']}")
             print(f"Present inventory:{events['inventory']['quantity']}")
             name = events['inventory']['name'].tolist()
             num = events['inventory']['quantity'].tolist()
             return name, num
+        if target == "grass" and close_attempted:
+            # A consumed grass source may legitimately produce no seeds. Let
+            # the bounded Controller retry locate another source.
+            return (
+                events['inventory']['name'].tolist(),
+                events['inventory']['quantity'].tolist(),
+            )
 
         if target == "wood":
-            events, local_success = mine_local_target(events, target)
+            events, local_success, _ = mine_local_target(events, target)
             if local_success:
                 print(f"Present inventory:{events['inventory']['name']}")
                 print(f"Present inventory:{events['inventory']['quantity']}")
@@ -777,7 +796,8 @@ def mine(target,equipment,underground,env,memory):
             events,_,_,_ = env.step([0,0,0,6,12,0,0,0]); save_rgb_for_video(events)
             sleep(env)
 
-    mine_ahead(env,memory)   
+    if _clear_tunnel_after_target_mining(underground):
+        mine_ahead(env,memory)
     events = sleep(env)
 
      # equipe dirt 
@@ -799,8 +819,29 @@ def mine(target,equipment,underground,env,memory):
 
 # A function that enables agent to clear itself of obstacles in front of him,
 # ONLY TO BE USED WHEN AGENT IS ABOVE GROUND! (as it is pretty destructive and does not gauge the extent of destruction until the function is finished)
+def _aboveground_clearance_is_safe(events):
+    """Require a real obstacle and stable footing before destructive recovery."""
+    blocks = events['voxels']['block_name']
+    floor = blocks[vradius + 1][vradius - 1][vradius]
+    body = blocks[vradius + 1][vradius][vradius]
+    head = blocks[vradius + 1][vradius + 1][vradius]
+    passable = {"air", "water"}
+    unsafe_floor = {"air", "water", "lava"}
+    return floor not in unsafe_floor and (body not in passable or head not in passable)
+
+
+def _fresh_aboveground_clearance_is_safe(env):
+    """Do not authorize destructive recovery from a stale movement frame."""
+    return _aboveground_clearance_is_safe(sleep(env))
+
+
 def mine_ahead_aboveground(env):
     print('trying to mine ahead')
+    events = sleep(env)
+    current_pitch = float(np.asarray(events['location_stats']['pitch']).reshape(-1)[0])
+    if abs(current_pitch) > 1.0:
+        pitch_action = _camera_action_index(-current_pitch)
+        events,_,_,_ = env.step([0,0,0,pitch_action,12,0,0,0]); save_rgb_for_video(events)
     for i in range(5):
         events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)# mine ahead
 
@@ -1080,21 +1121,16 @@ def try_forward(env,memory,underground,approach=0):
     if (approach and (not underground)):
         events = sleep(env)
         if (events['voxels']['block_name'][vradius+1][vradius][vradius] == "water"):
-            move_one_block(env,memory,0,0,1)
+            return bool(move_one_block(env,memory,0,0,1))
         elif (events['voxels']['block_name'][vradius+1][vradius+1][vradius] not in ("lava", "air")):
             print(f"approaching and met with obstacle , have to mine")
+            if not _fresh_aboveground_clearance_is_safe(env):
+                return False
             move_to_middle(env)
             mine_ahead_aboveground(env)
-            prev_pos = events['location_stats']['pos']
-            move_one_block(env,memory,0,0,1)
-            pres_pos = events['location_stats']['pos']
-            are_equal = (prev_pos == pres_pos).all()
-            if are_equal:
-                return False # return false only if agent finds itself stuck
-            return True
+            return bool(move_one_block(env,memory,0,0,1))
         else:
-            move_one_block(env,memory,0,0,1)
-            return True
+            return bool(move_one_block(env,memory,0,0,1))
     if (not underground):
         if (events['voxels']['block_name'][vradius+1][vradius-1][vradius] != "air") and events['voxels']['block_name'][vradius+1][vradius][vradius]== "air" and events['voxels']['block_name'][vradius+1][vradius+1][vradius]=="air":
             if (events['voxels']['block_name'][vradius+1][vradius-1][vradius] != "lava"):
@@ -1587,6 +1623,9 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
                                 observation+='\n'
                             observation +='\n'
                         print(f"had to mine ahead")
+                        if not _fresh_aboveground_clearance_is_safe(env):
+                            print("refusing blind above-ground clearing without an obstacle and safe footing")
+                            return False
                         move_to_middle(env)
                         mine_ahead_aboveground(env)
                         mined_ahead = 1
@@ -1601,6 +1640,9 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
                         if (action_tuple[0] == 2):
                             if not (try_leftward(env,memory,underground)):
                                 print(f"had to mine ahead because can't go left")
+                                if not _fresh_aboveground_clearance_is_safe(env):
+                                    print("refusing unsafe above-ground clearing")
+                                    return False
                                 move_to_middle(env)
                                 mine_ahead_aboveground(env)
                                 mined_ahead = 1
@@ -1612,6 +1654,9 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
                         elif (action_tuple[0] == 0):
                             if (not try_backward(env,memory,underground)):
                                 print(f"had to mine ahead because can't go back")
+                                if not _fresh_aboveground_clearance_is_safe(env):
+                                    print("refusing unsafe above-ground clearing")
+                                    return False
                                 move_to_middle(env)
                                 mine_ahead_aboveground(env)
                                 mined_ahead = 1
@@ -1624,6 +1669,9 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
                         # move_one_block(env,3-action_tuple[0],0,1-action_tuple[1])
                     if (not action_stack ) and (not mined_ahead):
                         print("Exception encountered, may be stuck permanently!! but i will venture a step forward")# tbd: think of some other way to let agent extricate himself
+                        if not _fresh_aboveground_clearance_is_safe(env):
+                            print("refusing unsafe above-ground clearing")
+                            return False
                         move_to_middle(env)
                         mine_ahead_aboveground(env)
                         direction = 0
@@ -1891,12 +1939,7 @@ def approach(env,memory,object,underground):# tbd: scanning blocknames not enoug
     events  = sleep(env)
     events = sleep(env)
     
-    if(object=="log"):
-        object="wood"
-    elif object == "cobblestone":
-        object = "stone"
-    elif object =="diamond":
-        object = "diamond ore"
+    object = update_find_obj_name(object)
     print(f"object is near here")
     target_block = select_target_block(events, object)
     if target_block is None:
@@ -1911,9 +1954,25 @@ def approach(env,memory,object,underground):# tbd: scanning blocknames not enoug
 
     last_signature = None
     stagnation_count = 0
+    reacquisition_count = 0
     for try_num in range(30):
         events = sleep(env)
-        target_block = tracked_target_block(events, target_block, object)
+        tracked_block = tracked_target_block(events, target_block, object)
+        if tracked_block is None:
+            if reacquisition_count >= 4:
+                print("approach exhausted target reacquisition budget")
+                return False
+            target_block = select_target_block(events, object)
+            reacquisition_count += 1
+            if target_block is not None:
+                print(
+                    "approach reacquired target at offsets "
+                    f"forward={target_block['forward_offset']}, "
+                    f"side={target_block['side_offset']}, "
+                    f"vertical={target_block['vertical_offset']}"
+                )
+        else:
+            target_block = tracked_block
         if target_block is None:
             print("approach lost sight of target")
             return False
@@ -2156,6 +2215,14 @@ def _inventory_item_count(events, item):
     )
 
 
+def _inventory_item_slot(events, item):
+    target = normalize_inventory_name(item)
+    for index, name in enumerate(events['inventory']['name'].tolist()):
+        if normalize_inventory_name(name) == target:
+            return index
+    return None
+
+
 def _camera_action_index(delta_degrees):
     return max(0, min(24, int(round(float(delta_degrees) / 15.0)) + 12))
 
@@ -2165,6 +2232,61 @@ def _crafting_table_placement_accepted(events, before_count):
         _crafting_table_observed(events)
         or _inventory_item_count(events, "crafting table") < before_count
     )
+
+
+def _front_body_block(events):
+    try:
+        return normalize_inventory_name(
+            events['voxels']['block_name'][vradius + 1][vradius][vradius]
+        )
+    except (KeyError, IndexError, TypeError):
+        return None
+
+
+def _place_crafting_table_in_alcove(
+    env,
+    events,
+    memory,
+    max_directions=4,
+    max_attacks_per_direction=3,
+):
+    """Create one bounded side cavity when a shaft has no placement surface."""
+    for direction_idx in range(max_directions):
+        table_index = _inventory_item_slot(events, 'crafting table')
+        if table_index is None:
+            break
+        before_count = _inventory_item_count(events, 'crafting table')
+        current_pitch = float(np.asarray(events['location_stats']['pitch']).reshape(-1)[0])
+        pitch_action = _camera_action_index(-current_pitch)
+        yaw_action = 18 if direction_idx > 0 else 12
+        events,_,_,_ = env.step(
+            [0,0,0,pitch_action,yaw_action,0,0,0]
+        ); save_rgb_for_video(events)
+        events = sleep(env)
+        if _crafting_table_observed(events):
+            _track_crafting_table_placement(memory, True, events)
+            return events, True
+
+        for _ in range(max_attacks_per_direction):
+            if _front_body_block(events) in {None, 'air', 'water'}:
+                break
+            events,_,_,_ = env.step(
+                [0,0,0,12,12,3,0,0]
+            ); save_rgb_for_video(events)
+            events = sleep(env)
+
+        table_index = _inventory_item_slot(events, 'crafting table')
+        if table_index is None:
+            break
+        events,_,_,_ = env.step(
+            [0,0,0,12,12,6,0,table_index]
+        ); save_rgb_for_video(events)
+        events = sleep(env)
+        share_memory(memory, events)
+        if _crafting_table_placement_accepted(events, before_count):
+            _track_crafting_table_placement(memory, True, events)
+            return events, True
+    return events, False
 
 
 def _place_crafting_table(env, events, memory, max_attempts=4):
@@ -2178,10 +2300,9 @@ def _place_crafting_table(env, events, memory, max_attempts=4):
     target_pitches = (50.0, 65.0)
     for recovery_round in range(2):
         for attempt_idx in range(max_attempts):
-            inventory = events['inventory']['name'].tolist()
-            if 'crafting table' not in inventory:
+            table_index = _inventory_item_slot(events, 'crafting table')
+            if table_index is None:
                 break
-            table_index = inventory.index('crafting table')
             before_count = _inventory_item_count(events, 'crafting table')
             print(
                 f"Crafting-table placement attempt {attempt_idx + 1}/{max_attempts} "
@@ -2193,10 +2314,9 @@ def _place_crafting_table(env, events, memory, max_attempts=4):
                 yaw_action = 18 if attempt_idx > 0 and pitch_idx == 0 else 12
                 events,_,_,_ = env.step([0,0,0,pitch_action,yaw_action,0,0,0]); save_rgb_for_video(events)
                 events = sleep(env)
-                inventory = events['inventory']['name'].tolist()
-                if 'crafting table' not in inventory:
+                table_index = _inventory_item_slot(events, 'crafting table')
+                if table_index is None:
                     break
-                table_index = inventory.index('crafting table')
                 events,_,_,_ = env.step([0,0,0,12,12,6,0,table_index]); save_rgb_for_video(events)
                 events = sleep(env)
                 share_memory(memory, events)
@@ -2204,7 +2324,7 @@ def _place_crafting_table(env, events, memory, max_attempts=4):
                     _track_crafting_table_placement(memory, True, events)
                     return events, True
 
-        if recovery_round == 0 and 'crafting table' in events['inventory']['name'].tolist():
+        if recovery_round == 0 and _inventory_item_slot(events, 'crafting table') is not None:
             print("No valid table surface found; making one bounded backward reposition.")
             start_position = np.asarray(events['location_stats']['pos'], dtype=float)
             for _ in range(8):
@@ -2214,6 +2334,9 @@ def _place_crafting_table(env, events, memory, max_attempts=4):
                     break
             events = sleep(env)
 
+    if _inventory_item_slot(events, 'crafting table') is not None:
+        print("No floor placement succeeded; trying a bounded side alcove.")
+        return _place_crafting_table_in_alcove(env, events, memory)
     return events, False
 
 
@@ -2229,11 +2352,14 @@ def _reclaim_crafting_table(env, events, memory, max_attacks=12):
             _track_crafting_table_placement(memory, False)
             return events, True
 
-    # Walk over the dropped item, then restore the original position. This is
-    # bounded so a failed recovery cannot stall the whole episode.
-    for direction in (1, 2):
+    # Sweep paired forward/back and left/right paths over the dropped item.
+    # Each failed pair returns near the starting position, and the complete
+    # recovery remains bounded.
+    for forward, lateral in ((1, 0), (2, 0), (0, 1), (0, 2)):
         for _ in range(6):
-            events,_,_,_ = env.step([direction,0,0,12,12,0,0,0]); save_rgb_for_video(events)
+            events,_,_,_ = env.step(
+                [forward,lateral,0,12,12,0,0,0]
+            ); save_rgb_for_video(events)
             if _inventory_item_count(events, 'crafting table') > 0:
                 share_memory(memory, events)
                 _track_crafting_table_placement(memory, False)

@@ -7,7 +7,7 @@ from dc3pa.integration.round592_semantics import (
 def test_semantic_fixture_uses_runtime_inventory_names():
     assert _inventory_item_for_target("wooden door") == "wooden_door"
     assert _inventory_item_for_target("diamond axe") == "diamond_axe"
-    assert _inventory_item_for_target("coal ore") == "coal_ore"
+    assert _inventory_item_for_target("coal ore") == "coal"
 
 
 def test_semantic_fixture_records_harvest_spawn_blocks():

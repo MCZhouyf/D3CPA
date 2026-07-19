@@ -58,6 +58,10 @@ def update_find_obj_name(obj_name):
 
     if normalized in {"log", "oak log", "birch log", "spruce log", "jungle log", "acacia log", "dark oak log", "planks", "tree"}:
         return "wood"
+    elif normalized in {"tall grass", "tallgrass"}:
+        # MineDojo's observation wrapper normalizes the Minecraft ``tallgrass``
+        # block to ``grass``; ``grass block`` remains a distinct block name.
+        return "grass"
     elif normalized == "cobblestone":
         return "stone"
     elif normalized == "diamond":
@@ -105,6 +109,8 @@ def update_inventory_obj_name(obj_name):
 
     if normalized in {"wood", "tree", "oak log", "birch log", "spruce log", "jungle log", "acacia log", "dark oak log"}:
         return "log"
+    elif normalized in {"tall grass", "tallgrass", "grass"}:
+        return "wheat seeds"
     elif normalized == "stone":
         return "cobblestone"
     elif normalized == "coal ore":
@@ -119,6 +125,16 @@ def update_inventory_obj_name(obj_name):
         return "gold"
     else:
         return normalized
+
+
+def task_completion_inventory_names(task_name):
+    """Return inventory names that satisfy a task without changing task identity."""
+    normalized = normalize_inventory_name(task_name)
+    aliases = {
+        # Mining coal ore yields coal in MineDojo survival inventory.
+        "coal ore": ("coal",),
+    }
+    return (normalized,) + aliases.get(normalized, ())
 
 def update_craft_num(craft_name, craft_num):
     if craft_name in ["stick", "planks", "bowl"]:

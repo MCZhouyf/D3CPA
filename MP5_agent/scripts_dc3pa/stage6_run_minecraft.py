@@ -962,9 +962,14 @@ def main(argv: Optional[list[str]] = None) -> int:
             "provider model aliasing requires --provider-model-alias-policy "
             "and --provider-model-alias-approval"
         )
-    if alias_arguments_present and not args.real_experiment_blueprint:
+    if (
+        alias_arguments_present
+        and not args.real_experiment_blueprint
+        and not round511_enabled
+    ):
         parser.error(
-            "provider model aliasing requires a bound real experiment Blueprint"
+            "provider model aliasing requires a bound real experiment Blueprint "
+            "or Round 5.11 development run"
         )
     if alias_arguments_present and model_profile is None:
         parser.error("provider model aliasing requires an explicit model profile")

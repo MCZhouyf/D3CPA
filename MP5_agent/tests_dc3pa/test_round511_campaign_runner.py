@@ -8,6 +8,7 @@ import pytest
 
 from scripts_dc3pa.run_round511_development_campaign import (
     DEVELOPMENT_MAX_EXPLORE_STEPS,
+    _load_existing_attempt_summary,
     _run_stage6_process,
     _stage6_command,
     _stage6_environment,
@@ -55,6 +56,8 @@ def test_stage6_command_never_mounts_blueprint_or_credentials(tmp_path: Path):
         bootstrap_amendment=Path("amendment.json"),
         bootstrap_binding_train=Path("train-binding.json"),
         bootstrap_binding_tune=Path("tune-binding.json"),
+        provider_model_alias_policy=Path("alias-policy.json"),
+        provider_model_alias_approval=Path("alias-approval.json"),
     )
     command = _stage6_command(
         args=args,
@@ -69,6 +72,8 @@ def test_stage6_command_never_mounts_blueprint_or_credentials(tmp_path: Path):
     rendered = " ".join(command)
     assert "--real-experiment-blueprint" not in command
     assert "--formal-task-spec" in command
+    assert "--provider-model-alias-policy" in command
+    assert "--provider-model-alias-approval" in command
     assert "dev_holdout" not in rendered
     assert "OPENAI_API_KEY" not in rendered
     assert re.search(r"sk-[A-Za-z0-9]{10,}", rendered) is None
@@ -128,3 +133,20 @@ def test_stage6_timeout_interrupts_the_complete_process_group(
     assert result == 124
     assert calls[0][1]["start_new_session"] is True
     assert signals == [(4321, signal.SIGINT)]
+
+
+def test_existing_failed_attempt_summary_is_resume_safe(tmp_path: Path):
+    summary = tmp_path / "attempt_summary.json"
+    summary.write_text(
+        '{"accepted": false, "attempt": 2, "run_id": "run-2"}\n',
+        encoding="utf-8",
+    )
+
+    payload = _load_existing_attempt_summary(summary, run_id="run-2", attempt=2)
+
+    assert payload is not None
+    assert payload["accepted"] is False
+    with pytest.raises(ValueError, match="run ID mismatch"):
+        _load_existing_attempt_summary(summary, run_id="different", attempt=2)
+    with pytest.raises(ValueError, match="index mismatch"):
+        _load_existing_attempt_summary(summary, run_id="run-2", attempt=3)
