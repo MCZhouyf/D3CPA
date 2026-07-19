@@ -22,6 +22,7 @@ on:
       - "round510-*"
       - "round5101-*"
       - "round511-*"
+      - "round512-*"
   pull_request:
 
 permissions:
@@ -150,6 +151,11 @@ jobs:
         run: >-
           python scripts_dc3pa/run_round511_gate.py
           --junit artifacts/round511.xml
+
+      - name: Round 5.12 closeout boundary gate
+        run: >-
+          python scripts_dc3pa/run_round512_gate.py
+          --junit artifacts/round512.xml
 
       - name: Print reports on failure
         if: failure()
