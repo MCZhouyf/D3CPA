@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import signal
+import subprocess
+from collections import Counter
 from dataclasses import asdict, dataclass, field, replace
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Mapping
 
 from .formal_acquisition_execution import TECHNICAL_FAILURE_CATEGORIES
@@ -40,6 +44,21 @@ def _canonical_json(value: Any) -> bytes:
 
 def _sha(value: Any) -> str:
     return hashlib.sha256(_canonical_json(value)).hexdigest()
+
+
+def sha256_file(path: str | Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _load_json(path: str | Path) -> Mapping[str, Any]:
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    if not isinstance(payload, Mapping):
+        raise ValueError(f"Expected JSON object: {path}")
+    return payload
 
 
 @dataclass(frozen=True)
@@ -223,6 +242,271 @@ def classify_structured_failure(
         return None, ()
     rule = matches[0]
     return rule.category, rule.required_signals
+
+
+def _trace_event_types(path: Path) -> tuple[str, ...]:
+    if not path.is_file():
+        return ()
+    result: list[str] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        payload = json.loads(line)
+        if isinstance(payload, Mapping):
+            result.append(str(payload.get("event_type", "")))
+    return tuple(result)
+
+
+def _structured_attempt_signals(
+    summary: Mapping[str, Any], trace_event_types: tuple[str, ...]
+) -> dict[str, Any]:
+    """Normalize only source-bound fields; never inspect free-text payloads."""
+    return_code = summary.get("process_return_code")
+    signals: dict[str, Any] = {"process_exit_code": return_code}
+    if return_code == 124:
+        # The frozen campaign runner returns 124 only from its episode watchdog.
+        signals.update(
+            {
+                "timeout_stage": "stage6_episode",
+                "watchdog_status": "timed_out",
+            }
+        )
+    elif isinstance(return_code, int) and return_code < 0:
+        signals.update(
+            {
+                "process_exit_status": "signaled",
+                "process_signal": signal.Signals(-return_code).name,
+            }
+        )
+    if "environment_seed_applied" in trace_event_types:
+        signals["seed_application_status"] = "applied"
+    return signals
+
+
+def reconcile_technical_failures(
+    campaign_root: str | Path,
+    *,
+    policy: Round511ReconciliationPolicy | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Build evidence-only rows for every preceding failed attempt."""
+    active = policy or Round511ReconciliationPolicy()
+    runs_root = Path(campaign_root) / "runs"
+    rows: list[dict[str, Any]] = []
+    category_counts: Counter[str] = Counter()
+    failed_decision_rows = 0
+
+    for marker_path in sorted(runs_root.glob("*/accepted.json")):
+        marker = _load_json(marker_path)
+        final_attempt = int(marker.get("attempt", -1))
+        for attempt_index in range(final_attempt):
+            attempt_root = marker_path.parent / f"attempt-{attempt_index}"
+            summary_path = attempt_root / "attempt_summary.json"
+            binding_path = attempt_root / "run_binding.json"
+            trace_path = attempt_root / "trace.jsonl"
+            records_path = attempt_root / "development_decisions.jsonl"
+            summary = _load_json(summary_path)
+            binding = _load_json(binding_path)
+            event_types = _trace_event_types(trace_path)
+            signals = _structured_attempt_signals(summary, event_types)
+            category, used = classify_structured_failure(signals, active)
+            decision_count = 0
+            if records_path.is_file():
+                decision_count = sum(
+                    bool(line.strip())
+                    for line in records_path.read_text(encoding="utf-8").splitlines()
+                )
+            failed_decision_rows += decision_count
+            assigned = category or "unclassifiable"
+            category_counts[assigned] += 1
+            evidence_hashes = {
+                "attempt_summary_sha256": sha256_file(summary_path),
+                "run_binding_sha256": sha256_file(binding_path),
+                "trace_sha256": sha256_file(trace_path) if trace_path.is_file() else None,
+            }
+            rows.append(
+                {
+                    "attempt_id": str(summary.get("run_id", "")),
+                    "task": str(binding.get("task", "")),
+                    "seed": str(binding.get("seed", "")),
+                    "role": str(binding.get("role", "")),
+                    "group_id": str(binding.get("group_id", "")),
+                    "attempt_index": attempt_index,
+                    "original_evidence_hashes": evidence_hashes,
+                    "structured_signals_used": {name: signals[name] for name in used},
+                    "classification_policy_id": active.compute_policy_id(),
+                    "assigned_category": assigned,
+                    "confidence": "proven" if category else "unclassifiable",
+                    "decision_row_count": decision_count,
+                    "decision_rows_included_in_final_dataset": 0,
+                }
+            )
+
+    summary = {
+        "technical_attempts": len(rows),
+        "classified_attempts": len(rows) - category_counts["unclassifiable"],
+        "unclassifiable_attempts": category_counts["unclassifiable"],
+        "counts_per_category": dict(sorted(category_counts.items())),
+        "failed_attempt_decision_rows_produced": failed_decision_rows,
+        "failed_attempt_decision_rows_included": 0,
+        "technical_failure_reconciliation_eligible": (
+            len(rows) == 40 and category_counts["unclassifiable"] == 0
+        ),
+        "classification_policy_id": active.compute_policy_id(),
+    }
+    return rows, summary
+
+
+def source_budget_proof(repo_root: str | Path, source_commit: str) -> dict[str, Any]:
+    """Inspect the exact bound runner source without using current defaults."""
+    label = "MP5_agent/scripts_dc3pa/run_round511_development_campaign.py"
+    source = subprocess.run(
+        ["git", "show", f"{source_commit}:{label}"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    source_sha = hashlib.sha256(source.encode("utf-8")).hexdigest()
+    fixed_execution = '"--max-execution-attempts",\n        "4",' in source
+    fixed_explore = "DEVELOPMENT_MAX_EXPLORE_STEPS = 60" in source and (
+        'env["DC3PA_MAX_EXPLORE_STEPS"] = str(DEVELOPMENT_MAX_EXPLORE_STEPS)'
+        in source
+    )
+    timeout_default = 'parser.add_argument("--timeout-seconds", type=int, default=1800)' in source
+    return {
+        "source_artifact_label": f"git:{source_commit}:{label}",
+        "source_artifact_sha256": source_sha,
+        "fields": {
+            "max_execution_attempts": {
+                "status": "proven" if fixed_execution else "unprovable",
+                "value": 4 if fixed_execution else None,
+                "source_key": "_stage6_command/--max-execution-attempts",
+                "no_runtime_override_proof": fixed_execution,
+            },
+            "max_explore_steps": {
+                "status": "proven" if fixed_explore else "unprovable",
+                "value": 60 if fixed_explore else None,
+                "source_key": "_stage6_environment/DC3PA_MAX_EXPLORE_STEPS",
+                "no_runtime_override_proof": fixed_explore,
+            },
+            "episode_timeout_seconds": {
+                "status": "unprovable",
+                "value": None,
+                "source_key": "build_parser/--timeout-seconds",
+                "default_observed": 1800 if timeout_default else None,
+                "no_runtime_override_proof": False,
+                "reason": "CLI override permitted and no attempt-time command manifest exists",
+            },
+        },
+    }
+
+
+def reconcile_execution_budgets(
+    campaign_root: str | Path,
+    *,
+    repo_root: str | Path,
+    policy: Round511ReconciliationPolicy | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Create one provenance row for each missing attempt budget field."""
+    active = policy or Round511ReconciliationPolicy()
+    attempts = sorted(Path(campaign_root).glob("runs/*/attempt-*"))
+    proof_cache: dict[str, Mapping[str, Any]] = {}
+    rows: list[dict[str, Any]] = []
+    complete_attempts = 0
+    partial_profiles: set[tuple[tuple[str, Any], ...]] = set()
+
+    for attempt_root in attempts:
+        binding = _load_json(attempt_root / "run_binding.json")
+        summary = _load_json(attempt_root / "attempt_summary.json")
+        source_commit = str(binding.get("source_commit", ""))
+        if source_commit not in proof_cache:
+            proof_cache[source_commit] = source_budget_proof(repo_root, source_commit)
+        proof = proof_cache[source_commit]
+        statuses: list[str] = []
+        partial: list[tuple[str, Any]] = []
+        for field_name in active.missing_budget_fields:
+            field_proof = dict(proof["fields"][field_name])
+            status = str(field_proof.pop("status"))
+            value = field_proof.pop("value")
+            statuses.append(status)
+            if status == "proven":
+                partial.append((field_name, value))
+            rows.append(
+                {
+                    "attempt_id": str(summary.get("run_id", "")),
+                    "field_name": field_name,
+                    "reconstructed_value": value,
+                    "source_artifact_label": proof["source_artifact_label"],
+                    "source_artifact_sha256": proof["source_artifact_sha256"],
+                    "source_key": field_proof.pop("source_key"),
+                    "proof_that_no_runtime_override_existed": field_proof.pop(
+                        "no_runtime_override_proof"
+                    ),
+                    "reconstruction_status": status,
+                    **field_proof,
+                }
+            )
+        if all(status == "proven" for status in statuses):
+            complete_attempts += 1
+        partial_profiles.add(tuple(partial))
+
+    proven = sum(row["reconstruction_status"] == "proven" for row in rows)
+    unprovable = len(rows) - proven
+    summary = {
+        "attempts_audited": len(attempts),
+        "missing_fields_discovered": len(rows),
+        "fields_proven": proven,
+        "fields_unprovable": unprovable,
+        "attempts_with_complete_proof": complete_attempts,
+        "attempts_with_incomplete_proof": len(attempts) - complete_attempts,
+        "distinct_complete_budget_profiles": 0 if not complete_attempts else 1,
+        "distinct_proven_partial_profiles": len(partial_profiles),
+        "budget_reconciliation_eligible": (
+            len(attempts) == 100 and len(rows) == 300 and unprovable == 0
+        ),
+        "reconciliation_policy_id": active.compute_policy_id(),
+    }
+    return rows, summary
+
+
+def choose_salvage_path(
+    technical_summary: Mapping[str, Any],
+    budget_summary: Mapping[str, Any],
+    *,
+    retry_limit_violations: int,
+    contamination_count: int,
+    lineage_mismatch_count: int,
+    remediation_approval: Round511ReconciliationApproval | None,
+) -> dict[str, Any]:
+    """Return the mandatory scientific path and currently executable path."""
+    blockers: list[str] = []
+    if int(technical_summary.get("unclassifiable_attempts", 0)):
+        blockers.append("one_or_more_technical_failures_unclassifiable")
+    if int(budget_summary.get("fields_unprovable", 0)):
+        blockers.append("one_or_more_budget_fields_unprovable")
+    if contamination_count:
+        blockers.append("failed_attempt_decision_contamination")
+    if lineage_mismatch_count:
+        blockers.append("attempt_lineage_mismatch")
+    if retry_limit_violations != 3:
+        blockers.append("protocol_invalid_units_not_limited_to_known_three")
+    scientifically_required = "path_b" if blockers else "path_a"
+    authorized = (
+        remediation_approval is not None
+        and remediation_approval.approval_kind == "remediation"
+        and remediation_approval.remediation_path == scientifically_required
+    )
+    return {
+        "scientifically_required_path": scientifically_required,
+        "selected_path": scientifically_required if authorized else "path_c",
+        "salvage_status": "authorized" if authorized else "blocked",
+        "reasons": blockers or ["selective_replacement_preconditions_satisfied"],
+        "remediation_approval_present": remediation_approval is not None,
+        "remediation_approval_id": (
+            remediation_approval.with_id().approval_id if remediation_approval else None
+        ),
+        "mine_dojo_execution_permitted": authorized,
+    }
 
 
 @dataclass(frozen=True)
