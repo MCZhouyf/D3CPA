@@ -23,6 +23,7 @@ on:
       - "round5101-*"
       - "round511-*"
       - "round512-*"
+      - "round5121-*"
   pull_request:
 
 permissions:
@@ -156,6 +157,11 @@ jobs:
         run: >-
           python scripts_dc3pa/run_round512_gate.py
           --junit artifacts/round512.xml
+
+      - name: Round 5.12.1 reconciliation gate
+        run: >-
+          python scripts_dc3pa/run_round5121_gate.py
+          --junit artifacts/round5121.xml
 
       - name: Print reports on failure
         if: failure()

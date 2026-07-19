@@ -15,6 +15,27 @@ from typing import Any, Mapping
 
 ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = ROOT.parent
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from dc3pa.experiments.formal_acquisition_execution import (
+    TECHNICAL_FAILURE_CATEGORIES,
+)
+from dc3pa.experiments.round511_reconciliation import (
+    Round511ReconciliationPolicy,
+)
+from dc3pa.experiments.round511_remediation import (
+    MAXIMUM_TECHNICAL_RETRIES,
+    approved_execution_budget,
+    classify_failure_at_source,
+    materialize_accepted_datasets,
+    next_attempt_index,
+    persist_budget_snapshot,
+    recover_accepted_marker,
+    validate_retry_limit,
+)
+
+DEVELOPMENT_MAX_EXECUTION_ATTEMPTS = 4
 DEVELOPMENT_MAX_EXPLORE_STEPS = 60
 
 
@@ -191,7 +212,7 @@ def _stage6_command(
         "--trace",
         str(trace),
         "--max-execution-attempts",
-        "4",
+        str(DEVELOPMENT_MAX_EXECUTION_ATTEMPTS),
         "--image-encoder-factory",
         "dc3pa.memory.mineclip_scene_encoder:build_mineclip_image_encoder",
         "--text-encoder-factory",
@@ -270,7 +291,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
-    if args.maximum_technical_retries < 0 or args.timeout_seconds <= 0:
+    validate_retry_limit(args.maximum_technical_retries)
+    if args.timeout_seconds <= 0:
         raise ValueError("Retry and timeout limits are invalid")
     if not os.environ.get("OPENAI_API_KEY", ""):
         raise ValueError("OPENAI_API_KEY is required in the environment")
@@ -303,6 +325,12 @@ def main() -> int:
     )
     output_root = args.output_root.resolve()
     output_root.mkdir(parents=True, exist_ok=True)
+    budget_snapshot = approved_execution_budget(
+        max_execution_attempts=DEVELOPMENT_MAX_EXECUTION_ATTEMPTS,
+        max_explore_steps=DEVELOPMENT_MAX_EXPLORE_STEPS,
+        episode_timeout_seconds=args.timeout_seconds,
+    )
+    reconciliation_policy = Round511ReconciliationPolicy().with_id()
     completed = 0
     technical_failures = 0
 
@@ -312,11 +340,30 @@ def main() -> int:
         ).hexdigest()[:16]
         group_root = output_root / "runs" / group_hash
         accepted = group_root / "accepted.json"
+        group_root.mkdir(parents=True, exist_ok=True)
+        recover_accepted_marker(output_root, group_root)
         if accepted.is_file():
             completed += 1
             continue
-        group_root.mkdir(parents=True, exist_ok=True)
-        for attempt in range(args.maximum_technical_retries + 1):
+        while True:
+            try:
+                attempt = next_attempt_index(group_root)
+            except (RuntimeError, ValueError) as exc:
+                print(
+                    json.dumps(
+                        {
+                            "status": "technical_failure_exhausted",
+                            "group_id": assignment["group_id"],
+                            "completed": completed,
+                            "reason": str(exc),
+                        },
+                        sort_keys=True,
+                    )
+                )
+                return 2
+            if attempt is None:
+                completed += 1
+                break
             run_id = _attempt_id(collection_id, str(assignment["group_id"]), attempt)
             attempt_root = group_root / f"attempt-{attempt}"
             attempt_root.mkdir(parents=True, exist_ok=True)
@@ -325,11 +372,6 @@ def main() -> int:
                 summary_path, run_id=run_id, attempt=attempt
             )
             if existing_summary is not None:
-                if bool(existing_summary.get("accepted")):
-                    raise FileNotFoundError(
-                        f"Accepted attempt is missing group marker: {accepted}"
-                    )
-                technical_failures += 1
                 continue
             binding_path = attempt_root / "run_binding.json"
             records = attempt_root / "development_decisions.jsonl"
@@ -337,6 +379,8 @@ def main() -> int:
             receipt = attempt_root / "bootstrap_receipt.json"
             console = attempt_root / "console.log"
             bootstrap_output = attempt_root / "bootstrap"
+            budget_path = attempt_root / "execution_budget_snapshot.json"
+            persist_budget_snapshot(budget_path, budget_snapshot)
             if not binding_path.exists():
                 _write_exclusive(
                     binding_path,
@@ -362,6 +406,7 @@ def main() -> int:
                         ],
                         "prompt_hash_bundle_id": release["prompt_hash_bundle_id"],
                         "requested_model_name": "gpt-5.1",
+                        "execution_budget_snapshot_id": budget_snapshot.snapshot_id,
                     },
                 )
             command = _stage6_command(
@@ -386,6 +431,19 @@ def main() -> int:
             accepted_attempt = bool(
                 receipt_payload.get("pipeline_pass") and records.is_file()
             )
+            failure_category = None
+            structured_failure_signal: Mapping[str, Any] = {}
+            if not accepted_attempt:
+                failure_category, structured_failure_signal = classify_failure_at_source(
+                    return_code=returncode, trace_path=trace
+                )
+            status = (
+                "completed_success"
+                if accepted_attempt and bool(receipt_payload.get("task_completed"))
+                else "completed_scientific_failure"
+                if accepted_attempt
+                else "technical_failure"
+            )
             _write_exclusive(
                 summary_path,
                 {
@@ -396,76 +454,62 @@ def main() -> int:
                     "task_completed": bool(receipt_payload.get("task_completed")),
                     "records_present": records.is_file(),
                     "accepted": accepted_attempt,
+                    "status": status,
+                    "failure_category": (
+                        None
+                        if accepted_attempt
+                        else failure_category or "unclassifiable"
+                    ),
+                    "structured_failure_signal": dict(structured_failure_signal),
+                    "classification_policy_id": reconciliation_policy.policy_id,
+                    "execution_budget_snapshot_id": budget_snapshot.snapshot_id,
                 },
             )
             if accepted_attempt:
-                _write_exclusive(
-                    accepted,
-                    {
-                        "run_id": run_id,
-                        "attempt": attempt,
-                        "role": assignment["role"],
-                        "group_id": assignment["group_id"],
-                        "task": assignment["task"],
-                        "seed": str(assignment["seed"]),
-                        "task_completed": bool(receipt_payload.get("task_completed")),
-                        "records": str(records.relative_to(output_root)),
-                        "receipt": str(receipt.relative_to(output_root)),
-                    },
-                )
+                recover_accepted_marker(output_root, group_root)
+                materialize_accepted_datasets(output_root)
                 completed += 1
                 break
             technical_failures += 1
-        else:
-            print(
-                json.dumps(
-                    {
-                        "status": "technical_failure_exhausted",
-                        "group_id": assignment["group_id"],
-                        "completed": completed,
-                    },
-                    sort_keys=True,
+            if failure_category not in TECHNICAL_FAILURE_CATEGORIES:
+                print(
+                    json.dumps(
+                        {
+                            "status": "unclassifiable_technical_failure",
+                            "group_id": assignment["group_id"],
+                            "attempt": attempt,
+                        },
+                        sort_keys=True,
+                    )
                 )
-            )
-            return 2
+                return 2
 
-    train_lines: list[str] = []
-    tune_lines: list[str] = []
-    for accepted in sorted((output_root / "runs").glob("*/accepted.json")):
-        payload = _load(accepted)
-        record_path = output_root / str(payload["records"])
-        lines = [line for line in record_path.read_text(encoding="utf-8").splitlines() if line]
-        if payload["role"] == "dev_train":
-            train_lines.extend(lines)
-        elif payload["role"] == "dev_tune":
-            tune_lines.extend(lines)
-        else:
-            raise ValueError("Accepted run has protected role")
-    for name, lines in (
-        ("development_decisions_train.jsonl", train_lines),
-        ("development_decisions_tune.jsonl", tune_lines),
-        ("development_decisions_all.jsonl", train_lines + tune_lines),
-    ):
-        destination = output_root / name
-        if destination.exists():
-            existing = destination.read_text(encoding="utf-8").splitlines()
-            if existing != lines:
-                raise FileExistsError(destination)
-        else:
-            destination.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    dataset_manifest = materialize_accepted_datasets(output_root)
+    technical_failures = sum(
+        str(_load(path).get("status", "")) == "technical_failure"
+        for path in (output_root / "runs").glob("*/attempt-*/attempt_summary.json")
+    )
     summary = {
         "collection_id": collection_id,
         "assignment_count": len(assignments),
         "completed_assignment_count": completed,
         "technical_failure_attempt_count": technical_failures,
-        "train_decision_count": len(train_lines),
-        "tune_decision_count": len(tune_lines),
+        "train_decision_count": dataset_manifest["roles"]["dev_train"][
+            "record_count"
+        ],
+        "tune_decision_count": dataset_manifest["roles"]["dev_tune"][
+            "record_count"
+        ],
+        "accepted_dataset_manifest_id": dataset_manifest["manifest_id"],
         "holdout_assignment_count": 0,
         "holdout_accessed": False,
         "final_evaluation_started": False,
     }
     summary_path = output_root / "campaign_summary.json"
-    if not summary_path.exists():
+    if summary_path.exists():
+        if _load(summary_path) != summary:
+            raise ValueError("Existing campaign summary differs from ledger state")
+    else:
         _write_exclusive(summary_path, summary)
     print(json.dumps(summary, sort_keys=True))
     return 0

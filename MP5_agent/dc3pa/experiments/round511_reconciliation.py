@@ -367,7 +367,10 @@ def source_budget_proof(repo_root: str | Path, source_commit: str) -> dict[str, 
         text=True,
     ).stdout
     source_sha = hashlib.sha256(source.encode("utf-8")).hexdigest()
-    fixed_execution = '"--max-execution-attempts",\n        "4",' in source
+    fixed_execution = '"--max-execution-attempts",\n        "4",' in source or (
+        "DEVELOPMENT_MAX_EXECUTION_ATTEMPTS = 4" in source
+        and 'str(DEVELOPMENT_MAX_EXECUTION_ATTEMPTS)' in source
+    )
     fixed_explore = "DEVELOPMENT_MAX_EXPLORE_STEPS = 60" in source and (
         'env["DC3PA_MAX_EXPLORE_STEPS"] = str(DEVELOPMENT_MAX_EXPLORE_STEPS)'
         in source
