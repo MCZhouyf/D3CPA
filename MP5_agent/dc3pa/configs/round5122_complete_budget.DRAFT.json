@@ -1,0 +1,22 @@
+{
+  "action_step_limit": 30,
+  "author_timeout_decision_id": "AUTHOR_DECISION_REQUIRED",
+  "contract_id": "COMPUTE_AFTER_AUTHOR_DECISION",
+  "controller_exploration_step_limit": 60,
+  "controller_source_sha256": "f9b5d52fcef6d5ca2740b395d3d54a19cd01ac034b055a83e90e622e7368e3c3",
+  "controller_task_retry_limit": 30,
+  "environment_task_timeout_seconds": null,
+  "episode_timeout_seconds": null,
+  "max_execution_attempts": 4,
+  "max_explore_steps": 60,
+  "maximum_technical_retries": 2,
+  "one_effective_profile_required": true,
+  "planning_replanning_limit": 4,
+  "provider_maximum_retries": 3,
+  "provider_request_timeout_seconds": 180.0,
+  "schema_version": 1,
+  "source_commit": "FINAL_ENGINEERING_SHA_REQUIRED",
+  "structured_actions_source_sha256": "4a65d0cea264d378c6f1b30aa65940e7cd84e61722304a6730796a3837912f96",
+  "success_logic_source_sha256": "ff3a443e5b4171e49717b9522876d55d33d31630d19a86c8f63814c5d7e4db10",
+  "task_specific_cutoffs_bound_by_source": true
+}

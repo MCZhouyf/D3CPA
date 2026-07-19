@@ -1,0 +1,22 @@
+{
+  "acquisition_writes_required": 0,
+  "assignment_count": 60,
+  "assignment_manifest_id": "90553e430d1effc09ef95f6afa995c64e26d60fdcd432212496a1ff3c444c406",
+  "authorization_id": "AUTHOR_MUST_COMPUTE_FROM_CONFIRMED_PAYLOAD",
+  "authorization_name": "ZYF_ROUND5122_FRESH_DEVELOPMENT_CAMPAIGN",
+  "authorized_at": "AUTHOR_MUST_SUPPLY_TIME_WITH_TIMEZONE",
+  "approved_by": "ZYF",
+  "campaign_id": "GENERATE_AFTER_SOURCE_AND_BUDGET_FREEZE",
+  "complete_budget_contract_id": "FROZEN_COMPLETE_BUDGET_CONTRACT_ID_REQUIRED",
+  "dev_train_count": 45,
+  "dev_tune_count": 15,
+  "evaluation_chain_calls_required": 0,
+  "final_unmounted": true,
+  "holdout_unmounted": true,
+  "memory_writes_required": 0,
+  "old_campaign_import_forbidden": true,
+  "output_root_must_start_empty": true,
+  "path_b_approval_id": "SIGNED_PATH_B_APPROVAL_ID_REQUIRED",
+  "schema_version": 1,
+  "source_commit": "FINAL_ENGINEERING_SHA_REQUIRED"
+}
