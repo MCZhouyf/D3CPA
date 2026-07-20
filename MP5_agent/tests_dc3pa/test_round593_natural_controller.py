@@ -174,7 +174,7 @@ def test_table_placement_clears_bounded_side_alcove_after_floor_scan(monkeypatch
     class FakeEnv:
         def __init__(self):
             self.events = _events(
-                blocks=[((1, 0, 0), "stone")],
+                blocks=[((1, -1, 0), "stone"), ((1, 0, 0), "stone")],
                 inventory=memory.inventory,
             )
             self.actions = []
@@ -184,10 +184,16 @@ def test_table_placement_clears_bounded_side_alcove_after_floor_scan(monkeypatch
             self.actions.append(list(action))
             if action[5] == 3:
                 self.alcove_cleared = True
-                self.events = _events(inventory=memory.inventory)
+                self.events = _events(
+                    blocks=[((1, -1, 0), "stone")],
+                    inventory=memory.inventory,
+                )
             elif action[5] == 6 and self.alcove_cleared:
                 self.events = _events(
-                    blocks=[((1, 0, 0), "crafting_table")],
+                    blocks=[
+                        ((1, -1, 0), "stone"),
+                        ((1, 0, 0), "crafting_table"),
+                    ],
                     inventory={"cobblestone": 8},
                 )
                 self.events["nearby_tools"] = {"table": True}
@@ -206,6 +212,58 @@ def test_table_placement_clears_bounded_side_alcove_after_floor_scan(monkeypatch
     assert structured_actions._crafting_table_observed(returned)
     assert any(action[5] == 3 for action in env.actions)
     assert memory._dc3pa_crafting_table_placed is True
+
+
+def test_alcove_placement_targets_solid_floor_after_clearing_body(monkeypatch):
+    memory = FakeMemory({"crafting table": 1, "cobblestone": 8})
+
+    class FakeEnv:
+        def __init__(self):
+            self.events = _events(
+                blocks=[((1, -1, 0), "stone"), ((1, 0, 0), "stone")],
+                inventory=memory.inventory,
+            )
+            self.actions = []
+            self.pitch = 0.0
+            self.cavity_cleared = False
+
+        def step(self, action):
+            self.actions.append(list(action))
+            if action[3] != 12:
+                self.pitch += (action[3] - 12) * 15.0
+                self.events["location_stats"]["pitch"] = np.array([self.pitch])
+            if action[5] == 3 and self.pitch >= 30:
+                self.cavity_cleared = True
+                self.events = _events(
+                    blocks=[((1, -1, 0), "stone")],
+                    inventory=memory.inventory,
+                )
+                self.events["location_stats"]["pitch"] = np.array([self.pitch])
+            elif action[5] == 6 and self.cavity_cleared and self.pitch >= 30:
+                self.events = _events(
+                    blocks=[((1, -1, 0), "stone"), ((1, 0, 0), "crafting_table")],
+                    inventory={"cobblestone": 8},
+                )
+                self.events["nearby_tools"] = {"table": True}
+                self.events["location_stats"]["pitch"] = np.array([self.pitch])
+            return self.events, 0, False, {}
+
+    env = FakeEnv()
+    monkeypatch.setattr(structured_actions, "sleep", lambda current_env: current_env.events)
+    monkeypatch.setattr(structured_actions, "share_memory", lambda current_memory, obs: None)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda obs: None)
+
+    returned, ready = structured_actions._place_crafting_table_in_alcove(
+        env, env.events, memory, max_directions=1
+    )
+
+    assert ready
+    assert structured_actions._crafting_table_observed(returned)
+    attack_index = next(i for i, action in enumerate(env.actions) if action[5] == 3)
+    place_index = next(i for i, action in enumerate(env.actions) if action[5] == 6)
+    assert any(action[3] > 12 for action in env.actions[:attack_index])
+    assert any(action[3] != 12 for action in env.actions[attack_index + 1:place_index])
+    assert env.pitch >= 30
 
 
 def test_table_inventory_slot_accepts_minedojo_underscore_name():

@@ -2243,12 +2243,21 @@ def _front_body_block(events):
         return None
 
 
+def _front_floor_block(events):
+    try:
+        return normalize_inventory_name(
+            events['voxels']['block_name'][vradius + 1][vradius - 1][vradius]
+        )
+    except (KeyError, IndexError, TypeError):
+        return None
+
+
 def _place_crafting_table_in_alcove(
     env,
     events,
     memory,
     max_directions=4,
-    max_attacks_per_direction=3,
+    max_attacks_per_direction=12,
 ):
     """Create one bounded side cavity when a shaft has no placement surface."""
     for direction_idx in range(max_directions):
@@ -2267,25 +2276,56 @@ def _place_crafting_table_in_alcove(
             _track_crafting_table_placement(memory, True, events)
             return events, True
 
+        # The body voxel is below the agent's eye line. Horizontal attacks hit
+        # the head-level wall instead, so settle the camera downward first.
+        current_pitch = float(np.asarray(events['location_stats']['pitch']).reshape(-1)[0])
+        pitch_action = _camera_action_index(45.0 - current_pitch)
+        events,_,_,_ = env.step(
+            [0,0,0,pitch_action,12,0,0,0]
+        ); save_rgb_for_video(events)
+        events = sleep(env)
+
         for _ in range(max_attacks_per_direction):
             if _front_body_block(events) in {None, 'air', 'water'}:
                 break
             events,_,_,_ = env.step(
                 [0,0,0,12,12,3,0,0]
             ); save_rgb_for_video(events)
-            events = sleep(env)
 
-        table_index = _inventory_item_slot(events, 'crafting table')
-        if table_index is None:
-            break
-        events,_,_,_ = env.step(
-            [0,0,0,12,12,6,0,table_index]
-        ); save_rgb_for_video(events)
-        events = sleep(env)
-        share_memory(memory, events)
-        if _crafting_table_placement_accepted(events, before_count):
-            _track_crafting_table_placement(memory, True, events)
-            return events, True
+        body_block = _front_body_block(events)
+        floor_block = _front_floor_block(events)
+        print(
+            f"Alcove placement direction {direction_idx + 1}/{max_directions}: "
+            f"body={body_block}, floor={floor_block}"
+        )
+        if body_block not in {'air', 'water'}:
+            continue
+        if floor_block in {None, 'air', 'water'}:
+            continue
+
+        # A place action must ray-trace a solid face. After clearing the body
+        # block, looking straight ahead targets air and can never place the
+        # table. Aim down at the alcove floor and place on its top face.
+        for target_pitch in (35.0, 50.0, 65.0):
+            current_pitch = float(
+                np.asarray(events['location_stats']['pitch']).reshape(-1)[0]
+            )
+            pitch_action = _camera_action_index(target_pitch - current_pitch)
+            events,_,_,_ = env.step(
+                [0,0,0,pitch_action,12,0,0,0]
+            ); save_rgb_for_video(events)
+            events = sleep(env)
+            table_index = _inventory_item_slot(events, 'crafting table')
+            if table_index is None:
+                break
+            events,_,_,_ = env.step(
+                [0,0,0,12,12,6,0,table_index]
+            ); save_rgb_for_video(events)
+            events = sleep(env)
+            share_memory(memory, events)
+            if _crafting_table_placement_accepted(events, before_count):
+                _track_crafting_table_placement(memory, True, events)
+                return events, True
     return events, False
 
 
