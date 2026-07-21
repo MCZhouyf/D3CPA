@@ -15,6 +15,7 @@ TESTS = (
     "tests_dc3pa/test_round5124_fusion_data.py",
     "tests_dc3pa/test_round5124_fusion_fit.py",
     "tests_dc3pa/test_round5124_holdout.py",
+    "tests_dc3pa/test_round5125_replacement_holdout.py",
     "tests_dc3pa/test_round5123_amendment.py",
     "tests_dc3pa/test_round5122_contracts.py",
     "tests_dc3pa/test_round55_grouped_bootstrap.py",
