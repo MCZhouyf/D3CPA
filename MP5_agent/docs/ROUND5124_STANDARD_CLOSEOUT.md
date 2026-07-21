@@ -59,8 +59,11 @@ replicates, seed `5102026`, and 10 reliability bins. Task-seed/run grouping is
 supplementary sensitivity only and cannot override the primary activation
 decision. Decision-row IID bootstrap is forbidden.
 
-The monotonic Fusion candidate is now frozen. Holdout remains unopened, final
-evaluation remains unopened, and Round 6 has not started.
+The monotonic Fusion candidate is frozen with artifact ID
+`8e5376a7aa0aefd7b4f3fe6ece78c9148b108f7705d746824651848e0e4b82e1`.
+Its intercept is `0.3628558461827391`; the only nonzero coefficient is
+`confidence_probability=1.5885805075294157`. The fixed L2 is `1e-3`, and the
+selected checkpoint is 5000. No manual coefficient edit occurred.
 
 ## Locked Holdout Implementation
 
@@ -85,3 +88,25 @@ activation decision.
 
 Real holdout records, assignments, predictions, component releases, reports,
 and the single-use ledger remain external and are not committed.
+
+## Holdout Status
+
+The pre-holdout engineering commit was
+`24f0d3ae5e16397db3e76196cb096bce26c20cef`. Its hosted Actions run completed
+successfully before unlock. The final runtime, candidate, activation policy,
+Controller, prompts, taskset, Paper Memory V5, Log Bootstrap, and execution
+budget were frozen before the single-use ledger was claimed.
+
+The assignment file was opened once. The process then stopped before the first
+MineDojo episode because the launch command supplied the legacy task-asset root
+rather than the active taskset's approved runtime-asset root. This was a
+pre-episode configuration failure: Controller starts, provider calls, decision
+records, scientific outcomes, memory writes, AcquisitionStore writes, and
+Evaluation Chain calls were all zero.
+
+The single-use protocol forbids resetting the ledger or reopening assignments,
+even when no scientific outcome was observed. The ledger is therefore terminal
+as `failed_prelaunch`; there is no holdout metric report, and
+`PaperFusionRelease` is `null`. Final evaluation remains unopened and Round 6
+has not started. A future holdout requires new author authorization and a new
+sealed assignment set; the current holdout cannot be retried.
