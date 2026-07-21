@@ -19,12 +19,14 @@ from dc3pa.experiments.round5124_holdout import (
     FinalHoldoutRuntimeRelease,
     LockedHoldoutExecutionManifest,
     create_single_use_ledger,
+    preflight_active_task_assets,
     sha256_file,
 )
 from dc3pa.experiments.round5124_fusion_fit import (
     MonotonicFusionCandidateArtifact,
     Round5124ActivationPolicy,
 )
+from dc3pa.experiments.task_assets import tree_sha256
 
 
 def _load(path: Path):
@@ -47,6 +49,7 @@ def main() -> int:
     parser.add_argument("--activation-policy", required=True, type=Path)
     parser.add_argument("--sealed-assignments", required=True, type=Path)
     parser.add_argument("--active-taskset-release", required=True, type=Path)
+    parser.add_argument("--active-taskset-root", required=True, type=Path)
     parser.add_argument("--bootstrap-policy", required=True, type=Path)
     parser.add_argument("--bootstrap-amendment", required=True, type=Path)
     parser.add_argument("--development-protocol", required=True, type=Path)
@@ -88,6 +91,18 @@ def main() -> int:
     activation_payload["calibration_metrics"] = tuple(activation_payload["calibration_metrics"])
     activation = Round5124ActivationPolicy(**activation_payload)
     taskset = _load(args.active_taskset_release)
+    active_taskset_root = args.active_taskset_root.resolve()
+    if args.active_taskset_release.resolve().parent != active_taskset_root:
+        raise ValueError("Active taskset release must be inside active taskset root")
+    active_manifest = active_taskset_root / "active_artifacts.json"
+    runtime_task_root = active_taskset_root / "creative_task_jsons"
+    formal_task_root = active_taskset_root / "formal_task_specs"
+    if not all(
+        path.is_file() for path in (active_manifest, args.active_taskset_release)
+    ):
+        raise FileNotFoundError("Active taskset release or manifest is missing")
+    if not all(path.is_dir() for path in (runtime_task_root, formal_task_root)):
+        raise FileNotFoundError("Active runtime/formal task asset directory is missing")
     bootstrap = _load(args.bootstrap_policy)
     amendment = _load(args.bootstrap_amendment)
     protocol = _load(args.development_protocol)
@@ -109,6 +124,10 @@ def main() -> int:
         holdout_runner_sha256=sha256_file(paths["runner"]),
         prompt_hash_bundle_id="e8703f9d7a79612afa6a58ce37dca2f6e8591b943f5dd8c6ece9b89f9d45bd00",
         active_taskset_release_id=str(taskset["release_id"]),
+        active_taskset_manifest_sha256=sha256_file(active_manifest),
+        runtime_task_tree_sha256=tree_sha256(runtime_task_root),
+        formal_task_tree_sha256=tree_sha256(formal_task_root),
+        active_task_count=int(taskset["active_task_count"]),
         paper_memory_v5_release_id="cc2310aeb60f63e6a1896a4c05109a1ec391649ce102e11b65b6343605789813",
         paper_memory_snapshot_root_sha256=str(snapshot["snapshot_root_sha256"]),
         formal_log_bootstrap_policy_id=str(bootstrap["policy_id"]),
@@ -135,6 +154,7 @@ def main() -> int:
         acquisition_writes_permitted=False,
         controller_changes_after_freeze_permitted=False,
     ).with_id()
+    preflight_active_task_assets(active_taskset_root, runtime=runtime)
     _write(args.runtime_output, runtime.to_dict())
     manifest = LockedHoldoutExecutionManifest(
         source_commit=source_commit,

@@ -23,7 +23,7 @@ from dc3pa.experiments.round511_remediation import classify_failure_at_source
 from dc3pa.experiments.round5124_holdout import (
     FinalHoldoutRuntimeRelease,
     LockedHoldoutExecutionManifest,
-    claim_single_use_ledger,
+    claim_single_use_ledger_after_asset_preflight,
     consume_single_use_ledger,
     sha256_file,
 )
@@ -143,6 +143,8 @@ def _command(
     trace: Path,
     receipt: Path,
     bootstrap_output: Path,
+    task_root: Path,
+    formal_task_spec_root: Path,
 ) -> list[str]:
     return [
         "xvfb-run",
@@ -162,9 +164,9 @@ def _command(
         "--mllm_url",
         os.environ.get("OPENAI_BASE_URL", ""),
         "--task",
-        str(_task_path(args.task_root, str(assignment["task"]))),
+        str(_task_path(task_root, str(assignment["task"]))),
         "--formal-task-spec",
-        str(_formal_task_spec_path(args.formal_task_spec_root, str(assignment["task"]))),
+        str(_formal_task_spec_path(formal_task_spec_root, str(assignment["task"]))),
         "--config",
         str(args.stage6_config),
         "--memory-root",
@@ -229,8 +231,7 @@ def build_parser() -> argparse.ArgumentParser:
         "bootstrap-binding",
         "memory-root",
         "mineclip-checkpoint",
-        "task-root",
-        "formal-task-spec-root",
+        "active-taskset-root",
         "provider-model-alias-policy",
         "provider-model-alias-approval",
         "output-root",
@@ -270,11 +271,13 @@ def main() -> int:
     ):
         raise ValueError("Holdout bootstrap binding differs from frozen runtime")
 
-    # This atomic transition happens before the first read of assignment plaintext.
-    claim_single_use_ledger(
+    # Public task assets are fully checked before this opens the sealed assignments.
+    _, asset_roots = claim_single_use_ledger_after_asset_preflight(
         args.single_use_ledger,
         manifest=manifest,
         sealed_assignment_path=args.assignments,
+        active_taskset_root=args.active_taskset_root,
+        runtime=runtime,
     )
     assignments = _validate_assignments(_load(args.assignments))
     output_root = args.output_root.resolve()
@@ -329,6 +332,8 @@ def main() -> int:
                 trace=trace,
                 receipt=receipt,
                 bootstrap_output=attempt_root / "bootstrap",
+                task_root=asset_roots["task_root"],
+                formal_task_spec_root=asset_roots["formal_task_spec_root"],
             )
             env = _stage6_environment(seed=assignment["seed"], max_explore_steps=120)
             with console.open("ab") as handle:

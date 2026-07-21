@@ -9,15 +9,23 @@ from dc3pa.experiments.round5124_holdout import (
     FinalHoldoutRuntimeRelease,
     HoldoutDecisionRecord,
     LockedHoldoutExecutionManifest,
+    claim_single_use_ledger_after_asset_preflight,
     claim_single_use_ledger,
     consume_single_use_ledger,
     create_single_use_ledger,
     sha256_file,
 )
 from dc3pa.experiments.round5124_holdout_features import export_holdout_features
+from dc3pa.experiments.task_assets import tree_sha256
 
 
-def _runtime(*, candidate_sha: str = "candidate-sha") -> FinalHoldoutRuntimeRelease:
+def _runtime(
+    *,
+    candidate_sha: str = "candidate-sha",
+    active_manifest_sha: str = "active-manifest",
+    runtime_tree_sha: str = "runtime-tree",
+    formal_tree_sha: str = "formal-tree",
+) -> FinalHoldoutRuntimeRelease:
     return FinalHoldoutRuntimeRelease(
         source_commit="commit",
         controller_sha256="controller",
@@ -28,6 +36,10 @@ def _runtime(*, candidate_sha: str = "candidate-sha") -> FinalHoldoutRuntimeRele
         holdout_runner_sha256="runner",
         prompt_hash_bundle_id="prompts",
         active_taskset_release_id="taskset",
+        active_taskset_manifest_sha256=active_manifest_sha,
+        runtime_task_tree_sha256=runtime_tree_sha,
+        formal_task_tree_sha256=formal_tree_sha,
+        active_task_count=50,
         paper_memory_v5_release_id="memory",
         paper_memory_snapshot_root_sha256="snapshot",
         formal_log_bootstrap_policy_id="bootstrap",
@@ -133,6 +145,44 @@ def _write(path: Path, value) -> None:
     path.write_text(json.dumps(value, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def _active_taskset(tmp_path: Path) -> tuple[Path, FinalHoldoutRuntimeRelease]:
+    root = tmp_path / "active"
+    task_root = root / "creative_task_jsons"
+    formal_root = root / "formal_task_specs"
+    task_root.mkdir(parents=True)
+    formal_root.mkdir(parents=True)
+    artifacts = []
+    for index in range(49):
+        filename = f"task_{index:02d}.json"
+        _write(task_root / filename, [{"task": f"item {index}"}])
+        _write(formal_root / filename, {"task_name": f"task {index}"})
+    pressure_plate = "craft_wooden_pressure_plate.json"
+    _write(task_root / pressure_plate, [{"task": "wooden pressure plate"}])
+    _write(
+        formal_root / pressure_plate,
+        {"task_name": "craft wooden pressure plate"},
+    )
+    for kind, folder in (
+        ("runtime_task_json", "creative_task_jsons"),
+        ("formal_task_spec", "formal_task_specs"),
+    ):
+        for path in sorted((root / folder).glob("*.json")):
+            artifacts.append(
+                {
+                    "artifact_kind": kind,
+                    "path": path.relative_to(root).as_posix(),
+                }
+            )
+    manifest = root / "active_artifacts.json"
+    _write(manifest, {"artifacts": artifacts})
+    runtime = _runtime(
+        active_manifest_sha=sha256_file(manifest),
+        runtime_tree_sha=tree_sha256(task_root),
+        formal_tree_sha=tree_sha256(formal_root),
+    )
+    return root, runtime
+
+
 def test_single_use_holdout_ledger_cannot_reopen(tmp_path):
     assignments = tmp_path / "sealed.json"
     assignments.write_text("sealed", encoding="utf-8")
@@ -165,6 +215,50 @@ def test_single_use_holdout_rejects_assignment_drift_before_claim(tmp_path):
             ledger, manifest=manifest, sealed_assignment_path=assignments
         )
     assert json.loads(ledger.read_text())["state"] == "sealed_unopened"
+
+
+def test_bad_active_task_root_cannot_claim_holdout_ledger(tmp_path):
+    assignments = tmp_path / "sealed.json"
+    assignments.write_text("sealed", encoding="utf-8")
+    manifest = _manifest(assignments, tmp_path / "out")
+    ledger = tmp_path / "ledger.json"
+    create_single_use_ledger(ledger, manifest=manifest)
+    _, runtime = _active_taskset(tmp_path)
+    assignments.unlink()
+
+    with pytest.raises(FileNotFoundError, match="Active taskset root"):
+        claim_single_use_ledger_after_asset_preflight(
+            ledger,
+            manifest=manifest,
+            sealed_assignment_path=assignments,
+            active_taskset_root=tmp_path / "wrong-root",
+            runtime=runtime,
+        )
+
+    assert json.loads(ledger.read_text())["state"] == "sealed_unopened"
+
+
+def test_active_task_preflight_resolves_pressure_plate_pair_before_claim(tmp_path):
+    assignments = tmp_path / "sealed.json"
+    assignments.write_text("sealed", encoding="utf-8")
+    manifest = _manifest(assignments, tmp_path / "out")
+    ledger = tmp_path / "ledger.json"
+    create_single_use_ledger(ledger, manifest=manifest)
+    active_root, runtime = _active_taskset(tmp_path)
+
+    _, roots = claim_single_use_ledger_after_asset_preflight(
+        ledger,
+        manifest=manifest,
+        sealed_assignment_path=assignments,
+        active_taskset_root=active_root,
+        runtime=runtime,
+    )
+
+    assert (roots["task_root"] / "craft_wooden_pressure_plate.json").is_file()
+    assert (
+        roots["formal_task_spec_root"] / "craft_wooden_pressure_plate.json"
+    ).is_file()
+    assert json.loads(ledger.read_text())["state"] == "claimed"
 
 
 def test_holdout_record_rejects_evaluation_or_writes():

@@ -13,6 +13,7 @@ from typing import Any, Mapping
 
 from .development_records import CONFIDENCE_LEVELS, ENV_STATES
 from .development_shadow import Round511RunBinding, Round511ShadowCollector
+from .task_assets import tree_sha256
 
 
 SCHEMA_VERSION = 1
@@ -78,6 +79,10 @@ class FinalHoldoutRuntimeRelease:
     holdout_runner_sha256: str
     prompt_hash_bundle_id: str
     active_taskset_release_id: str
+    active_taskset_manifest_sha256: str
+    runtime_task_tree_sha256: str
+    formal_task_tree_sha256: str
+    active_task_count: int
     paper_memory_v5_release_id: str
     paper_memory_snapshot_root_sha256: str
     formal_log_bootstrap_policy_id: str
@@ -108,6 +113,9 @@ class FinalHoldoutRuntimeRelease:
             self.holdout_runner_sha256,
             self.prompt_hash_bundle_id,
             self.active_taskset_release_id,
+            self.active_taskset_manifest_sha256,
+            self.runtime_task_tree_sha256,
+            self.formal_task_tree_sha256,
             self.paper_memory_v5_release_id,
             self.paper_memory_snapshot_root_sha256,
             self.formal_log_bootstrap_policy_id,
@@ -120,6 +128,8 @@ class FinalHoldoutRuntimeRelease:
         )
         if any(not value for value in required):
             raise ValueError("Final holdout runtime binding is incomplete")
+        if self.active_task_count != 50:
+            raise ValueError("Final holdout runtime must bind the approved 50-task set")
         expected_budget = {
             "action_step_timeout_seconds": 30,
             "episode_timeout_seconds": 3600,
@@ -274,6 +284,106 @@ def claim_single_use_ledger(
     claimed["ledger_id"] = _sha({k: v for k, v in claimed.items() if k != "ledger_id"})
     _atomic_replace(ledger_path, claimed)
     return claimed
+
+
+def preflight_active_task_assets(
+    active_taskset_root: str | Path,
+    *,
+    runtime: FinalHoldoutRuntimeRelease,
+) -> Mapping[str, Path]:
+    """Validate every public task asset without opening holdout assignments."""
+    root = Path(active_taskset_root).resolve()
+    if not root.is_dir():
+        raise FileNotFoundError(f"Active taskset root does not exist: {root}")
+    manifest_path = root / "active_artifacts.json"
+    if not manifest_path.is_file():
+        raise FileNotFoundError(
+            f"Active taskset manifest does not exist: {manifest_path}"
+        )
+    if sha256_file(manifest_path) != runtime.active_taskset_manifest_sha256:
+        raise ValueError("Active taskset manifest hash mismatch")
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    artifacts = manifest.get("artifacts")
+    if not isinstance(artifacts, list):
+        raise ValueError("Active taskset manifest has no artifact list")
+    expected_by_kind = {
+        "runtime_task_json": set(),
+        "formal_task_spec": set(),
+    }
+    prefixes = {
+        "runtime_task_json": "creative_task_jsons/",
+        "formal_task_spec": "formal_task_specs/",
+    }
+    for item in artifacts:
+        if not isinstance(item, Mapping):
+            raise ValueError("Active taskset artifact descriptor is not an object")
+        kind = str(item.get("artifact_kind", ""))
+        if kind not in expected_by_kind:
+            continue
+        relative = str(item.get("path", ""))
+        if (
+            not relative.startswith(prefixes[kind])
+            or Path(relative).suffix != ".json"
+        ):
+            raise ValueError(f"Invalid {kind} path in active taskset manifest: {relative}")
+        path = (root / relative).resolve()
+        try:
+            path.relative_to(root)
+        except ValueError as exc:
+            raise ValueError(f"Active taskset path escapes its root: {relative}") from exc
+        if not path.is_file():
+            raise FileNotFoundError(f"Active taskset asset does not exist: {path}")
+        try:
+            json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            raise ValueError(f"Active taskset asset is not valid JSON: {path}") from exc
+        expected_by_kind[kind].add(relative)
+
+    task_root = root / "creative_task_jsons"
+    formal_root = root / "formal_task_specs"
+    actual_runtime = {
+        path.relative_to(root).as_posix() for path in task_root.glob("*.json")
+    }
+    actual_formal = {
+        path.relative_to(root).as_posix() for path in formal_root.glob("*.json")
+    }
+    if actual_runtime != expected_by_kind["runtime_task_json"]:
+        raise ValueError("Runtime task assets differ from the active taskset manifest")
+    if actual_formal != expected_by_kind["formal_task_spec"]:
+        raise ValueError("Formal task specs differ from the active taskset manifest")
+    if (
+        len(actual_runtime) != runtime.active_task_count
+        or len(actual_formal) != runtime.active_task_count
+    ):
+        raise ValueError("Active taskset asset count differs from the frozen runtime")
+    if {Path(path).name for path in actual_runtime} != {
+        Path(path).name for path in actual_formal
+    }:
+        raise ValueError("Runtime task and formal task asset names do not match")
+    if tree_sha256(task_root) != runtime.runtime_task_tree_sha256:
+        raise ValueError("Runtime task asset tree hash mismatch")
+    if tree_sha256(formal_root) != runtime.formal_task_tree_sha256:
+        raise ValueError("Formal task spec tree hash mismatch")
+    return {"task_root": task_root, "formal_task_spec_root": formal_root}
+
+
+def claim_single_use_ledger_after_asset_preflight(
+    path: str | Path,
+    *,
+    manifest: LockedHoldoutExecutionManifest,
+    sealed_assignment_path: str | Path,
+    active_taskset_root: str | Path,
+    runtime: FinalHoldoutRuntimeRelease,
+) -> tuple[Mapping[str, Any], Mapping[str, Path]]:
+    """Claim only after all non-secret launch assets have passed preflight."""
+    roots = preflight_active_task_assets(active_taskset_root, runtime=runtime)
+    claimed = claim_single_use_ledger(
+        path,
+        manifest=manifest,
+        sealed_assignment_path=sealed_assignment_path,
+    )
+    return claimed, roots
 
 
 def consume_single_use_ledger(
