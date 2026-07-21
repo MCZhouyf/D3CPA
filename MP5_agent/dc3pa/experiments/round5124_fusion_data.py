@@ -584,7 +584,19 @@ def qualify_pre_fusion(
 
 
 def load_directed_jsonl(path: str | Path) -> list[DirectedFusionFeatureRecord]:
-    return [DirectedFusionFeatureRecord(**item) for item in _read_jsonl(path)]
+    records = []
+    for item in _read_jsonl(path):
+        payload = dict(item)
+        features = payload.get("features")
+        if not isinstance(features, Mapping) or set(features) != set(
+            FINAL_FEATURE_ORDER
+        ):
+            raise ValueError("Directed Fusion feature mapping is incomplete")
+        payload["features"] = {
+            name: features[name] for name in FINAL_FEATURE_ORDER
+        }
+        records.append(DirectedFusionFeatureRecord(**payload))
+    return records
 
 
 def write_json_immutable(path: str | Path, value: Mapping[str, Any]) -> None:

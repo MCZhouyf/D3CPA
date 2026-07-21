@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 
 import pytest
@@ -8,6 +9,7 @@ from dc3pa.experiments.round5124_fusion_data import (
     FINAL_FEATURE_ORDER,
     FusionFeatureDirectionPolicy,
     PreFusionQualificationReport,
+    load_directed_jsonl,
     transform_raw_record,
 )
 
@@ -146,3 +148,12 @@ def test_pre_fusion_qualification_requires_reproducible_legacy():
             legacy_baseline_reproducible=False,
             report_id="",
         )
+
+
+def test_directed_jsonl_round_trip_restores_frozen_feature_order(tmp_path):
+    item = transform_raw_record(raw_record())
+    path = tmp_path / "directed.jsonl"
+    path.write_text(json.dumps(item.to_dict(), sort_keys=True) + "\n")
+    loaded = load_directed_jsonl(path)
+    assert tuple(loaded[0].features) == FINAL_FEATURE_ORDER
+    assert loaded[0].transformed_feature_hash == item.transformed_feature_hash
