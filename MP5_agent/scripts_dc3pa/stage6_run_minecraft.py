@@ -86,6 +86,10 @@ from dc3pa.experiments.development_shadow import (  # noqa: E402
     Round511RunBinding,
     Round511ShadowCollector,
 )
+from dc3pa.experiments.round5124_holdout import (  # noqa: E402
+    Round5124HoldoutRunBinding,
+    Round5124HoldoutShadowCollector,
+)
 from dc3pa.memory import (  # noqa: E402
     HashingTextEncoder,
     MultimodalMemory,
@@ -779,6 +783,16 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Exclusive JSONL output for one Round 5.11 run.",
     )
+    parser.add_argument(
+        "--round5124-holdout-run",
+        type=Path,
+        help="External immutable binding for one locked Round 5.12.4 holdout run.",
+    )
+    parser.add_argument(
+        "--round5124-holdout-records",
+        type=Path,
+        help="Exclusive JSONL output for one locked Round 5.12.4 holdout run.",
+    )
     return parser
 
 
@@ -802,7 +816,14 @@ def main(argv: Optional[list[str]] = None) -> int:
     round511_enabled = any(
         (args.round511_development_run, args.round511_development_records)
     )
-    round511_binding = None
+    round5124_holdout_enabled = any(
+        (args.round5124_holdout_run, args.round5124_holdout_records)
+    )
+    if round511_enabled and round5124_holdout_enabled:
+        parser.error("Development and holdout shadow collection are mutually exclusive")
+    shadow_enabled = round511_enabled or round5124_holdout_enabled
+    shadow_binding = None
+    shadow_records_path = None
     if round511_enabled:
         if not all((args.round511_development_run, args.round511_development_records)):
             parser.error(
@@ -810,7 +831,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                 "and --round511-development-records"
             )
         try:
-            round511_binding = Round511RunBinding.from_mapping(
+            shadow_binding = Round511RunBinding.from_mapping(
                 _load_json(args.round511_development_run)
             )
         except (KeyError, OSError, TypeError, ValueError) as exc:
@@ -822,7 +843,30 @@ def main(argv: Optional[list[str]] = None) -> int:
             capture_output=True,
             text=True,
         ).stdout.strip()
-        if round511_binding.source_commit != current_commit:
+        shadow_records_path = args.round511_development_records
+    elif round5124_holdout_enabled:
+        if not all((args.round5124_holdout_run, args.round5124_holdout_records)):
+            parser.error(
+                "Round 5.12.4 holdout requires both --round5124-holdout-run "
+                "and --round5124-holdout-records"
+            )
+        try:
+            shadow_binding = Round5124HoldoutRunBinding.from_mapping(
+                _load_json(args.round5124_holdout_run)
+            )
+        except (KeyError, OSError, TypeError, ValueError) as exc:
+            parser.error(str(exc))
+        shadow_records_path = args.round5124_holdout_records
+    if shadow_enabled:
+        assert shadow_binding is not None
+        current_commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=ROOT.parent,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        if shadow_binding.source_commit != current_commit:
             parser.error("Round 5.11 run binding/source commit mismatch")
         if args.mode != "reasoning_only":
             parser.error("Round 5.11 development requires reasoning_only mode")
@@ -863,7 +907,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         runtime_config = replace(
             runtime_config, planner_failure_policy=args.planner_failure_policy
         )
-    if round511_enabled:
+    if shadow_enabled:
         runtime_config = replace(
             runtime_config,
             mode="reasoning_only",
@@ -910,7 +954,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     if (
         formal_bootstrap_enabled
         and not args.real_experiment_blueprint
-        and not round511_enabled
+        and not shadow_enabled
     ):
         parser.error("formal log bootstrap requires a real experiment Blueprint")
     formal_acquisition_arguments = (
@@ -965,7 +1009,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     if (
         alias_arguments_present
         and not args.real_experiment_blueprint
-        and not round511_enabled
+        and not shadow_enabled
     ):
         parser.error(
             "provider model aliasing requires a bound real experiment Blueprint "
@@ -1016,7 +1060,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     hybrid_config = HybridProbabilityConfig.from_mapping(
         payload.get("hybrid_probability", {})
     )
-    if round511_enabled:
+    if shadow_enabled:
         hybrid_config = replace(
             hybrid_config,
             model_confidence_model_id="gpt-5.1",
@@ -1130,14 +1174,14 @@ def main(argv: Optional[list[str]] = None) -> int:
             expected_provider_call_count = 1
         except (KeyError, OSError, TypeError, ValueError) as exc:
             parser.error(str(exc))
-    if args.real_experiment_blueprint or round511_enabled:
-        if round511_enabled:
-            assert round511_binding is not None
+    if args.real_experiment_blueprint or shadow_enabled:
+        if shadow_enabled:
+            assert shadow_binding is not None
             # The frozen protocol ID replaces the full Blueprint identity here so
             # protected holdout assignments never enter the collection process.
             real_experiment_blueprint = SimpleNamespace(
-                blueprint_id=round511_binding.development_protocol_id,
-                source_commit=round511_binding.source_commit,
+                blueprint_id=shadow_binding.development_protocol_id,
+                source_commit=shadow_binding.source_commit,
             )
         else:
             real_experiment_blueprint = load_blueprint(args.real_experiment_blueprint)
@@ -1431,14 +1475,14 @@ def main(argv: Optional[list[str]] = None) -> int:
                     )
                 except (OSError, TypeError, ValueError) as exc:
                     parser.error(str(exc))
-        if round511_enabled:
+        if shadow_enabled:
             real_experiment_trace_payload = {
-                "development_protocol_id": round511_binding.development_protocol_id,
-                "role": round511_binding.role,
-                "group_id": round511_binding.group_id,
-                "task": round511_binding.task,
-                "seed": round511_binding.seed,
-                "holdout_mounted": False,
+                "development_protocol_id": shadow_binding.development_protocol_id,
+                "role": shadow_binding.role,
+                "group_id": shadow_binding.group_id,
+                "task": shadow_binding.task,
+                "seed": shadow_binding.seed,
+                "holdout_mounted": round5124_holdout_enabled,
             }
         else:
             real_experiment_trace_payload = validate_real_experiment_launch(
@@ -1553,7 +1597,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             expected_calls = _expected_reasoning_only_provider_calls(
                 task_count=expected_provider_call_count,
                 result=result,
-                include_passive_confidence=round511_enabled,
+                include_passive_confidence=shadow_enabled,
             )
         receipt = receipt_from_stage6_result(
             campaign=dry_run_campaign,
@@ -1626,7 +1670,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             expected_calls = _expected_reasoning_only_provider_calls(
                 task_count=expected_provider_call_count,
                 result=result,
-                include_passive_confidence=round511_enabled,
+                include_passive_confidence=shadow_enabled,
             )
         provider_contract = _provider_call_contract_passed(
             expected_minimum=expected_calls,
@@ -1946,7 +1990,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                 manifest = MemorySnapshotManifest.from_json(
                     runtime_config.memory_snapshot_manifest
                 )
-                if formal_bootstrap_binding is not None and not round511_enabled:
+                if formal_bootstrap_binding is not None and not shadow_enabled:
                     assert_bootstrap_snapshot_binding(
                         manifest.metadata,
                         expected_policy_id=formal_bootstrap_policy.policy_id,
@@ -1974,8 +2018,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             )
             with memory_context as multimodal_memory:
                 development_shadow_observer = None
-                if round511_enabled:
-                    assert round511_binding is not None
+                if shadow_enabled:
+                    assert shadow_binding is not None
                     if multimodal_memory is None or not multimodal_memory.readonly:
                         raise RuntimeError(
                             "Round 5.11 requires Paper Memory V5 opened read-only"
@@ -1985,14 +2029,19 @@ def main(argv: Optional[list[str]] = None) -> int:
                     )
                     if (
                         manifest.snapshot_root_sha256
-                        != round511_binding.snapshot_root_sha256
+                        != shadow_binding.snapshot_root_sha256
                     ):
                         raise ValueError(
                             "Round 5.11 run binding/snapshot root mismatch"
                         )
-                    development_shadow_observer = Round511ShadowCollector(
+                    collector_type = (
+                        Round5124HoldoutShadowCollector
+                        if round5124_holdout_enabled
+                        else Round511ShadowCollector
+                    )
+                    development_shadow_observer = collector_type(
                         memory=multimodal_memory,
-                        binding=round511_binding,
+                        binding=shadow_binding,
                     )
                 bundle = build_stage6_runtime(
                     env=evaluator.env,
@@ -2040,13 +2089,13 @@ def main(argv: Optional[list[str]] = None) -> int:
                     development_shadow_observer=development_shadow_observer,
                 )
                 task_list = _load_task_list(args.task)
-                if round511_enabled:
+                if shadow_enabled:
                     if len(task_list) != 1:
                         raise ValueError("Round 5.11 requires exactly one task JSON")
                     runtime_target = str(task_list[0].get("task", ""))
                     if not _runtime_target_matches_catalog_task(
                         runtime_target=runtime_target,
-                        catalog_task=round511_binding.task,
+                        catalog_task=shadow_binding.task,
                     ):
                         if args.formal_task_spec is None:
                             raise ValueError(
@@ -2055,13 +2104,13 @@ def main(argv: Optional[list[str]] = None) -> int:
                             )
                         _validate_formal_task_spec(
                             spec_path=args.formal_task_spec,
-                            catalog_task=round511_binding.task,
+                            catalog_task=shadow_binding.task,
                             runtime_task_path=Path(args.task),
                             runtime_task=task_list[0],
                         )
-                    if str(args.real_experiment_seed) != round511_binding.seed:
+                    if str(args.real_experiment_seed) != shadow_binding.seed:
                         raise ValueError("Round 5.11 launch/binding seed mismatch")
-                    if args.formal_bootstrap_scope != round511_binding.role:
+                    if args.formal_bootstrap_scope != shadow_binding.role:
                         raise ValueError("Round 5.11 bootstrap scope/role mismatch")
                 underground = False
                 all_succeeded = True
@@ -2076,7 +2125,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                     if not result.success:
                         all_succeeded = False
                         break
-                if round511_enabled:
+                if shadow_enabled:
                     assert development_shadow_observer is not None
                     assert last_result is not None
                     manifest = MemorySnapshotManifest.from_json(
@@ -2123,7 +2172,8 @@ def main(argv: Optional[list[str]] = None) -> int:
                         formal_memory_write_count=int(last_result.memory_recorded),
                         acquisition_write_count=acquisition_writes,
                     )
-                    output = args.round511_development_records.resolve()
+                    assert shadow_records_path is not None
+                    output = shadow_records_path.resolve()
                     if output.exists():
                         raise FileExistsError(output)
                     output.parent.mkdir(parents=True, exist_ok=True)

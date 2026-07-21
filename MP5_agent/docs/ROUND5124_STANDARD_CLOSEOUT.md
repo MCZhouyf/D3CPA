@@ -59,5 +59,29 @@ replicates, seed `5102026`, and 10 reliability bins. Task-seed/run grouping is
 supplementary sensitivity only and cannot override the primary activation
 decision. Decision-row IID bootstrap is forbidden.
 
-At this closeout point, Fusion remains unfitted, holdout remains unopened,
-final evaluation remains unopened, and Round 6 has not started.
+The monotonic Fusion candidate is now frozen. Holdout remains unopened, final
+evaluation remains unopened, and Round 6 has not started.
+
+## Locked Holdout Implementation
+
+The final holdout path uses a dedicated `dev_holdout` record schema and the
+same read-only passive evidence observer used during development. The observer
+cannot select, edit, reject, or execute actions. Evaluation Chain calls and
+formal-memory or AcquisitionStore writes make a holdout record invalid.
+
+The holdout assignment file is bound by SHA-256 before it is opened. A
+single-use ledger is created as `sealed_unopened`, atomically claimed before
+the first plaintext read, and irreversibly consumed after all 15 assignments
+have final scientific receipts. Only classified infrastructure failures can
+retry, with at most two technical retries per assignment. Scientific failures
+are final and are not run to success.
+
+The locked evaluator is physically separate from the fitter. It verifies the
+frozen candidate, activation policy, runtime, campaign summary, and consumed
+ledger; it cannot import the trainer, update coefficients, change thresholds,
+or use tune data. Primary activation uncertainty is grouped by task.
+Task-seed/run grouping is supplementary sensitivity and cannot override the
+activation decision.
+
+Real holdout records, assignments, predictions, component releases, reports,
+and the single-use ledger remain external and are not committed.

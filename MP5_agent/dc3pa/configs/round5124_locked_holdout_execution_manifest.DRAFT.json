@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "source_commit": null,
+  "runtime_release_id": null,
+  "runtime_release_sha256": null,
+  "candidate_artifact_id": null,
+  "candidate_artifact_sha256": null,
+  "activation_policy_id": null,
+  "activation_policy_sha256": null,
+  "sealed_assignment_sha256": null,
+  "expected_assignment_count": 15,
+  "output_root": null,
+  "github_actions_run_url": null,
+  "source_worktree_clean": true,
+  "github_actions_green": true,
+  "holdout_outcome_files_absent": true,
+  "manifest_id": null
+}

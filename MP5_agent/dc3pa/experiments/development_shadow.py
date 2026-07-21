@@ -153,6 +153,10 @@ class Round511ShadowCollector:
         self.errors: list[str] = []
         self.excluded_step_count = 0
 
+    def _make_record(self, **values: Any) -> DevelopmentDecisionRecord:
+        """Construct one record; protected phases may override only its schema."""
+        return DevelopmentDecisionRecord(**values).with_hash()
+
     def prepare_attempt(
         self,
         *,
@@ -304,7 +308,7 @@ class Round511ShadowCollector:
                 action.to_dict() if hasattr(action, "to_dict") else action
             )
             records.append(
-                DevelopmentDecisionRecord(
+                self._make_record(
                     record_id=_record_id(
                         self.binding.collection_id,
                         self.binding.run_id,
@@ -376,7 +380,7 @@ class Round511ShadowCollector:
                     acquisition_write_count=int(acquisition_write_count),
                     holdout_accessed=False,
                     excluded_from_final_evaluation=True,
-                ).with_hash()
+                )
             )
         if not records:
             raise ValueError("Round 5.11 run produced no labelable decision records")

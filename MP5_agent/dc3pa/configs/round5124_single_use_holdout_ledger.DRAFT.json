@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "manifest_id": null,
+  "sealed_assignment_sha256": null,
+  "state": "sealed_unopened",
+  "sealed_at": null,
+  "claimed_at": "",
+  "consumed_at": "",
+  "failure": "",
+  "ledger_id": null
+}
