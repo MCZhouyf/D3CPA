@@ -12,6 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TESTS = (
     "tests_dc3pa/test_round5124_standard_closeout.py",
+    "tests_dc3pa/test_round5124_fusion_data.py",
     "tests_dc3pa/test_round5123_amendment.py",
     "tests_dc3pa/test_round5122_contracts.py",
     "tests_dc3pa/test_round55_grouped_bootstrap.py",
