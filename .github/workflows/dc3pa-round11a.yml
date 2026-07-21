@@ -27,6 +27,7 @@ on:
       - "round5122-*"
       - "round5123-*"
       - "round5124-*"
+      - "round5125-*"
   pull_request:
 
 permissions:
