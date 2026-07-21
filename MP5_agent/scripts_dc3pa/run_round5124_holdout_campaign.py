@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -18,7 +19,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from dc3pa.experiments.bootstrap_data_guard import load_bootstrap_data_binding
+from dc3pa.experiments.formal_bootstrap_amendment import (
+    load_formal_bootstrap_amendment,
+)
 from dc3pa.experiments.formal_acquisition_execution import TECHNICAL_FAILURE_CATEGORIES
+from dc3pa.experiments.formal_log_bootstrap import load_formal_log_bootstrap_policy
+from dc3pa.experiments.provider_model_alias import load_provider_model_alias_policy
 from dc3pa.experiments.round511_remediation import classify_failure_at_source
 from dc3pa.experiments.round5124_holdout import (
     FinalHoldoutRuntimeRelease,
@@ -28,6 +34,11 @@ from dc3pa.experiments.round5124_holdout import (
     sha256_file,
 )
 from dc3pa.experiments.round5124_holdout_features import export_holdout_features
+from dc3pa.memory.snapshot import (
+    MemorySnapshotManifest,
+    assert_snapshot_unchanged,
+    resolve_snapshot_database,
+)
 from scripts_dc3pa.run_round511_development_campaign import (
     _formal_task_spec_path,
     _load,
@@ -132,6 +143,78 @@ def _verify_runtime(
     if any(actual != expected for actual, expected in checks):
         raise ValueError("Frozen holdout runtime/manifest artifact binding changed")
     return current_commit
+
+
+def _preflight_launch_dependencies(
+    args: argparse.Namespace,
+    *,
+    runtime: FinalHoldoutRuntimeRelease,
+    bootstrap_binding: Any,
+) -> None:
+    """Validate public runtime dependencies before opening sealed assignments."""
+    required_files = {
+        "Stage 6 config": args.stage6_config,
+        "MineCLIP checkpoint": args.mineclip_checkpoint,
+        "Python interpreter": args.python,
+        "bootstrap policy": args.bootstrap_policy,
+        "bootstrap amendment": args.bootstrap_amendment,
+        "provider model-alias policy": args.provider_model_alias_policy,
+        "provider model-alias approval": args.provider_model_alias_approval,
+    }
+    for label, path in required_files.items():
+        if not Path(path).is_file():
+            raise FileNotFoundError(f"{label} does not exist: {path}")
+    if not os.access(args.python, os.X_OK):
+        raise PermissionError(f"Python interpreter is not executable: {args.python}")
+    if shutil.which("xvfb-run") is None:
+        raise FileNotFoundError("xvfb-run is not available on PATH")
+    config = _load(args.stage6_config)
+    if not isinstance(config.get("runtime"), Mapping):
+        raise ValueError("Stage 6 config has no runtime object")
+
+    alias_policy = load_provider_model_alias_policy(
+        args.provider_model_alias_policy,
+        approval_record=args.provider_model_alias_approval,
+    )
+    alias_policy.assert_activation_allowed(
+        scope="development_experiment", requested_model="gpt-5.1"
+    )
+    bootstrap_policy = load_formal_log_bootstrap_policy(args.bootstrap_policy)
+    bootstrap_amendment = load_formal_bootstrap_amendment(args.bootstrap_amendment)
+    if bootstrap_policy.policy_id != runtime.formal_log_bootstrap_policy_id:
+        raise ValueError("Bootstrap policy differs from frozen runtime")
+    if bootstrap_binding.bootstrap_policy_id != bootstrap_policy.policy_id:
+        raise ValueError("Bootstrap binding/policy mismatch")
+    if bootstrap_binding.bootstrap_amendment_id != bootstrap_amendment.amendment_id:
+        raise ValueError("Bootstrap binding/amendment mismatch")
+
+    _preflight_memory_snapshot(
+        args.memory_root,
+        runtime=runtime,
+        bootstrap_binding=bootstrap_binding,
+    )
+
+
+def _preflight_memory_snapshot(
+    memory_root: Path,
+    *,
+    runtime: FinalHoldoutRuntimeRelease,
+    bootstrap_binding: Any,
+) -> None:
+    memory_root = memory_root.resolve()
+    if not memory_root.is_dir():
+        raise FileNotFoundError(f"Readonly memory root does not exist: {memory_root}")
+    manifest = MemorySnapshotManifest.from_json(memory_root / "snapshot_manifest.json")
+    resolve_snapshot_database(manifest, memory_root=memory_root)
+    assert_snapshot_unchanged(manifest)
+    if manifest.snapshot_root_sha256 != runtime.paper_memory_snapshot_root_sha256:
+        raise ValueError("Memory snapshot root differs from frozen runtime")
+    if (
+        bootstrap_binding.memory_snapshot_id != runtime.paper_memory_v5_release_id
+        or bootstrap_binding.memory_snapshot_sha256
+        != runtime.paper_memory_snapshot_root_sha256
+    ):
+        raise ValueError("Bootstrap binding/memory snapshot mismatch")
 
 
 def _command(
@@ -278,6 +361,11 @@ def main() -> int:
         sealed_assignment_path=args.assignments,
         active_taskset_root=args.active_taskset_root,
         runtime=runtime,
+        dependency_preflight=lambda: _preflight_launch_dependencies(
+            args,
+            runtime=runtime,
+            bootstrap_binding=bootstrap_binding,
+        ),
     )
     assignments = _validate_assignments(_load(args.assignments))
     output_root = args.output_root.resolve()

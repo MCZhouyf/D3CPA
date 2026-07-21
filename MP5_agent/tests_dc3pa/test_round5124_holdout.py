@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -17,6 +19,8 @@ from dc3pa.experiments.round5124_holdout import (
 )
 from dc3pa.experiments.round5124_holdout_features import export_holdout_features
 from dc3pa.experiments.task_assets import tree_sha256
+from dc3pa.memory.snapshot import ReadOnlyMemoryError, create_snapshot_manifest
+from scripts_dc3pa.run_round5124_holdout_campaign import _preflight_memory_snapshot
 
 
 def _runtime(
@@ -236,6 +240,73 @@ def test_bad_active_task_root_cannot_claim_holdout_ledger(tmp_path):
         )
 
     assert json.loads(ledger.read_text())["state"] == "sealed_unopened"
+
+
+def test_dependency_preflight_failure_cannot_claim_holdout_ledger(tmp_path):
+    assignments = tmp_path / "sealed.json"
+    _write(assignments, {"secret": "must-not-open"})
+    taskset_root, runtime = _active_taskset(tmp_path)
+    manifest = _manifest(assignments, tmp_path / "out")
+    ledger = tmp_path / "ledger.json"
+    create_single_use_ledger(ledger, manifest=manifest)
+    called = False
+
+    def reject_wrong_memory_root():
+        nonlocal called
+        called = True
+        raise ValueError("snapshot manifest/database mismatch")
+
+    with pytest.raises(ValueError, match="snapshot manifest/database mismatch"):
+        claim_single_use_ledger_after_asset_preflight(
+            ledger,
+            manifest=manifest,
+            sealed_assignment_path=assignments,
+            active_taskset_root=taskset_root,
+            runtime=runtime,
+            dependency_preflight=reject_wrong_memory_root,
+        )
+    assert called
+    assert json.loads(ledger.read_text())["state"] == "sealed_unopened"
+
+
+def test_memory_snapshot_preflight_rejects_runtime_path_alias(tmp_path):
+    frozen_root = tmp_path / "frozen"
+    frozen_root.mkdir()
+    database = frozen_root / "memory.sqlite3"
+    with sqlite3.connect(database) as connection:
+        connection.execute("CREATE TABLE evidence (id INTEGER PRIMARY KEY)")
+    snapshot = create_snapshot_manifest(
+        database,
+        source_commit="commit",
+        snapshot_root=frozen_root,
+    )
+    snapshot.to_json(frozen_root / "snapshot_manifest.json")
+    runtime = SimpleNamespace(
+        paper_memory_v5_release_id="memory-release",
+        paper_memory_snapshot_root_sha256=snapshot.snapshot_root_sha256,
+    )
+    binding = SimpleNamespace(
+        memory_snapshot_id="memory-release",
+        memory_snapshot_sha256=snapshot.snapshot_root_sha256,
+    )
+    _preflight_memory_snapshot(
+        frozen_root,
+        runtime=runtime,
+        bootstrap_binding=binding,
+    )
+
+    wrong_root = tmp_path / "wrong"
+    wrong_root.mkdir()
+    (wrong_root / "snapshot_manifest.json").write_text(
+        (frozen_root / "snapshot_manifest.json").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    with pytest.raises(ReadOnlyMemoryError, match="snapshot manifest/database mismatch"):
+        _preflight_memory_snapshot(
+            wrong_root,
+            runtime=runtime,
+            bootstrap_binding=binding,
+        )
 
 
 def test_active_task_preflight_resolves_pressure_plate_pair_before_claim(tmp_path):

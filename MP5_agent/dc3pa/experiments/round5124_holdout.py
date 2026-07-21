@@ -9,7 +9,7 @@ import os
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from .development_records import CONFIDENCE_LEVELS, ENV_STATES
 from .development_shadow import Round511RunBinding, Round511ShadowCollector
@@ -375,9 +375,12 @@ def claim_single_use_ledger_after_asset_preflight(
     sealed_assignment_path: str | Path,
     active_taskset_root: str | Path,
     runtime: FinalHoldoutRuntimeRelease,
+    dependency_preflight: Callable[[], None] | None = None,
 ) -> tuple[Mapping[str, Any], Mapping[str, Path]]:
     """Claim only after all non-secret launch assets have passed preflight."""
     roots = preflight_active_task_assets(active_taskset_root, runtime=runtime)
+    if dependency_preflight is not None:
+        dependency_preflight()
     claimed = claim_single_use_ledger(
         path,
         manifest=manifest,
