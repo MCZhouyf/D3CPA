@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import subprocess
 import sys
@@ -41,6 +42,18 @@ def _write(path: Path, payload) -> None:
     with path.open("x", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2, sort_keys=True)
         handle.write("\n")
+
+
+def _serialized_sha256(payload) -> str:
+    data = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    return hashlib.sha256(data).hexdigest()
+
+
+def _required_protocol_id(protocol) -> str:
+    value = protocol.get("protocol_id") or protocol.get("development_protocol_id")
+    if not value:
+        raise ValueError("Development protocol has no frozen protocol ID")
+    return str(value)
 
 
 def main() -> int:
@@ -106,6 +119,18 @@ def main() -> int:
     bootstrap = _load(args.bootstrap_policy)
     amendment = _load(args.bootstrap_amendment)
     protocol = _load(args.development_protocol)
+    protocol_id = _required_protocol_id(protocol)
+    output_paths = (
+        args.runtime_output,
+        args.manifest_output,
+        args.ledger_output,
+        args.bootstrap_binding_output,
+    )
+    existing_outputs = [str(path) for path in output_paths if path.exists()]
+    if existing_outputs:
+        raise FileExistsError(
+            "Holdout freeze output already exists: " + ", ".join(existing_outputs)
+        )
     snapshot = _load(args.memory_root / "snapshot_manifest.json")
     paths = {
         "controller": ROOT / "agent" / "controller.py",
@@ -155,11 +180,11 @@ def main() -> int:
         controller_changes_after_freeze_permitted=False,
     ).with_id()
     preflight_active_task_assets(active_taskset_root, runtime=runtime)
-    _write(args.runtime_output, runtime.to_dict())
+    runtime_payload = runtime.to_dict()
     manifest = LockedHoldoutExecutionManifest(
         source_commit=source_commit,
         runtime_release_id=runtime.release_id,
-        runtime_release_sha256=sha256_file(args.runtime_output),
+        runtime_release_sha256=_serialized_sha256(runtime_payload),
         candidate_artifact_id=candidate.artifact_id,
         candidate_artifact_sha256=sha256_file(args.candidate),
         activation_policy_id=activation.policy_id,
@@ -172,14 +197,12 @@ def main() -> int:
         github_actions_green=True,
         holdout_outcome_files_absent=True,
     ).with_id()
-    _write(args.manifest_output, manifest.to_dict())
-    create_single_use_ledger(args.ledger_output, manifest=manifest)
     binding = BootstrapDataBinding(
         binding_name="dc3pa-round5124-dev-holdout-v1",
         bootstrap_policy_id=str(bootstrap["policy_id"]),
         bootstrap_amendment_id=str(amendment["amendment_id"]),
         source_commit=source_commit,
-        blueprint_id=str(protocol.get("protocol_id") or protocol["development_protocol_id"]),
+        blueprint_id=protocol_id,
         scope="dev_holdout",
         method_id="single_chain_reactive_development",
         task_catalog_sha256=str(taskset["catalog_sha256"]),
@@ -189,7 +212,11 @@ def main() -> int:
         memory_snapshot_id=runtime.paper_memory_v5_release_id,
         memory_snapshot_sha256=runtime.paper_memory_snapshot_root_sha256,
     ).with_id()
+    _write(args.runtime_output, runtime_payload)
+    _write(args.manifest_output, manifest.to_dict())
     _write(args.bootstrap_binding_output, binding.to_dict())
+    # The single-use ledger is created last, after every other freeze artifact.
+    create_single_use_ledger(args.ledger_output, manifest=manifest)
     print(
         json.dumps(
             {

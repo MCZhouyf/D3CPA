@@ -2,8 +2,13 @@ from __future__ import annotations
 
 from collections import Counter
 
+import pytest
+
 from scripts_dc3pa.create_round5125_replacement_holdout import (
     build_replacement_assignments,
+)
+from scripts_dc3pa.freeze_round5124_holdout_runtime import (
+    _required_protocol_id,
 )
 
 
@@ -57,3 +62,9 @@ def test_replacement_holdout_is_deterministic_for_frozen_source():
     first = build_replacement_assignments(reference, source_commit="b" * 40)
     second = build_replacement_assignments(reference, source_commit="b" * 40)
     assert first == second
+
+
+def test_holdout_freeze_rejects_unfrozen_protocol_before_writes():
+    with pytest.raises(ValueError, match="no frozen protocol ID"):
+        _required_protocol_id({"development_assignments": []})
+    assert _required_protocol_id({"protocol_id": "frozen"}) == "frozen"
