@@ -360,6 +360,14 @@ def audit_development_collection(
 
 def load_development_record(payload: Mapping[str, Any]) -> DevelopmentDecisionRecord:
     normalized = dict(payload)
+    if "effective_outcome_source" in normalized:
+        if not str(normalized["effective_outcome_source"]).strip():
+            raise ValueError("effective_outcome_source cannot be empty")
+        normalized.pop("effective_outcome_source")
+    if "original_outcome_superseded" in normalized:
+        if not isinstance(normalized["original_outcome_superseded"], bool):
+            raise ValueError("original_outcome_superseded must be boolean")
+        normalized.pop("original_outcome_superseded")
     for key in (
         "returned_model_identities",
         "knowledge_missing_prerequisites",
