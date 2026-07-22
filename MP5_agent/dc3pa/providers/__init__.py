@@ -7,6 +7,7 @@ from .model_profile import (
 from .openai_responses import (
     AdapterMessage,
     OpenAIResponsesChatAdapter,
+    ProviderTransportError,
     ResponseUsage,
     SafeResponseMetadata,
     TextResponseWithMetadata,
@@ -19,6 +20,7 @@ __all__ = [
     "GPT51_MODEL_ID",
     "OpenAIResponsesChatAdapter",
     "OpenAIResponsesModelProfile",
+    "ProviderTransportError",
     "ResponseUsage",
     "SafeResponseMetadata",
     "TextResponseWithMetadata",

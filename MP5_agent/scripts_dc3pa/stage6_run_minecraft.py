@@ -204,6 +204,16 @@ class TracedChatModel:
                 "actual_method": actual_method_name,
                 "error_type": type(exc).__name__,
             }
+            provider_stage = getattr(exc, "provider_stage", "")
+            provider_status = getattr(exc, "provider_transport_status", "")
+            if provider_stage and provider_status:
+                payload.update(
+                    {
+                        "provider_stage": provider_stage,
+                        "provider_transport_status": provider_status,
+                        "exception_class": type(exc).__name__,
+                    }
+                )
             if self._include_error_detail:
                 payload["error"] = str(exc)
             self._trace_writer.write("llm_call_failed", payload)

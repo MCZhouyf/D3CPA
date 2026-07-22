@@ -7,6 +7,7 @@ from dc3pa.experiments.round511_reconciliation import (
     reconcile_execution_budgets,
     reconcile_technical_failures,
 )
+from dc3pa.experiments.round511_remediation import classify_failure_at_source
 
 
 def _write(path: Path, payload):
@@ -60,6 +61,31 @@ def test_timeout_is_classified_but_plain_exit_one_remains_unclassifiable(tmp_pat
     ]
     assert summary["unclassifiable_attempts"] == 1
     assert not summary["technical_failure_reconciliation_eligible"]
+
+
+def test_structured_rate_limit_is_classified_without_free_text(tmp_path):
+    trace = tmp_path / "trace.jsonl"
+    trace.write_text(
+        json.dumps(
+            {
+                "event_type": "llm_call_failed",
+                "payload": {
+                    "provider_stage": "request",
+                    "provider_transport_status": "rate_limited",
+                    "exception_class": "ProviderTransportError",
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    category, signals = classify_failure_at_source(return_code=1, trace_path=trace)
+    assert category == "provider_transport_failure"
+    assert signals == {
+        "provider_stage": "request",
+        "provider_transport_status": "rate_limited",
+        "exception_class": "ProviderTransportError",
+    }
 
 
 def test_budget_provenance_does_not_promote_cli_default(tmp_path):

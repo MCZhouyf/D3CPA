@@ -153,10 +153,28 @@ def next_attempt_index(group_root: str | Path) -> int | None:
 def classify_failure_at_source(
     *, return_code: int, trace_path: str | Path
 ) -> tuple[str | None, dict[str, Any]]:
-    event_types = _trace_event_types(Path(trace_path))
+    path = Path(trace_path)
+    event_types = _trace_event_types(path)
     signals = _structured_attempt_signals(
         {"process_return_code": return_code}, event_types
     )
+    if path.is_file():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            event = json.loads(line)
+            if not isinstance(event, Mapping) or event.get("event_type") != "llm_call_failed":
+                continue
+            payload = event.get("payload", {})
+            if not isinstance(payload, Mapping):
+                continue
+            provider_fields = (
+                "provider_stage",
+                "provider_transport_status",
+                "exception_class",
+            )
+            if all(payload.get(field) for field in provider_fields):
+                signals.update({field: payload[field] for field in provider_fields})
     category, used = classify_structured_failure(
         signals, Round511ReconciliationPolicy()
     )

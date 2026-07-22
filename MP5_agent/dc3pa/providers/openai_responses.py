@@ -24,6 +24,15 @@ from .model_profile import OpenAIResponsesModelProfile
 _RETRYABLE_STATUS = {408, 409, 429, 500, 502, 503, 504}
 
 
+class ProviderTransportError(RuntimeError):
+    """Provider request failure carrying safe, machine-readable trace fields."""
+
+    def __init__(self, status: str, *, attempts: int) -> None:
+        super().__init__(f"OpenAI Responses request failed after {attempts} attempts")
+        self.provider_stage = "request"
+        self.provider_transport_status = status
+
+
 @dataclass(frozen=True)
 class AdapterMessage:
     content: str
@@ -234,9 +243,14 @@ class OpenAIResponsesChatAdapter:
                 if attempt + 1 >= attempts:
                     break
                 self.sleep(min(8.0, (2.0 ** attempt) + random.random() * 0.25))
-        raise RuntimeError(
-            f"OpenAI Responses request failed after {attempts} attempts"
-        ) from last_error
+        status = "failed"
+        if isinstance(last_error, requests.Timeout):
+            status = "timeout"
+        elif isinstance(last_error, requests.HTTPError):
+            response = last_error.response
+            if response is not None and response.status_code == 429:
+                status = "rate_limited"
+        raise ProviderTransportError(status, attempts=attempts) from last_error
 
     def invoke(self, value: Any, **_: Any) -> AdapterMessage:
         return AdapterMessage(content=self.invoke_with_metadata(value).text)

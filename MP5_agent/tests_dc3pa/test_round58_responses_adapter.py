@@ -3,7 +3,11 @@ from __future__ import annotations
 import pytest
 import requests
 
-from dc3pa.providers import OpenAIResponsesChatAdapter, OpenAIResponsesModelProfile
+from dc3pa.providers import (
+    OpenAIResponsesChatAdapter,
+    OpenAIResponsesModelProfile,
+    ProviderTransportError,
+)
 
 
 class SystemMessage:
@@ -71,6 +75,19 @@ class _WrongModelSession(_Session):
     def post(self, url, headers, json, timeout):
         self.calls.append((url, headers, json, timeout))
         return _WrongModelResponse()
+
+
+class _RateLimitResponse(_Response):
+    status_code = 429
+
+    def raise_for_status(self):
+        raise requests.HTTPError("rate limited", response=self)
+
+
+class _RateLimitSession(_Session):
+    def post(self, url, headers, json, timeout):
+        self.calls.append((url, headers, json, timeout))
+        return _RateLimitResponse()
 
 
 def test_adapter_sends_responses_request_without_sampling_or_prompt_logging():
@@ -155,6 +172,22 @@ def test_adapter_exhausts_profile_retries_and_preserves_failure():
     with pytest.raises(RuntimeError, match="after 4 attempts"):
         adapter.predict("hello")
     assert session.calls == 4
+
+
+def test_adapter_exposes_rate_limit_as_safe_structured_status():
+    session = _RateLimitSession()
+    adapter = OpenAIResponsesChatAdapter(
+        profile=OpenAIResponsesModelProfile(maximum_retries=0),
+        purpose="planning",
+        api_key="test-key",
+        session=session,
+        sleep=lambda _: None,
+    )
+
+    with pytest.raises(ProviderTransportError) as exc_info:
+        adapter.predict("hello")
+    assert exc_info.value.provider_stage == "request"
+    assert exc_info.value.provider_transport_status == "rate_limited"
 
 
 def test_adapter_fails_closed_if_provider_does_not_confirm_selected_model():
