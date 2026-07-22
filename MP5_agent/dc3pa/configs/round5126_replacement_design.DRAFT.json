@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "status": "DRAFT",
+  "task_pool_id": null,
+  "task_pool_sha256": null,
+  "assignment_count": 15,
+  "strata": {
+    "basic": 3,
+    "easy": 3,
+    "medium": 3,
+    "hard": 3,
+    "complex": 3
+  },
+  "selection_rule": "one_frozen_task_per_stratum_three_seeds",
+  "observational_outcomes_available": false,
+  "design_id": null
+}

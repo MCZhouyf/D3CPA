@@ -28,6 +28,7 @@ on:
       - "round5123-*"
       - "round5124-*"
       - "round5125-*"
+      - "round5126-*"
   pull_request:
 
 permissions:
@@ -181,6 +182,11 @@ jobs:
         run: >-
           python scripts_dc3pa/run_round5124_gate.py
           --junit artifacts/round5124.xml
+
+      - name: Round 5.12.6 replacement holdout pre-authorization gate
+        run: >-
+          python scripts_dc3pa/run_round5126_gate.py
+          --junit artifacts/round5126.xml
 
       - name: Print reports on failure
         if: failure()
