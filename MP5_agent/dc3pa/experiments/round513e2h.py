@@ -383,6 +383,7 @@ class TrackERunBindingV4_1_2_R1(_Hashed):
     task: str
     terminal_task: str
     seed_commitment: str
+    seed: int
     collection_mode: str
     output_root: str
     scientific_method_version: str = SCIENTIFIC_METHOD_VERSION
@@ -410,6 +411,8 @@ class TrackERunBindingV4_1_2_R1(_Hashed):
             raise ValueError("Approved gamma ordering is invalid")
         if self.collection_mode != "chrmlite_estimation_collection_v41":
             raise ValueError("Track E R1 binding has the wrong collection mode")
+        if isinstance(self.seed, bool) or self.seed <= 0:
+            raise ValueError("Track E R1 binding requires a positive numeric seed")
         if self.binding_id and self.binding_id != self.compute_id():
             raise ValueError("Track E R1 binding hash mismatch")
 
@@ -426,6 +429,10 @@ class CHRMLiteEngineeringSmokeRuntimeReleaseV4_1_2_R1(_Hashed):
     decision_store_revision: str
     preflight_before_environment: bool
     controller_evaluator_budget_validation: bool
+    track_e_image_vector_bridge_validation: bool
+    numeric_seed_binding_validation: bool
+    python_hash_seed_process_start_validation: bool
+    effective_environment_seed_validation: bool
     scientific_method_version: str = SCIENTIFIC_METHOD_VERSION
     runtime_binding_revision: str = RUNTIME_BINDING_REVISION
     minedojo_started: bool = False
@@ -441,7 +448,14 @@ class CHRMLiteEngineeringSmokeRuntimeReleaseV4_1_2_R1(_Hashed):
             "run_binding_schema_id", "assignment_schema_id",
         ):
             _required_text(getattr(self, name), name)
-        if not all((self.preflight_before_environment, self.controller_evaluator_budget_validation)):
+        if not all((
+            self.preflight_before_environment,
+            self.controller_evaluator_budget_validation,
+            self.track_e_image_vector_bridge_validation,
+            self.numeric_seed_binding_validation,
+            self.python_hash_seed_process_start_validation,
+            self.effective_environment_seed_validation,
+        )):
             raise ValueError("Runtime release lacks fail-closed preflight")
         if self.minedojo_started:
             raise ValueError("Source-hardening runtime release cannot start MineDojo")
@@ -468,6 +482,7 @@ class TrackEExecutionManifestV4_1_2_R1(_Hashed):
     ordered_assignment_root: str
     technical_retry_policy_id: str
     process_cleanup_policy_id: str
+    seed: int
     output_root: str
     gamma_candidate: str
     gamma_cov_text: str
@@ -493,6 +508,8 @@ class TrackEExecutionManifestV4_1_2_R1(_Hashed):
         _gamma_text(self.gamma_plus_text, "0.00744657", "gamma_plus_text")
         if not self.environment_execution_permitted:
             raise PermissionError("Execution manifest does not permit environment launch")
+        if isinstance(self.seed, bool) or self.seed <= 0:
+            raise ValueError("Execution manifest requires a positive numeric seed")
         if self.manifest_id and self.manifest_id != self.compute_id():
             raise ValueError("Execution manifest hash mismatch")
 
@@ -584,6 +601,7 @@ def validate_track_e_r1_artifacts(
         (execution_manifest.ordered_assignment_root, binding.ordered_assignment_root),
         (execution_manifest.technical_retry_policy_id, binding.technical_retry_policy_id),
         (execution_manifest.process_cleanup_policy_id, binding.process_cleanup_policy_id),
+        (execution_manifest.seed, binding.seed),
         (execution_manifest.output_root, binding.output_root),
         (execution_manifest.gamma_candidate, binding.gamma_candidate),
         (execution_manifest.gamma_cov_text, binding.gamma_cov_text),

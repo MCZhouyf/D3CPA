@@ -13,6 +13,7 @@ import contextlib
 import importlib
 import json
 import os
+import random
 import shutil
 import subprocess
 import sys
@@ -23,6 +24,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Mapping, Optional
+
+import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -383,6 +386,22 @@ def _configure_real_experiment_seed(
     os.environ["DC3PA_WORLD_SEED"] = str(requested_seed)
     os.environ["DC3PA_SIM_SEED"] = str(requested_seed)
     return requested_seed
+
+
+def _configure_track_e_r1_seed(binding: TrackERunBindingV4_1_2_R1) -> int:
+    seed = int(binding.seed)
+    if seed <= 0:
+        raise ValueError("Track E R1 requires a positive numeric seed")
+    if os.environ.get("PYTHONHASHSEED") != str(seed):
+        raise ValueError(
+            "Track E R1 requires PYTHONHASHSEED to equal the frozen seed "
+            "before the Python process starts"
+        )
+    os.environ["DC3PA_WORLD_SEED"] = str(seed)
+    os.environ["DC3PA_SIM_SEED"] = str(seed)
+    random.seed(seed)
+    np.random.seed(seed % (2 ** 32))
+    return seed
 
 
 def _apply_formal_acquisition_execution_budget(blueprint: Any) -> Any:
@@ -991,6 +1010,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     round513_retrieval_policy = None
     round513_support_policy = None
     round513_r1_enabled = False
+    r1_binding = None
     if round513_track_e_enabled:
         assert args.round513_track_e_binding is not None
         assert args.round513_contract_root is not None
@@ -1142,6 +1162,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         ).stdout.strip()
         if round513_binding.source_commit != current_commit:
             parser.error("Round 5.13 Track E binding/source commit mismatch")
+        if round513_r1_enabled:
+            assert r1_binding is not None
+            try:
+                _configure_track_e_r1_seed(r1_binding)
+            except ValueError as exc:
+                parser.error(str(exc))
         if not round513_r1_enabled:
             contract_sources = {
                 round513_planner_schema.source_commit,
@@ -1917,6 +1943,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         )
     except ValueError as exc:
         parser.error(str(exc))
+    if round513_r1_enabled:
+        assert r1_binding is not None
+        if requested_environment_seed not in (None, r1_binding.seed):
+            parser.error("Track E R1 seed conflicts with the real-experiment seed")
+        requested_environment_seed = r1_binding.seed
 
     def write_dry_run_receipt(result=None, exception: Optional[BaseException] = None) -> None:
         if not dry_run_enabled or dry_run_campaign is None or dry_run_entry is None:
@@ -2311,6 +2342,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                 ),
                 refresh_environment=args.mode != "mp5_legacy",
                 initial_observation=initial_observation,
+                image_encoder=(image_encoder if round513_r1_enabled else None),
             )
             if args.mode == "mp5_legacy":
                 runtime_config = replace(runtime_config, record_multimodal_memory=False)

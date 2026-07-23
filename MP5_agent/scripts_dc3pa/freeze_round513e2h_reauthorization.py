@@ -286,6 +286,10 @@ def main() -> int:
         decision_store_revision="orthogonal-disposition-r1",
         preflight_before_environment=True,
         controller_evaluator_budget_validation=True,
+        track_e_image_vector_bridge_validation=True,
+        numeric_seed_binding_validation=True,
+        python_hash_seed_process_start_validation=True,
+        effective_environment_seed_validation=True,
     ).with_id()
 
     new_rows = tuple(
@@ -404,6 +408,8 @@ def main() -> int:
             "Confidence and plan are generated together with one Planner call per decision.",
             "Memory and Acquisition remain no-write.",
             "Formal Development, Holdout, Final Evaluation, and Round 6 remain closed.",
+            "Each numeric assignment seed is bound, applied before environment construction, and verified against effective world and simulator seeds.",
+            "Each pre-action image vector is produced only by the injected frozen MineCLIP image encoder.",
         ),
     ).with_id()
 

@@ -206,6 +206,7 @@ def _binding(**changes):
     }
     values.update(
         execution_source_commit=SOURCE,
+        seed=571921411,
         gamma_candidate="0dc2d2104e6b0cc7395716f0fb8a5a1e196c339d2c944ae51982ba945aef1b1f",
         gamma_cov_text="1.0",
         gamma_minus_text="-0.01040883",
@@ -269,6 +270,21 @@ def test_run_binding_requires_every_field_and_exact_gamma_strings():
         TrackERunBindingV4_1_2_R1(**values)
     with pytest.raises(ValueError, match="exact decimal"):
         _binding(gamma_minus_text="-1.040883e-2")
+    with pytest.raises(ValueError, match="positive numeric seed"):
+        _binding(seed=0)
+
+
+def test_track_e_seed_requires_process_start_hash_seed(monkeypatch):
+    from scripts_dc3pa.stage6_run_minecraft import _configure_track_e_r1_seed
+
+    binding = _binding(seed=571921411)
+    monkeypatch.delenv("PYTHONHASHSEED", raising=False)
+    with pytest.raises(ValueError, match="before the Python process starts"):
+        _configure_track_e_r1_seed(binding)
+    monkeypatch.setenv("PYTHONHASHSEED", str(binding.seed))
+    assert _configure_track_e_r1_seed(binding) == binding.seed
+    assert os.environ["DC3PA_WORLD_SEED"] == str(binding.seed)
+    assert os.environ["DC3PA_SIM_SEED"] == str(binding.seed)
 
 
 @pytest.mark.minedojo
@@ -335,6 +351,10 @@ def test_full_r1_preflight_validates_lineage_and_controller_evaluator_budget(tmp
         decision_store_revision="orthogonal-disposition-r1",
         preflight_before_environment=True,
         controller_evaluator_budget_validation=True,
+        track_e_image_vector_bridge_validation=True,
+        numeric_seed_binding_validation=True,
+        python_hash_seed_process_start_validation=True,
+        effective_environment_seed_validation=True,
     ).with_id()
     outcome = adapters["step_outcome_registry"].raw_contract_payload
     output = str((tmp_path / "output").resolve())
@@ -367,6 +387,7 @@ def test_full_r1_preflight_validates_lineage_and_controller_evaluator_budget(tmp
         ordered_assignment_root=binding.ordered_assignment_root,
         technical_retry_policy_id=binding.technical_retry_policy_id,
         process_cleanup_policy_id=binding.process_cleanup_policy_id,
+        seed=binding.seed,
         output_root=binding.output_root,
         gamma_candidate=binding.gamma_candidate,
         gamma_cov_text=binding.gamma_cov_text,
@@ -384,6 +405,17 @@ def test_full_r1_preflight_validates_lineage_and_controller_evaluator_budget(tmp
         adapters=adapters,
         cli_output_root=output,
     )
+    with pytest.raises(ValueError, match="Execution Manifest/Run Binding/CLI"):
+        validate_track_e_r1_artifacts(
+            binding=binding,
+            compatibility=compatibility,
+            runtime_release=runtime,
+            technical_retry_policy=retry_policy,
+            process_cleanup_policy=cleanup_policy,
+            execution_manifest=replace(manifest, seed=binding.seed + 1, manifest_id="").with_id(),
+            adapters=adapters,
+            cli_output_root=output,
+        )
     bad_binding = _binding(
         **{
             **binding.payload_without_id(),

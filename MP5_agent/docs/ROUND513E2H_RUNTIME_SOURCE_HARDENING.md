@@ -23,3 +23,10 @@ The external freeze tool can now create the runtime release, re-seal the same
 nine scientific assignment payloads under the R1 schema, and create a new
 pending Smoke Authorization Input. This source-hardening round still cannot
 start MineDojo; execution requires a subsequent source-frozen authorization.
+
+The pre-execution execution amendment also binds each assignment's numeric seed
+in both the R1 Run Binding and Execution Manifest. The runner requires the same
+`PYTHONHASHSEED` at process start, applies the world and simulator seed before
+environment construction, and verifies the effective simulator values. Track-E
+state snapshots derive their pre-action image vector only through the injected
+frozen MineCLIP image encoder; malformed vectors fail closed.

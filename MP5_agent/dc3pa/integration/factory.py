@@ -60,6 +60,7 @@ def build_legacy_state_provider(
     noop_action: Optional[Sequence[int]] = None,
     refresh_environment: bool = True,
     initial_observation: Any = None,
+    image_encoder: Any = None,
 ) -> LegacyMP5StateProvider:
     if not isinstance(refresh_environment, bool):
         raise TypeError("refresh_environment must be bool")
@@ -82,6 +83,7 @@ def build_legacy_state_provider(
     return LegacyMP5StateProvider(
         refresh_observation=refresh_observation,
         inventory_provider=inventory_provider,
+        image_encoder=image_encoder,
     )
 
 

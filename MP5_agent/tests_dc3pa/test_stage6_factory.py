@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from dc3pa.integration import (
@@ -61,6 +62,45 @@ def test_state_provider_updates_legacy_memory_callback():
     snapshot = provider.snapshot({"task": "log"}, False)
     assert env.calls == 1 and calls
     assert snapshot.state.task == "log"
+
+
+def test_track_e_state_provider_encodes_current_rgb_before_planning():
+    env = Env()
+    memory = LegacyMemory()
+
+    class Encoder:
+        def __init__(self):
+            self.images = []
+
+        def encode_image(self, image):
+            self.images.append(np.asarray(image).copy())
+            return np.asarray([0.25, 0.75], dtype=np.float32)
+
+    encoder = Encoder()
+    provider = build_legacy_state_provider(
+        env=env,
+        legacy_memory=memory,
+        share_memory=lambda target, observation: None,
+        image_encoder=encoder,
+    )
+    snapshot = provider.snapshot({"task": "log"}, False)
+    assert len(encoder.images) == 1
+    assert snapshot.reliability_context.image_vector.tolist() == [0.25, 0.75]
+
+
+def test_track_e_state_provider_rejects_invalid_image_vector():
+    class InvalidEncoder:
+        def encode_image(self, image):
+            return np.asarray([[float("nan")]])
+
+    provider = build_legacy_state_provider(
+        env=Env(),
+        legacy_memory=LegacyMemory(),
+        share_memory=lambda target, observation: None,
+        image_encoder=InvalidEncoder(),
+    )
+    with pytest.raises(ValueError, match="invalid vector"):
+        provider.snapshot({"task": "log"}, False)
 
 
 def test_factory_builds_reasoning_only_without_model_or_multimodal_memory():

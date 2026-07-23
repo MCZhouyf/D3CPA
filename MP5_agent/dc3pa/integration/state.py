@@ -123,6 +123,7 @@ class LegacyMP5StateProvider:
         refresh_observation: Callable[[], Any],
         inventory_provider: Callable[[], Mapping[str, Any]],
         *,
+        image_encoder: Any = None,
         position_provider: Optional[Callable[[bool, Any], str]] = None,
         scene_description_factory: Optional[
             Callable[[str, Mapping[str, float], str, Any], str]
@@ -130,6 +131,7 @@ class LegacyMP5StateProvider:
     ):
         self.refresh_observation = refresh_observation
         self.inventory_provider = inventory_provider
+        self.image_encoder = image_encoder
         self.position_provider = position_provider
         self.scene_description_factory = scene_description_factory
 
@@ -146,6 +148,14 @@ class LegacyMP5StateProvider:
             else ("underground" if underground else "surface_or_unknown")
         )
         image = extract_rgb_observation(observation)
+        image_vector = None
+        if self.image_encoder is not None:
+            if image is None:
+                raise ValueError("Track-E image encoder requires an RGB observation")
+            encoded = np.asarray(self.image_encoder.encode_image(image), dtype=np.float64)
+            if encoded.ndim != 1 or encoded.size == 0 or not np.isfinite(encoded).all():
+                raise ValueError("Track-E image encoder returned an invalid vector")
+            image_vector = np.ascontiguousarray(encoded.copy())
         state = AgentState(
             task=task,
             inventory=inventory,
@@ -159,6 +169,7 @@ class LegacyMP5StateProvider:
         context = ReliabilityContext(
             task_context=task_context,
             image=image,
+            image_vector=image_vector,
             metadata={
                 "underground": bool(underground),
                 "environment_step_index": 0,
