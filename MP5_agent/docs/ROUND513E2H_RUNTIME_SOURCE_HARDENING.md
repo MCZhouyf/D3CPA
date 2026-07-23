@@ -13,5 +13,13 @@ The repository contains no unique, complete, prospectively authorized E2
 technical-retry and process-cleanup policy. Existing retry evidence is scoped
 to earlier Acquisition/Holdout work, and the legacy cleanup helper does not
 provide campaign-owned process, port, lock, or display-session guarantees.
-E2H therefore stops at an author-decision boundary before runtime release,
-assignment resealing, reauthorization, or MineDojo execution.
+ZYF subsequently selected the prospective T1 one-retry and C1 scoped-cleanup
+policies. Technical retries are restricted to four enumerated pre-action
+failures, one retry, and isolated output; scientific outcomes remain final.
+Cleanup is restricted to resources recorded in the campaign launch-ownership
+ledger and may not kill unrelated processes.
+
+The external freeze tool can now create the runtime release, re-seal the same
+nine scientific assignment payloads under the R1 schema, and create a new
+pending Smoke Authorization Input. This source-hardening round still cannot
+start MineDojo; execution requires a subsequent source-frozen authorization.

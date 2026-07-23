@@ -418,6 +418,9 @@ class TrackERunBindingV4_1_2_R1(_Hashed):
 class CHRMLiteEngineeringSmokeRuntimeReleaseV4_1_2_R1(_Hashed):
     source_commit: str
     compatibility_release_id: str
+    technical_retry_policy_id: str
+    process_cleanup_policy_id: str
+    source_hardening_audit_id: str
     run_binding_schema_id: str
     assignment_schema_id: str
     decision_store_revision: str
@@ -432,6 +435,12 @@ class CHRMLiteEngineeringSmokeRuntimeReleaseV4_1_2_R1(_Hashed):
     _id_field = "release_id"
 
     def __post_init__(self) -> None:
+        for name in (
+            "compatibility_release_id", "technical_retry_policy_id",
+            "process_cleanup_policy_id", "source_hardening_audit_id",
+            "run_binding_schema_id", "assignment_schema_id",
+        ):
+            _required_text(getattr(self, name), name)
         if not all((self.preflight_before_environment, self.controller_evaluator_budget_validation)):
             raise ValueError("Runtime release lacks fail-closed preflight")
         if self.minedojo_started:
@@ -497,6 +506,23 @@ def validate_track_e_r1_artifacts(
     adapters: Mapping[str, ContractRuntimeAdapterV4_1_2_R1],
     cli_output_root: str,
 ) -> None:
+    expected_binding_schema_id = dataclass_schema_id(
+        TrackERunBindingV4_1_2_R1,
+        invariants={
+            "scientific_method_version": "V4.1.2",
+            "runtime_binding_revision": "R1",
+            "engineering_only": True,
+            "gamma_candidate": "B",
+        },
+    )
+    if (
+        compatibility.source_commit != binding.execution_source_commit
+        or runtime_release.source_commit != binding.execution_source_commit
+        or runtime_release.run_binding_schema_id != expected_binding_schema_id
+        or runtime_release.technical_retry_policy_id != binding.technical_retry_policy_id
+        or runtime_release.process_cleanup_policy_id != binding.process_cleanup_policy_id
+    ):
+        raise ValueError("Runtime release/source/policy binding mismatch")
     required_types = {
         "planner_schema", "rule_registry", "bilateral_retrieval_policy",
         "decision_record_schema", "step_outcome_registry", "instrumentation_release",
@@ -858,6 +884,331 @@ class TechnicalRetryAndCleanupDecisionInput(_Hashed):
         payload["retry_candidates"] = [dict(item) for item in self.retry_candidates]
         payload["cleanup_candidates"] = [dict(item) for item in self.cleanup_candidates]
         payload["required_author_fields"] = list(self.required_author_fields)
+        return payload
+
+
+@dataclass(frozen=True)
+class TechnicalRetryPolicyV4_1_2_R1(_Hashed):
+    source_commit: str
+    decision_input_id: str
+    decision_input_file_sha256: str
+    approval_statement_sha256: str
+    retry_candidate: str
+    allowed_technical_failure_categories: tuple[str, ...]
+    maximum_attempts_per_technical_category: int
+    total_maximum_attempts: int
+    backoff_seconds: int
+    scientific_success_retries: int
+    scientific_failure_retries: int
+    pre_action_proof_required: bool
+    attempt_isolation_required: bool
+    technical_partial_record_disposition: str
+    unclassified_technical_failure_policy: str
+    schema_version: int = 1
+    policy_id: str = ""
+
+    _id_field = "policy_id"
+
+    def __post_init__(self) -> None:
+        expected = (
+            "environment_start_failure", "seed_application_failure",
+            "provider_transport_failure", "provider_empty_response",
+        )
+        if self.retry_candidate != "T1_one_retry":
+            raise ValueError("Technical retry policy does not match the author decision")
+        if self.allowed_technical_failure_categories != expected:
+            raise ValueError("Technical retry categories do not match the author decision")
+        if (
+            self.maximum_attempts_per_technical_category != 2
+            or self.total_maximum_attempts != 2
+            or self.backoff_seconds != 30
+        ):
+            raise ValueError("Technical retry budget does not match the author decision")
+        if self.scientific_success_retries or self.scientific_failure_retries:
+            raise ValueError("Scientific outcomes must never be retried")
+        if not self.pre_action_proof_required or not self.attempt_isolation_required:
+            raise ValueError("Technical retries require pre-action proof and isolation")
+        if self.technical_partial_record_disposition != "technical_quarantine":
+            raise ValueError("Technical partial records must be quarantined")
+        if self.unclassified_technical_failure_policy != "stop_immediately":
+            raise ValueError("Unclassified technical failures must stop immediately")
+        if self.policy_id and self.policy_id != self.compute_id():
+            raise ValueError("Technical retry policy hash mismatch")
+
+    def payload_without_id(self) -> dict[str, Any]:
+        payload = super().payload_without_id()
+        payload["allowed_technical_failure_categories"] = list(
+            self.allowed_technical_failure_categories
+        )
+        return payload
+
+
+@dataclass(frozen=True)
+class ProcessCleanupPolicyV4_1_2_R1(_Hashed):
+    source_commit: str
+    decision_input_id: str
+    decision_input_file_sha256: str
+    approval_statement_sha256: str
+    cleanup_candidate: str
+    cleanup_grace_seconds: int
+    campaign_owned_ports: tuple[str, ...]
+    campaign_owned_lock_patterns: tuple[str, ...]
+    campaign_owned_display_sessions: tuple[str, ...]
+    required_target_checks: tuple[str, ...]
+    launch_ownership_ledger_required: bool
+    unrelated_process_kill_permitted: bool
+    residual_process_policy: str
+    output_directory_policy: str
+    schema_version: int = 1
+    policy_id: str = ""
+
+    _id_field = "policy_id"
+
+    def __post_init__(self) -> None:
+        expected_targets = (
+            "MineDojo", "Minecraft", "Mineflayer", "bridge",
+            "ports", "lock_files", "display_sessions",
+        )
+        if self.cleanup_candidate != "C1_scoped_process_group_cleanup":
+            raise ValueError("Cleanup candidate does not match the author decision")
+        if self.cleanup_grace_seconds != 20:
+            raise ValueError("Cleanup grace period does not match the author decision")
+        if not all((
+            self.campaign_owned_ports,
+            self.campaign_owned_lock_patterns,
+            self.campaign_owned_display_sessions,
+        )):
+            raise ValueError("Cleanup ownership scope is incomplete")
+        if self.required_target_checks != expected_targets:
+            raise ValueError("Cleanup target inventory is incomplete")
+        if not self.launch_ownership_ledger_required or self.unrelated_process_kill_permitted:
+            raise ValueError("Cleanup must be ledger-scoped and non-invasive")
+        if self.residual_process_policy != "stop_if_campaign_owned_residual_remains":
+            raise ValueError("Cleanup residual policy is not fail closed")
+        if self.output_directory_policy != "exclusive_per_attempt_then_atomic_disposition":
+            raise ValueError("Cleanup output policy does not isolate attempts")
+        if self.policy_id and self.policy_id != self.compute_id():
+            raise ValueError("Process cleanup policy hash mismatch")
+
+    def payload_without_id(self) -> dict[str, Any]:
+        payload = super().payload_without_id()
+        for name in (
+            "campaign_owned_ports", "campaign_owned_lock_patterns",
+            "campaign_owned_display_sessions", "required_target_checks",
+        ):
+            payload[name] = list(getattr(self, name))
+        return payload
+
+
+def dataclass_schema_id(cls: type, *, invariants: Mapping[str, Any]) -> str:
+    return canonical_sha256({
+        "class": cls.__name__,
+        "fields": list(cls.__dataclass_fields__),
+        "invariants": dict(invariants),
+    })
+
+
+@dataclass(frozen=True)
+class Round513E2SourceHardeningAudit(_Hashed):
+    source_commit: str
+    supersession_decision_id: str
+    compatibility_release_id: str
+    technical_retry_policy_id: str
+    process_cleanup_policy_id: str
+    adapter_version: str
+    raw_identity_round_trip_passed: bool
+    canonical_hash_before_adaptation_passed: bool
+    source_provenance_separation_passed: bool
+    exact_compatibility_allowlist_passed: bool
+    controller_evaluator_budget_validation_passed: bool
+    snapshot_guard_passed: bool
+    paper_memory_write_probe_rejected: bool
+    relevant_skips: int
+    minedojo_launch_count: int
+    scientific_method_changed: bool
+    gamma_changed: bool
+    schema_version: int = 1
+    audit_id: str = ""
+
+    _id_field = "audit_id"
+
+    def __post_init__(self) -> None:
+        required = (
+            self.raw_identity_round_trip_passed,
+            self.canonical_hash_before_adaptation_passed,
+            self.source_provenance_separation_passed,
+            self.exact_compatibility_allowlist_passed,
+            self.controller_evaluator_budget_validation_passed,
+            self.snapshot_guard_passed,
+            self.paper_memory_write_probe_rejected,
+        )
+        if not all(required) or self.relevant_skips or self.minedojo_launch_count:
+            raise ValueError("Source-hardening audit is not eligible for source freeze")
+        if self.scientific_method_changed or self.gamma_changed:
+            raise ValueError("Source hardening changed frozen scientific content")
+        if self.adapter_version != ADAPTER_VERSION:
+            raise ValueError("Source-hardening audit uses an unknown adapter")
+        if self.audit_id and self.audit_id != self.compute_id():
+            raise ValueError("Source-hardening audit hash mismatch")
+
+
+@dataclass(frozen=True)
+class CHRMLiteEngineeringSmokeAssignmentsV4_1_2_R1(_Hashed):
+    source_commit: str
+    legacy_assignments_id: str
+    pool_id: str
+    runtime_release_id: str
+    technical_retry_policy_id: str
+    process_cleanup_policy_id: str
+    assignments: tuple[SmokeAssignmentV4_1_2_R1, ...]
+    fixed_before_outcomes: bool = True
+    observed_coverage_can_expand_set: bool = False
+    schema_version: int = 1
+    assignments_id: str = ""
+
+    _id_field = "assignments_id"
+
+    def __post_init__(self) -> None:
+        if len(self.assignments) != 9 or len({x.assignment_id for x in self.assignments}) != 9:
+            raise ValueError("R1 smoke assignments must contain exactly nine unique rows")
+        if not self.fixed_before_outcomes or self.observed_coverage_can_expand_set:
+            raise ValueError("R1 smoke assignments are not prospectively frozen")
+        if self.assignments_id and self.assignments_id != self.compute_id():
+            raise ValueError("R1 smoke assignments hash mismatch")
+
+    def payload_without_id(self) -> dict[str, Any]:
+        payload = super().payload_without_id()
+        payload["assignments"] = [item.to_dict() for item in self.assignments]
+        return payload
+
+
+@dataclass(frozen=True)
+class CHRMLiteEngineeringSmokeExclusionAuditV4_1_2_R1(_Hashed):
+    source_commit: str
+    assignments_id: str
+    prior_exclusion_audit_id: str
+    acquisition_overlap_count: int
+    historical_development_overlap_count: int
+    previous_smoke_overlap_count: int
+    future_formal_v412_overlap_count: int
+    holdout_overlap_count: int
+    final_overlap_count: int
+    proof_method: str
+    eligible: bool
+    schema_version: int = 1
+    audit_id: str = ""
+
+    _id_field = "audit_id"
+
+    def __post_init__(self) -> None:
+        counts = (
+            self.acquisition_overlap_count, self.historical_development_overlap_count,
+            self.previous_smoke_overlap_count, self.future_formal_v412_overlap_count,
+            self.holdout_overlap_count, self.final_overlap_count,
+        )
+        if any(counts) or not self.eligible:
+            raise ValueError("R1 smoke assignments overlap an excluded split")
+        if self.proof_method != "legacy_cryptographic_namespace_proof_rebound_to_equivalent_payload":
+            raise ValueError("R1 exclusion audit has an unknown proof method")
+        if self.audit_id and self.audit_id != self.compute_id():
+            raise ValueError("R1 exclusion audit hash mismatch")
+
+
+@dataclass(frozen=True)
+class CHRMLiteEngineeringSmokeSealV4_1_2_R1(_Hashed):
+    source_commit: str
+    compatibility_release_id: str
+    runtime_release_id: str
+    technical_retry_policy_id: str
+    process_cleanup_policy_id: str
+    assignments_id: str
+    assignments_root_sha256: str
+    ordered_scientific_payload_root: str
+    exclusion_audit_id: str
+    equivalence_audit_id: str
+    assignment_count: int
+    permanently_engineering_only: bool
+    fitting_ineligible: bool
+    sealed: bool
+    schema_version: int = 1
+    seal_id: str = ""
+
+    _id_field = "seal_id"
+
+    def __post_init__(self) -> None:
+        if self.assignment_count != 9:
+            raise ValueError("R1 smoke seal must bind exactly nine assignments")
+        if not all((self.permanently_engineering_only, self.fitting_ineligible, self.sealed)):
+            raise ValueError("R1 smoke seal does not enforce permanent exclusion")
+        if self.seal_id and self.seal_id != self.compute_id():
+            raise ValueError("R1 smoke seal hash mismatch")
+
+
+@dataclass(frozen=True)
+class CHRMLiteEngineeringSmokeAuthorizationInputV4_1_2_R1(_Hashed):
+    source_commit: str
+    runtime_release_id: str
+    compatibility_release_id: str
+    run_binding_schema_id: str
+    assignment_schema_id: str
+    smoke_assignments_id: str
+    smoke_assignment_seal_id: str
+    smoke_exclusion_audit_id: str
+    scientific_payload_equivalence_audit_id: str
+    technical_retry_policy_id: str
+    process_cleanup_policy_id: str
+    paper_memory_release_id: str
+    paper_memory_root: str
+    mineclip_policy_id: str
+    scene_exemplar_release_id: str
+    planner_prompt_id: str
+    planner_schema_id: str
+    planner_parser_id: str
+    rule_registry_id: str
+    bilateral_policy_id: str
+    decision_record_schema_id: str
+    step_outcome_registry_id: str
+    instrumentation_release_id: str
+    controller_id: str
+    evaluator_id: str
+    budget_profile_id: str
+    gamma_candidate: str
+    gamma_cov_text: str
+    gamma_minus_text: str
+    gamma_plus_text: str
+    declarations: tuple[str, ...]
+    reauthorization_status: str = "pending"
+    minedojo_execution_permitted: bool = False
+    formal_development_permitted: bool = False
+    holdout_final_round6_permitted: bool = False
+    approved_by: str | None = None
+    schema_version: int = 1
+    authorization_input_id: str = ""
+
+    _id_field = "authorization_input_id"
+
+    def __post_init__(self) -> None:
+        if self.reauthorization_status != "pending" or self.approved_by is not None:
+            raise ValueError("R1 authorization input fabricated author approval")
+        if any((
+            self.minedojo_execution_permitted,
+            self.formal_development_permitted,
+            self.holdout_final_round6_permitted,
+        )):
+            raise ValueError("R1 authorization input opens a forbidden execution boundary")
+        if len(self.declarations) < 12 or len(set(self.declarations)) != len(self.declarations):
+            raise ValueError("R1 authorization input declarations are incomplete")
+        _gamma_text(self.gamma_cov_text, "1.0", "gamma_cov_text")
+        _gamma_text(self.gamma_minus_text, "-0.01040883", "gamma_minus_text")
+        _gamma_text(self.gamma_plus_text, "0.00744657", "gamma_plus_text")
+        if self.gamma_candidate != "0dc2d2104e6b0cc7395716f0fb8a5a1e196c339d2c944ae51982ba945aef1b1f":
+            raise ValueError("R1 authorization input changed Candidate B")
+        if self.authorization_input_id and self.authorization_input_id != self.compute_id():
+            raise ValueError("R1 authorization input hash mismatch")
+
+    def payload_without_id(self) -> dict[str, Any]:
+        payload = super().payload_without_id()
+        payload["declarations"] = list(self.declarations)
         return payload
 
 

@@ -9,19 +9,23 @@ import pytest
 from dc3pa.experiments.round513e2h import (
     ADAPTER_VERSION,
     AtomicDecisionStoreV4_1_2_R1,
+    CHRMLiteEngineeringSmokeAuthorizationInputV4_1_2_R1,
     CHRMLiteEngineeringSmokeRuntimeReleaseV4_1_2_R1,
     ContractCompatibilityEntry,
     PolicyCandidate,
+    ProcessCleanupPolicyV4_1_2_R1,
     ProcessCleanupPolicyProvenanceAudit,
     Round513E2AuthorizationSupersessionDecision,
     Round513E2ContractCompatibilityReleaseR1,
     SmokeAssignmentScientificPayloadEquivalenceAudit,
     SmokeAssignmentV4_1_2_R1,
     TechnicalRetryAndCleanupDecisionInput,
+    TechnicalRetryPolicyV4_1_2_R1,
     TechnicalRetryPolicyProvenanceAudit,
     TrackERunBindingV4_1_2_R1,
     TrackEExecutionManifestV4_1_2_R1,
     canonical_sha256,
+    dataclass_schema_id,
     file_sha256,
     legacy_scientific_payload,
     load_versioned_contract,
@@ -271,7 +275,18 @@ def test_full_r1_preflight_validates_lineage_and_controller_evaluator_budget(tmp
     runtime = CHRMLiteEngineeringSmokeRuntimeReleaseV4_1_2_R1(
         source_commit=SOURCE,
         compatibility_release_id=compatibility.release_id,
-        run_binding_schema_id="1" * 64,
+        technical_retry_policy_id="a" * 64,
+        process_cleanup_policy_id="a" * 64,
+        source_hardening_audit_id="5" * 64,
+        run_binding_schema_id=dataclass_schema_id(
+            TrackERunBindingV4_1_2_R1,
+            invariants={
+                "scientific_method_version": "V4.1.2",
+                "runtime_binding_revision": "R1",
+                "engineering_only": True,
+                "gamma_candidate": "B",
+            },
+        ),
         assignment_schema_id="2" * 64,
         decision_store_revision="orthogonal-disposition-r1",
         preflight_before_environment=True,
@@ -518,3 +533,88 @@ def test_incomplete_policy_provenance_requires_author_decision():
     ).with_id()
     assert decision.status == "pending_ZYF_decision"
     assert decision.minedojo_execution_permitted is False
+
+
+def test_author_approved_retry_and_cleanup_policies_are_exact_and_fail_closed():
+    retry = TechnicalRetryPolicyV4_1_2_R1(
+        source_commit=SOURCE,
+        decision_input_id="1" * 64,
+        decision_input_file_sha256="2" * 64,
+        approval_statement_sha256="3" * 64,
+        retry_candidate="T1_one_retry",
+        allowed_technical_failure_categories=(
+            "environment_start_failure", "seed_application_failure",
+            "provider_transport_failure", "provider_empty_response",
+        ),
+        maximum_attempts_per_technical_category=2,
+        total_maximum_attempts=2,
+        backoff_seconds=30,
+        scientific_success_retries=0,
+        scientific_failure_retries=0,
+        pre_action_proof_required=True,
+        attempt_isolation_required=True,
+        technical_partial_record_disposition="technical_quarantine",
+        unclassified_technical_failure_policy="stop_immediately",
+    ).with_id()
+    cleanup = ProcessCleanupPolicyV4_1_2_R1(
+        source_commit=SOURCE,
+        decision_input_id="1" * 64,
+        decision_input_file_sha256="2" * 64,
+        approval_statement_sha256="3" * 64,
+        cleanup_candidate="C1_scoped_process_group_cleanup",
+        cleanup_grace_seconds=20,
+        campaign_owned_ports=("ledger ports",),
+        campaign_owned_lock_patterns=("ledger locks",),
+        campaign_owned_display_sessions=("ledger displays",),
+        required_target_checks=(
+            "MineDojo", "Minecraft", "Mineflayer", "bridge",
+            "ports", "lock_files", "display_sessions",
+        ),
+        launch_ownership_ledger_required=True,
+        unrelated_process_kill_permitted=False,
+        residual_process_policy="stop_if_campaign_owned_residual_remains",
+        output_directory_policy="exclusive_per_attempt_then_atomic_disposition",
+    ).with_id()
+    assert retry.policy_id and cleanup.policy_id
+    with pytest.raises(ValueError, match="Scientific outcomes"):
+        replace(retry, scientific_failure_retries=1, policy_id="")
+    with pytest.raises(ValueError, match="non-invasive"):
+        replace(cleanup, unrelated_process_kill_permitted=True, policy_id="")
+
+
+def test_pending_r1_authorization_cannot_open_execution_boundary():
+    excluded = {
+        "schema_version", "authorization_input_id", "declarations",
+        "reauthorization_status", "minedojo_execution_permitted",
+        "formal_development_permitted", "holdout_final_round6_permitted",
+        "approved_by", "gamma_cov_text", "gamma_minus_text", "gamma_plus_text",
+    }
+    values = {
+        name: "1" * 64
+        for name in CHRMLiteEngineeringSmokeAuthorizationInputV4_1_2_R1.__dataclass_fields__
+        if name not in excluded
+    }
+    values.update(
+        gamma_candidate="0dc2d2104e6b0cc7395716f0fb8a5a1e196c339d2c944ae51982ba945aef1b1f",
+        gamma_cov_text="1.0",
+        gamma_minus_text="-0.01040883",
+        gamma_plus_text="0.00744657",
+        declarations=tuple(f"declaration-{index}" for index in range(12)),
+    )
+    authorization = CHRMLiteEngineeringSmokeAuthorizationInputV4_1_2_R1(
+        **values
+    ).with_id()
+    assert authorization.reauthorization_status == "pending"
+    with pytest.raises(ValueError, match="forbidden execution"):
+        replace(authorization, minedojo_execution_permitted=True, authorization_input_id="")
+
+
+def test_policy_approval_rejects_unresolved_template():
+    from scripts_dc3pa.freeze_round513e2h_reauthorization import (
+        _validate_policy_approval,
+    )
+
+    with pytest.raises(ValueError, match="unresolved placeholders"):
+        _validate_policy_approval(
+            "retry_candidate=<T0_no_retry|T1_one_retry>; approved_by=ZYF"
+        )
