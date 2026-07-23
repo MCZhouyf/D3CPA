@@ -1,0 +1,18 @@
+{
+  "active_trigger_experiments_permitted": false,
+  "contract_id": null,
+  "feature_schema_id": null,
+  "final_evaluation_permitted": false,
+  "hard_gate_bypasses_fusion_and_smoothing": true,
+  "holdout_access_permitted": false,
+  "label_policy_id": null,
+  "method_name": "CHRM-lite + CDT-lite",
+  "model_fitting_permitted_in_round513a": false,
+  "parameter_provenance_policy_id": null,
+  "round6_permitted": false,
+  "schema_version": 1,
+  "source_commit": null,
+  "statistical_analysis_policy_id": null,
+  "status": "DRAFT",
+  "version": "4.1"
+}

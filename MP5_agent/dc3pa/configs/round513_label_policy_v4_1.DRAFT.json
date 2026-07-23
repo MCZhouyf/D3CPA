@@ -1,0 +1,9 @@
+{
+  "main_target": "deployment_step_success_within_frozen_budget",
+  "policy_id": null,
+  "positive_definition": "expected_state_transition_or_local_subgoal_completed",
+  "schema_version": 1,
+  "secondary_target": "deterministic_downstream_usefulness_when_available",
+  "status": "DRAFT",
+  "technical_failures_are_scientific_labels": false
+}

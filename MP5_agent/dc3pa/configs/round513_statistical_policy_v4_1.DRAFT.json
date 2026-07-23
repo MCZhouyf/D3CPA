@@ -1,0 +1,12 @@
+{
+  "cross_fit_folds": 5,
+  "cross_fit_group": "terminal_task",
+  "decision_row_iid_bootstrap_permitted": false,
+  "dev_train_role": "fitting_and_task_grouped_cross_fitting",
+  "dev_tune_role": "candidate_selection_and_calibration_audit",
+  "primary_bootstrap_group": "terminal_task",
+  "secondary_bootstrap_group": "task_seed_run",
+  "schema_version": 1,
+  "status": "DRAFT",
+  "terminal_task_may_cross_splits": false
+}

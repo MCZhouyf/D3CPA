@@ -1,0 +1,14 @@
+{
+  "c_fp_definition": "E(delta_cost*I(action_changed)|direct_correct_and_evaluated)",
+  "cdt_primary_cost_unit": "planner_equivalent_calls",
+  "insufficient_rho_rule": "shadow_or_fixed_period",
+  "intercept_fitted": true,
+  "intercept_regularized": false,
+  "laplace_alpha": 1.0,
+  "policy_id": null,
+  "rho_path_a_definition": "matched-state paired replay",
+  "rho_path_b_definition": "observed successful-revision yield, noncausal",
+  "schema_version": 1,
+  "status": "DRAFT",
+  "terminal_penalty_rule": "remaining_episode_seconds_divided_by_dev_train_median_seconds_per_planner_call"
+}

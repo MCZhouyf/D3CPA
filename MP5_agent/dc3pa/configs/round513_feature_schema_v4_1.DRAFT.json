@@ -1,0 +1,16 @@
+{
+  "confidence_extra_online_call_forbidden": true,
+  "confidence_levels": ["very_unlikely", "unlikely", "uncertain", "likely", "very_likely"],
+  "confidence_same_planner_generation_required": true,
+  "environment_empty_or_undercovered_state": "unknown",
+  "environment_minimum_count_per_side": 3,
+  "environment_states": ["mismatch", "unknown", "matched"],
+  "environment_top_k_per_side": 3,
+  "environment_tie_break": "similarity_desc_exemplar_id_asc",
+  "feature_order": ["knowledge_coverage", "knowledge_available", "model_logit", "environment_logit"],
+  "hard_gate_bypasses_fusion": true,
+  "hard_rules_excluded_from_soft_coverage": true,
+  "schema_id": null,
+  "schema_version": 1,
+  "status": "DRAFT"
+}
