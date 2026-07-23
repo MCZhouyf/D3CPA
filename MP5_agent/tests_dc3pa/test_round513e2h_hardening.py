@@ -217,6 +217,49 @@ def _binding(**changes):
     return TrackERunBindingV4_1_2_R1(**values).with_id()
 
 
+def _approved_policies(source=SOURCE):
+    retry = TechnicalRetryPolicyV4_1_2_R1(
+        source_commit=source,
+        decision_input_id="1" * 64,
+        decision_input_file_sha256="2" * 64,
+        approval_statement_sha256="3" * 64,
+        retry_candidate="T1_one_retry",
+        allowed_technical_failure_categories=(
+            "environment_start_failure", "seed_application_failure",
+            "provider_transport_failure", "provider_empty_response",
+        ),
+        maximum_attempts_per_technical_category=2,
+        total_maximum_attempts=2,
+        backoff_seconds=30,
+        scientific_success_retries=0,
+        scientific_failure_retries=0,
+        pre_action_proof_required=True,
+        attempt_isolation_required=True,
+        technical_partial_record_disposition="technical_quarantine",
+        unclassified_technical_failure_policy="stop_immediately",
+    ).with_id()
+    cleanup = ProcessCleanupPolicyV4_1_2_R1(
+        source_commit=source,
+        decision_input_id="1" * 64,
+        decision_input_file_sha256="2" * 64,
+        approval_statement_sha256="3" * 64,
+        cleanup_candidate="C1_scoped_process_group_cleanup",
+        cleanup_grace_seconds=20,
+        campaign_owned_ports=("ledger ports",),
+        campaign_owned_lock_patterns=("ledger locks",),
+        campaign_owned_display_sessions=("ledger displays",),
+        required_target_checks=(
+            "MineDojo", "Minecraft", "Mineflayer", "bridge",
+            "ports", "lock_files", "display_sessions",
+        ),
+        launch_ownership_ledger_required=True,
+        unrelated_process_kill_permitted=False,
+        residual_process_policy="stop_if_campaign_owned_residual_remains",
+        output_directory_policy="exclusive_per_attempt_then_atomic_disposition",
+    ).with_id()
+    return retry, cleanup
+
+
 def test_run_binding_requires_every_field_and_exact_gamma_strings():
     binding = _binding()
     assert binding.binding_id == binding.compute_id()
@@ -272,11 +315,12 @@ def test_full_r1_preflight_validates_lineage_and_controller_evaluator_budget(tmp
             for name, item in adapters.items()
         ),
     ).with_id()
+    retry_policy, cleanup_policy = _approved_policies()
     runtime = CHRMLiteEngineeringSmokeRuntimeReleaseV4_1_2_R1(
         source_commit=SOURCE,
         compatibility_release_id=compatibility.release_id,
-        technical_retry_policy_id="a" * 64,
-        process_cleanup_policy_id="a" * 64,
+        technical_retry_policy_id=retry_policy.policy_id,
+        process_cleanup_policy_id=cleanup_policy.policy_id,
         source_hardening_audit_id="5" * 64,
         run_binding_schema_id=dataclass_schema_id(
             TrackERunBindingV4_1_2_R1,
@@ -303,6 +347,8 @@ def test_full_r1_preflight_validates_lineage_and_controller_evaluator_budget(tmp
         decision_record_schema_id=adapters["decision_record_schema"].raw_contract_id,
         step_outcome_registry_id=adapters["step_outcome_registry"].raw_contract_id,
         instrumentation_release_id=adapters["instrumentation_release"].raw_contract_id,
+        technical_retry_policy_id=retry_policy.policy_id,
+        process_cleanup_policy_id=cleanup_policy.policy_id,
         controller_id=outcome["controller_contract_id"],
         evaluator_id=outcome["evaluator_contract_id"],
         budget_profile_id=outcome["execution_budget_profile_id"],
@@ -332,6 +378,8 @@ def test_full_r1_preflight_validates_lineage_and_controller_evaluator_budget(tmp
         binding=binding,
         compatibility=compatibility,
         runtime_release=runtime,
+        technical_retry_policy=retry_policy,
+        process_cleanup_policy=cleanup_policy,
         execution_manifest=manifest,
         adapters=adapters,
         cli_output_root=output,
@@ -347,6 +395,8 @@ def test_full_r1_preflight_validates_lineage_and_controller_evaluator_budget(tmp
             binding=bad_binding,
             compatibility=compatibility,
             runtime_release=runtime,
+            technical_retry_policy=retry_policy,
+            process_cleanup_policy=cleanup_policy,
             execution_manifest=manifest,
             adapters=adapters,
             cli_output_root=output,

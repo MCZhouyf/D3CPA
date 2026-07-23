@@ -107,7 +107,9 @@ from dc3pa.experiments.round513e2h import (  # noqa: E402
     AtomicDecisionStoreV4_1_2_R1,
     CHRMLiteEngineeringSmokeRuntimeReleaseV4_1_2_R1,
     ContractCompatibilityEntry,
+    ProcessCleanupPolicyV4_1_2_R1,
     Round513E2ContractCompatibilityReleaseR1,
+    TechnicalRetryPolicyV4_1_2_R1,
     TrackEExecutionManifestV4_1_2_R1,
     TrackERunBindingV4_1_2_R1,
     load_versioned_contract,
@@ -866,6 +868,16 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Author-approved V4.1.2-R1 execution manifest.",
     )
+    parser.add_argument(
+        "--round513-technical-retry-policy",
+        type=Path,
+        help="Frozen V4.1.2-R1 pre-action technical retry policy.",
+    )
+    parser.add_argument(
+        "--round513-process-cleanup-policy",
+        type=Path,
+        help="Frozen V4.1.2-R1 campaign-owned cleanup policy.",
+    )
     return parser
 
 
@@ -906,6 +918,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         args.round513_track_e_compatibility_release,
         args.round513_track_e_runtime_release,
         args.round513_track_e_execution_manifest,
+        args.round513_technical_retry_policy,
+        args.round513_process_cleanup_policy,
     )
     if any(round513_r1_arguments) and not round513_track_e_enabled:
         parser.error("Round 5.13 R1 artifacts require the base Track E arguments")
@@ -985,7 +999,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         round513_r1_enabled = binding_payload.get("runtime_binding_revision") == "R1"
         if round513_r1_enabled and not all(round513_r1_arguments):
             parser.error(
-                "Round 5.13 R1 requires compatibility, runtime, and execution releases"
+                "Round 5.13 R1 requires compatibility, runtime, execution, retry, and cleanup releases"
             )
         if not round513_r1_enabled and any(round513_r1_arguments):
             parser.error("R1 release arguments cannot be used with a V4.1 binding")
@@ -1013,6 +1027,22 @@ def main(argv: Optional[list[str]] = None) -> int:
                 runtime_release = CHRMLiteEngineeringSmokeRuntimeReleaseV4_1_2_R1(
                     **_load_json(args.round513_track_e_runtime_release)
                 )
+                retry_payload = _load_json(args.round513_technical_retry_policy)
+                retry_payload["allowed_technical_failure_categories"] = tuple(
+                    retry_payload["allowed_technical_failure_categories"]
+                )
+                technical_retry_policy = TechnicalRetryPolicyV4_1_2_R1(
+                    **retry_payload
+                )
+                cleanup_payload = _load_json(args.round513_process_cleanup_policy)
+                for field in (
+                    "campaign_owned_ports", "campaign_owned_lock_patterns",
+                    "campaign_owned_display_sessions", "required_target_checks",
+                ):
+                    cleanup_payload[field] = tuple(cleanup_payload[field])
+                process_cleanup_policy = ProcessCleanupPolicyV4_1_2_R1(
+                    **cleanup_payload
+                )
                 execution_manifest = TrackEExecutionManifestV4_1_2_R1(
                     **_load_json(args.round513_track_e_execution_manifest)
                 )
@@ -1029,6 +1059,8 @@ def main(argv: Optional[list[str]] = None) -> int:
                     binding=r1_binding,
                     compatibility=compatibility,
                     runtime_release=runtime_release,
+                    technical_retry_policy=technical_retry_policy,
+                    process_cleanup_policy=process_cleanup_policy,
                     execution_manifest=execution_manifest,
                     adapters=adapters,
                     cli_output_root=str(args.round513_track_e_output_root),

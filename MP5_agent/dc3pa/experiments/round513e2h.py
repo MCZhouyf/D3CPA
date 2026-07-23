@@ -502,6 +502,8 @@ def validate_track_e_r1_artifacts(
     binding: TrackERunBindingV4_1_2_R1,
     compatibility: Round513E2ContractCompatibilityReleaseR1,
     runtime_release: CHRMLiteEngineeringSmokeRuntimeReleaseV4_1_2_R1,
+    technical_retry_policy: TechnicalRetryPolicyV4_1_2_R1,
+    process_cleanup_policy: ProcessCleanupPolicyV4_1_2_R1,
     execution_manifest: TrackEExecutionManifestV4_1_2_R1,
     adapters: Mapping[str, ContractRuntimeAdapterV4_1_2_R1],
     cli_output_root: str,
@@ -521,6 +523,10 @@ def validate_track_e_r1_artifacts(
         or runtime_release.run_binding_schema_id != expected_binding_schema_id
         or runtime_release.technical_retry_policy_id != binding.technical_retry_policy_id
         or runtime_release.process_cleanup_policy_id != binding.process_cleanup_policy_id
+        or technical_retry_policy.policy_id != binding.technical_retry_policy_id
+        or process_cleanup_policy.policy_id != binding.process_cleanup_policy_id
+        or technical_retry_policy.source_commit != binding.execution_source_commit
+        or process_cleanup_policy.source_commit != binding.execution_source_commit
     ):
         raise ValueError("Runtime release/source/policy binding mismatch")
     required_types = {
