@@ -1,0 +1,22 @@
+{
+  "status": "DRAFT",
+  "author_approved": false,
+  "engineering_smoke_approved": false,
+  "formal_collection_approved": false,
+  "formal_assignments_generated": false,
+  "source_commit": null,
+  "contracts": [
+    "CHRMLiteDevelopmentCollectionAuthorization",
+    "CHRMLiteDevelopmentCollectionBlueprint",
+    "CHRMLiteDevelopmentSeedNamespace",
+    "CHRMLiteRuleTypeRegistryV4_1",
+    "CHRMLitePlannerOutputSchemaV4_1",
+    "CHRMLiteBilateralRetrievalPolicyV4_1",
+    "CHRMLiteStepOutcomeRegistryV4_1",
+    "CHRMLiteDecisionRecordSchemaV4_1",
+    "CHRMLiteCollectionExclusionRegistry",
+    "CHRMLiteSupportAndDegradationPolicy",
+    "CHRMLiteEngineeringSmokeDesign",
+    "CDTReplayFeasibilityBlueprint"
+  ]
+}
