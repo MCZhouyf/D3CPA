@@ -680,7 +680,7 @@ def default_outcome_definitions() -> tuple[StepOutcomeDefinition, ...]:
         StepOutcomeDefinition("equip", ("item", "inventory", "held_item"), ("held_item",), "equip_action_budget", "held_item_matches_requested_item", "budget_exhausted_with_observed_held_item_mismatch", common_technical, common_ambiguous),
         StepOutcomeDefinition("dig_down", ("position", "target_y"), ("position", "underground_state"), "dig_action_budget", "post_y_reaches_target_or_decreases_as_required", "budget_exhausted_with_observed_y_transition_absent", common_technical, common_ambiguous),
         StepOutcomeDefinition("dig_up", ("position", "underground_state"), ("position", "underground_state"), "dig_action_budget", "post_y_increases_and_surface_state_is_reached", "budget_exhausted_with_observed_upward_transition_absent", common_technical, common_ambiguous),
-        StepOutcomeDefinition("apply", ("target", "tool", "object_state"), ("object_state", "inventory_or_durability_delta"), "apply_action_budget", "target_object_state_changes_as requested", "budget_exhausted_with_observed_no_target_transition", common_technical, common_ambiguous),
+        StepOutcomeDefinition("apply", ("target", "tool", "object_state"), ("object_state", "inventory_or_durability_delta"), "apply_action_budget", "target_object_state_changes_as_requested", "budget_exhausted_with_observed_no_target_transition", common_technical, common_ambiguous),
     )
 
 

@@ -1,0 +1,20 @@
+{
+  "status": "DRAFT",
+  "author_approved": false,
+  "engineering_smoke_approved": false,
+  "approved_pool_id": null,
+  "assignments_fixed": false,
+  "assignment_count": 0,
+  "engineering_only": true,
+  "formal_fitting_eligible": false,
+  "outcome_selected": false,
+  "required_dimensions": [
+    "supported_action_families",
+    "five_difficulties",
+    "hard_rule_present",
+    "soft_rule_present",
+    "knowledge_unknown",
+    "environment_matched_unknown_mismatch",
+    "success_and_scientific_failure"
+  ]
+}

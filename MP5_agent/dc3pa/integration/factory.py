@@ -108,6 +108,7 @@ def build_stage6_runtime(
     ] = None,
     episode_id_provider: Optional[Callable[[int], str]] = None,
     development_shadow_observer: Any = None,
+    chrmlite_plan_source: Any = None,
 ) -> Stage6RuntimeBundle:
     """Compose Stage 0–5 components into the Stage-6 closed loop.
 
@@ -223,6 +224,7 @@ def build_stage6_runtime(
         record_metadata_provider=record_metadata_provider,
         episode_id_provider=episode_id_provider,
         development_shadow_observer=development_shadow_observer,
+        chrmlite_plan_source=chrmlite_plan_source,
     )
     return Stage6RuntimeBundle(
         runtime=runtime,

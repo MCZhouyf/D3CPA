@@ -131,12 +131,20 @@ class Stage6ClosedLoopRunner:
         ] = None,
         episode_id_provider: Optional[Callable[[int], str]] = None,
         development_shadow_observer: Any = None,
+        chrmlite_plan_source: Optional[PlanSource] = None,
     ):
         config.validate()
         if config.mode == "dc3pa" and cognitive_planner is None:
             raise ValueError("cognitive_planner is required in dc3pa mode")
         if config.mode == "mp5_legacy" and legacy_plan_source is None:
             raise ValueError("legacy_plan_source is required in mp5_legacy mode")
+        if (
+            config.mode == "chrmlite_estimation_collection_v41"
+            and chrmlite_plan_source is None
+        ):
+            raise ValueError(
+                "chrmlite_plan_source is required in chrmlite_estimation_collection_v41 mode"
+            )
         self.env = env
         self.config = config
         self.reasoning_chain = reasoning_chain
@@ -156,6 +164,7 @@ class Stage6ClosedLoopRunner:
         self.record_metadata_provider = record_metadata_provider
         self.episode_id_provider = episode_id_provider
         self.development_shadow_observer = development_shadow_observer
+        self.chrmlite_plan_source = chrmlite_plan_source
         self.memory_mode = MemoryMode.parse(config.memory_mode)
         if config.model_confidence_collection == "passive_final_plan":
             if confidence_observer is None or passive_confidence_scorer is None:
@@ -288,6 +297,16 @@ class Stage6ClosedLoopRunner:
             return _PlanningDecision(
                 plan=self._validate_plan_task(
                     self.reasoning_chain.plan(task, snapshot.state, planning_context), task
+                )
+            )
+        if self.config.mode == "chrmlite_estimation_collection_v41":
+            assert self.chrmlite_plan_source is not None
+            return _PlanningDecision(
+                plan=self._validate_plan_task(
+                    self.chrmlite_plan_source.plan(
+                        task, snapshot.state, planning_context
+                    ),
+                    task,
                 )
             )
 
@@ -830,16 +849,21 @@ class Stage6ClosedLoopRunner:
                 if self.episode_id_provider is not None
                 else new_episode_id(task, attempt_index)
             )
+            observer_prepared = True
             if self.development_shadow_observer is not None:
                 try:
-                    self.development_shadow_observer.prepare_attempt(
+                    prepared = self.development_shadow_observer.prepare_attempt(
                         plan=plan,
                         state=initial_snapshot.state,
                         context=reliability_context,
                         episode_id=episode_id,
                         attempt=attempt_index,
                     )
+                    if prepared is False:
+                        observer_prepared = False
                 except Exception as exc:
+                    if self.config.mode == "chrmlite_estimation_collection_v41":
+                        raise
                     self.development_shadow_observer.errors.append(
                         f"prepare attempt {attempt_index}: {type(exc).__name__}: {exc}"
                     )
@@ -849,6 +873,27 @@ class Stage6ClosedLoopRunner:
                         attempt_index,
                         {"error_type": type(exc).__name__, "error": str(exc)},
                     )
+            if not observer_prepared:
+                failure_reason = "completed_receipt_prevents_relaunch"
+                self._emit(
+                    events,
+                    "collection_relaunch_blocked",
+                    attempt_index,
+                    {"plan_id": plan.plan_id, "reason": failure_reason},
+                )
+                attempts.append(
+                    AttemptRecord(
+                        attempt=attempt_index,
+                        plan_id=plan.plan_id,
+                        plan_version=plan.version,
+                        controller_executed=False,
+                        controller_success=False,
+                        goal_success=False,
+                        duration_seconds=time.monotonic() - started,
+                        blocked_reason=failure_reason,
+                    )
+                )
+                break
             self._collect_passive_final_plan_confidence(
                 plan=plan,
                 state=initial_snapshot.state,
@@ -936,6 +981,8 @@ class Stage6ClosedLoopRunner:
                         attempt=attempt_index,
                     )
                 except Exception as exc:
+                    if self.config.mode == "chrmlite_estimation_collection_v41":
+                        raise
                     self.development_shadow_observer.errors.append(
                         f"finalize attempt {attempt_index}: {type(exc).__name__}: {exc}"
                     )

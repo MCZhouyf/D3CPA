@@ -9,7 +9,12 @@ from ..errors import ContractValidationError
 from ..memory.modes import MemoryMode
 
 
-_RUNTIME_MODES = {"mp5_legacy", "reasoning_only", "dc3pa"}
+_RUNTIME_MODES = {
+    "mp5_legacy",
+    "reasoning_only",
+    "dc3pa",
+    "chrmlite_estimation_collection_v41",
+}
 _UNRESOLVED_POLICIES = {"block", "reasoning_only", "execute"}
 _PLANNER_FAILURE_POLICIES = {"raise", "reasoning_only", "return_failure"}
 _CONTROLLER_EXCEPTION_POLICIES = {"raise", "return_failure"}
@@ -129,6 +134,31 @@ class Stage6RuntimeConfig:
             raise ContractValidationError(
                 "calibration_log_dir is only valid in memory_mode='acquire' or 'calibrate'"
             )
+
+        if self.mode == "chrmlite_estimation_collection_v41":
+            if memory_mode is not MemoryMode.EVALUATE_READONLY:
+                raise ContractValidationError(
+                    "chrmlite_estimation_collection_v41 requires evaluate_readonly memory"
+                )
+            if not self.telemetry_enabled:
+                raise ContractValidationError(
+                    "chrmlite_estimation_collection_v41 requires execution telemetry"
+                )
+            if self.model_confidence_collection != "disabled":
+                raise ContractValidationError(
+                    "V4.1 confidence must come from the Planner generation"
+                )
+            if any(
+                (
+                    self.record_legacy_workflow_memory,
+                    self.record_multimodal_memory,
+                    bool(self.acquisition_log_dir),
+                    bool(self.calibration_log_dir),
+                )
+            ):
+                raise ContractValidationError(
+                    "chrmlite_estimation_collection_v41 forbids Memory and Acquisition writes"
+                )
 
     @classmethod
     def from_mapping(cls, data: Mapping[str, Any]) -> "Stage6RuntimeConfig":

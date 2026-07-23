@@ -90,6 +90,20 @@ from dc3pa.experiments.round5124_holdout import (  # noqa: E402
     Round5124HoldoutRunBinding,
     Round5124HoldoutShadowCollector,
 )
+from dc3pa.experiments.round513_collection import (  # noqa: E402
+    CHRMLiteBilateralRetrievalPolicyV4_1,
+    CHRMLitePlannerOutputSchemaV4_1,
+    CHRMLiteRuleTypeRegistryV4_1,
+    CHRMLiteSupportAndDegradationPolicy,
+    RuleTypeDefinition,
+)
+from dc3pa.experiments.round513_instrumentation import (  # noqa: E402
+    AtomicDecisionStoreV4_1,
+    OneCallPlannerV4_1,
+    TrackECollectorV4_1,
+    TrackERunBindingV4_1,
+)
+from dc3pa.integration.providers import ChatModelTextAdapter  # noqa: E402
 from dc3pa.memory import (  # noqa: E402
     HashingTextEncoder,
     MultimodalMemory,
@@ -718,7 +732,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Run the Stage-6 DC3PA closed loop on the legacy MP5 environment"
     )
-    parser.add_argument("--mode", choices=("mp5_legacy", "reasoning_only", "dc3pa"), default="dc3pa")
+    parser.add_argument(
+        "--mode",
+        choices=(
+            "mp5_legacy",
+            "reasoning_only",
+            "dc3pa",
+            "chrmlite_estimation_collection_v41",
+        ),
+        default="dc3pa",
+    )
     parser.add_argument("--mllm_url", default="")
     parser.add_argument("--openai_key", default=os.environ.get("OPENAI_API_KEY", ""))
     parser.add_argument("--gpt_model_name", default=os.environ.get("GPT_MODEL_NAME", ""))
@@ -803,6 +826,21 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Exclusive JSONL output for one locked Round 5.12.4 holdout run.",
     )
+    parser.add_argument(
+        "--round513-track-e-binding",
+        type=Path,
+        help="Approved external engineering-only Track E run binding.",
+    )
+    parser.add_argument(
+        "--round513-contract-root",
+        type=Path,
+        help="External frozen Round 5.13C contract directory.",
+    )
+    parser.add_argument(
+        "--round513-track-e-output-root",
+        type=Path,
+        help="New empty output root for atomic Track E records.",
+    )
     return parser
 
 
@@ -829,8 +867,20 @@ def main(argv: Optional[list[str]] = None) -> int:
     round5124_holdout_enabled = any(
         (args.round5124_holdout_run, args.round5124_holdout_records)
     )
+    round513_arguments = (
+        args.round513_track_e_binding,
+        args.round513_contract_root,
+        args.round513_track_e_output_root,
+    )
+    round513_track_e_enabled = any(round513_arguments)
+    if round513_track_e_enabled and not all(round513_arguments):
+        parser.error(
+            "Round 5.13 Track E requires binding, contract root, and output root"
+        )
     if round511_enabled and round5124_holdout_enabled:
         parser.error("Development and holdout shadow collection are mutually exclusive")
+    if round513_track_e_enabled and (round511_enabled or round5124_holdout_enabled):
+        parser.error("Round 5.13 Track E cannot share a prior shadow/holdout collector")
     shadow_enabled = round511_enabled or round5124_holdout_enabled
     shadow_binding = None
     shadow_records_path = None
@@ -889,6 +939,98 @@ def main(argv: Optional[list[str]] = None) -> int:
         if not (args.image_encoder_factory and args.text_encoder_factory):
             parser.error("Round 5.11 development requires explicit MineCLIP encoders")
 
+    round513_binding = None
+    round513_planner_schema = None
+    round513_rule_registry = None
+    round513_retrieval_policy = None
+    round513_support_policy = None
+    if round513_track_e_enabled:
+        assert args.round513_track_e_binding is not None
+        assert args.round513_contract_root is not None
+        assert args.round513_track_e_output_root is not None
+        try:
+            round513_binding = TrackERunBindingV4_1(
+                **_load_json(args.round513_track_e_binding)
+            )
+            contract_root = args.round513_contract_root.resolve()
+            round513_planner_schema = CHRMLitePlannerOutputSchemaV4_1(
+                **_load_json(contract_root / "chrmlite_planner_output_schema_v4_1.json")
+            )
+            rule_payload = _load_json(
+                contract_root / "chrmlite_rule_type_registry_v4_1.json"
+            )
+            rule_payload["rules"] = tuple(
+                RuleTypeDefinition(**item) for item in rule_payload["rules"]
+            )
+            round513_rule_registry = CHRMLiteRuleTypeRegistryV4_1(**rule_payload)
+            round513_retrieval_policy = CHRMLiteBilateralRetrievalPolicyV4_1(
+                **_load_json(
+                    contract_root / "chrmlite_bilateral_retrieval_policy_v4_1.json"
+                )
+            )
+            round513_support_policy = CHRMLiteSupportAndDegradationPolicy(
+                **_load_json(
+                    contract_root / "chrmlite_support_and_degradation_policy.json"
+                )
+            )
+            round513_binding.require_execution_authorized()
+        except (KeyError, OSError, TypeError, ValueError, PermissionError) as exc:
+            parser.error(str(exc))
+        current_commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=ROOT.parent,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        if round513_binding.source_commit != current_commit:
+            parser.error("Round 5.13 Track E binding/source commit mismatch")
+        contract_sources = {
+            round513_planner_schema.source_commit,
+            round513_rule_registry.source_commit,
+            round513_retrieval_policy.source_commit,
+            round513_support_policy.source_commit,
+        }
+        if contract_sources != {current_commit}:
+            parser.error("Round 5.13 Track E contract/source commit mismatch")
+        if any(
+            (
+                round513_binding.planner_schema_id
+                != round513_planner_schema.schema_id,
+                round513_binding.planner_prompt_id
+                != round513_planner_schema.prompt_id,
+                round513_binding.planner_parser_id
+                != round513_planner_schema.parser_id,
+                round513_binding.rule_registry_id
+                != round513_rule_registry.registry_id,
+                round513_binding.dependency_schema_id
+                != round513_rule_registry.dependency_schema_id,
+                round513_binding.memory_release_id
+                != round513_retrieval_policy.paper_memory_v5_release_id,
+                round513_binding.scene_release_id
+                != round513_retrieval_policy.scene_exemplar_release_id,
+                round513_binding.mineclip_policy_id
+                != round513_retrieval_policy.mineclip_policy_id,
+            )
+        ):
+            parser.error("Round 5.13 Track E binding/frozen-contract lineage mismatch")
+        if args.mode != "chrmlite_estimation_collection_v41":
+            parser.error("Round 5.13 Track E requires its dedicated runtime mode")
+        if any(
+            (
+                args.formal_acquisition_campaign,
+                args.round5124_holdout_run,
+                args.real_experiment_phase_state,
+            )
+        ):
+            parser.error(
+                "Round 5.13 Track E cannot mount Acquisition, Holdout, or final-phase inputs"
+            )
+        if args.round513_track_e_output_root.exists() and any(
+            args.round513_track_e_output_root.iterdir()
+        ):
+            parser.error("Round 5.13 Track E output root must be empty")
+
     payload = _load_json(args.config)
     try:
         model_profile = _resolve_model_profile(args.model_profile, payload)
@@ -932,6 +1074,22 @@ def main(argv: Optional[list[str]] = None) -> int:
             capture_final_scene=False,
         )
         os.environ["MP5_DISABLE_MEMORY"] = "1"
+    if round513_track_e_enabled:
+        runtime_config = replace(
+            runtime_config,
+            mode="chrmlite_estimation_collection_v41",
+            memory_mode=MemoryMode.EVALUATE_READONLY.value,
+            memory_snapshot_manifest=str(args.memory_root / "snapshot_manifest.json"),
+            telemetry_enabled=True,
+            record_legacy_workflow_memory=False,
+            record_multimodal_memory=False,
+            acquisition_log_dir="",
+            calibration_log_dir="",
+            model_confidence_collection="disabled",
+            capture_final_scene=False,
+            planner_failure_policy="raise",
+        )
+        os.environ["MP5_DISABLE_MEMORY"] = "1"
     dry_run_enabled = any(
         (
             args.dry_run_campaign,
@@ -947,6 +1105,10 @@ def main(argv: Optional[list[str]] = None) -> int:
             args.paired_dry_run_protocol,
         )
     )
+    if round513_track_e_enabled and (dry_run_enabled or fallback_arguments_present):
+        parser.error(
+            "Round 5.13 Track E cannot share a legacy dry-run or diagnostic fallback session"
+        )
     formal_bootstrap_arguments = (
         args.formal_log_bootstrap_policy,
         args.formal_bootstrap_amendment,
@@ -957,6 +1119,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         args.formal_bootstrap_receipt,
     )
     formal_bootstrap_enabled = any(formal_bootstrap_arguments)
+    if round513_track_e_enabled and formal_bootstrap_enabled:
+        parser.error("Round 5.13 Track E cannot share a formal bootstrap session")
     if formal_bootstrap_enabled and not all(formal_bootstrap_arguments):
         parser.error("formal log bootstrap requires all formal bootstrap arguments")
     if formal_bootstrap_enabled and fallback_arguments_present:
@@ -978,6 +1142,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     formal_acquisition_enabled = any(
         value is not None for value in formal_acquisition_arguments
     )
+    if round513_track_e_enabled and formal_acquisition_enabled:
+        parser.error("Round 5.13 Track E cannot share a formal Acquisition session")
     if formal_acquisition_enabled and not all(
         value is not None for value in formal_acquisition_arguments
     ):
@@ -2028,6 +2194,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             )
             with memory_context as multimodal_memory:
                 development_shadow_observer = None
+                chrmlite_plan_source = None
                 if shadow_enabled:
                     assert shadow_binding is not None
                     if multimodal_memory is None or not multimodal_memory.readonly:
@@ -2052,6 +2219,35 @@ def main(argv: Optional[list[str]] = None) -> int:
                     development_shadow_observer = collector_type(
                         memory=multimodal_memory,
                         binding=shadow_binding,
+                    )
+                if round513_track_e_enabled:
+                    assert round513_binding is not None
+                    assert round513_planner_schema is not None
+                    assert round513_rule_registry is not None
+                    assert round513_retrieval_policy is not None
+                    assert round513_support_policy is not None
+                    assert args.round513_track_e_output_root is not None
+                    if multimodal_memory is None or not multimodal_memory.readonly:
+                        raise RuntimeError(
+                            "Round 5.13 Track E requires Paper Memory V5 read-only"
+                        )
+                    chrmlite_plan_source = OneCallPlannerV4_1(
+                        ChatModelTextAdapter(planner_instance.llm),
+                        round513_planner_schema,
+                    )
+                    development_shadow_observer = TrackECollectorV4_1(
+                        memory=multimodal_memory,
+                        binding=round513_binding,
+                        rule_registry=round513_rule_registry,
+                        retrieval_policy=round513_retrieval_policy,
+                        store=AtomicDecisionStoreV4_1(
+                            args.round513_track_e_output_root.resolve()
+                        ),
+                        dependency_support_threshold=(
+                            round513_support_policy.dependency_support_threshold
+                        ),
+                        gamma_minus=round513_binding.gamma_minus,
+                        gamma_plus=round513_binding.gamma_plus,
                     )
                 bundle = build_stage6_runtime(
                     env=evaluator.env,
@@ -2092,11 +2288,16 @@ def main(argv: Optional[list[str]] = None) -> int:
                         else None
                     ),
                     episode_id_provider=(
-                        (lambda _attempt_index: formal_acquisition_attempt_id)
-                        if formal_acquisition_enabled
-                        else None
+                        (lambda _attempt_index: round513_binding.episode_id)
+                        if round513_track_e_enabled
+                        else (
+                            (lambda _attempt_index: formal_acquisition_attempt_id)
+                            if formal_acquisition_enabled
+                            else None
+                        )
                     ),
                     development_shadow_observer=development_shadow_observer,
+                    chrmlite_plan_source=chrmlite_plan_source,
                 )
                 task_list = _load_task_list(args.task)
                 if shadow_enabled:
@@ -2122,6 +2323,12 @@ def main(argv: Optional[list[str]] = None) -> int:
                         raise ValueError("Round 5.11 launch/binding seed mismatch")
                     if args.formal_bootstrap_scope != shadow_binding.role:
                         raise ValueError("Round 5.11 bootstrap scope/role mismatch")
+                if round513_track_e_enabled:
+                    assert round513_binding is not None
+                    if len(task_list) != 1:
+                        raise ValueError("Round 5.13 Track E requires one task JSON")
+                    if str(task_list[0].get("task", "")) != round513_binding.task:
+                        raise ValueError("Round 5.13 Track E task/binding mismatch")
                 underground = False
                 all_succeeded = True
                 last_result = None

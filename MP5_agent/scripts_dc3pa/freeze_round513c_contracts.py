@@ -96,7 +96,7 @@ def main() -> int:
         raise ValueError("Round 5.13C output root must be empty")
 
     controller_id = _file_set_id(
-        (ROOT / "agent/controller.py", ROOT / "dc3pa/integration/adapters.py")
+        (ROOT / "agent/controller.py", ROOT / "dc3pa/integration/controller.py")
     )
     evaluator_id = _file_set_id((ROOT / "agent/run_agent.py",))
     budget_id = _file_set_id((ROOT / "dc3pa/integration/stage6_config.py",))
