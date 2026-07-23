@@ -31,6 +31,7 @@ from dc3pa.memory.snapshot import (
 
 SCHEMA_VERSION = 1
 FULL_ID = re.compile(r"[0-9a-f]{64}")
+HISTORICAL_REFERENCE = re.compile(r"[0-9a-f]{8,64}")
 ACTUAL_PROVENANCE_STATUSES = {
     "ACTUAL_PROVENANCE_CLOSED",
     "ACTUAL_PROVENANCE_INCOMPLETE",
@@ -691,14 +692,17 @@ class RetirementEntry:
     object_id: str
     object_kind: str
     reason: str
+    identity_complete: bool = True
     historical_object_preserved: bool = True
     prospective_use_forbidden: bool = True
     equivalence_to_actual_artifact_claimed: bool = False
     scientific_results_produced_under_object: int = 0
 
     def __post_init__(self) -> None:
-        if not _full_id(self.object_id):
-            raise ValueError("Retirement requires a full object ID")
+        if HISTORICAL_REFERENCE.fullmatch(self.object_id) is None:
+            raise ValueError("Retirement requires a hexadecimal historical reference")
+        if self.identity_complete != _full_id(self.object_id):
+            raise ValueError("Retirement identity-completeness declaration is incorrect")
         if not all((self.historical_object_preserved, self.prospective_use_forbidden)):
             raise ValueError("Retirement safeguards are incomplete")
         if self.equivalence_to_actual_artifact_claimed:
@@ -951,8 +955,8 @@ def transitive_dependency_ids(
     """Return full-ID nodes that directly or transitively bind invalid roots."""
 
     roots = set(invalid_roots)
-    if any(not _full_id(value) for value in roots):
-        raise ValueError("Dependency roots must use full IDs")
+    if any(HISTORICAL_REFERENCE.fullmatch(value) is None for value in roots):
+        raise ValueError("Dependency roots must be hexadecimal historical references")
     dependent: set[str] = set()
     changed = True
     while changed:

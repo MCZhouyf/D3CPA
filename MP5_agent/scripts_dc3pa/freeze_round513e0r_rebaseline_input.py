@@ -84,7 +84,7 @@ def _full_hex_values(value: Any) -> set[str]:
         for child in value:
             result.update(_full_hex_values(child))
         return result
-    if isinstance(value, str) and len(value) == 64:
+    if isinstance(value, str) and 8 <= len(value) <= 64:
         try:
             int(value, 16)
         except ValueError:
@@ -229,7 +229,12 @@ def main() -> int:
     retirement = InvalidBindingRetirementRegistry(
         source_commit=source,
         entries=tuple(
-            RetirementEntry(object_id=object_id, object_kind=kind, reason=reason)
+            RetirementEntry(
+                object_id=object_id,
+                object_kind=kind,
+                reason=reason,
+                identity_complete=len(object_id) == 64,
+            )
             for object_id, kind, reason in required_objects
         ),
     ).with_id()

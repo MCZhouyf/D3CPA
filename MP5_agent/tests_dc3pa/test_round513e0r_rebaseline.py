@@ -132,6 +132,23 @@ def test_invalid_prefixes_never_compare_as_full_ids():
     assert not exact_full_id_equal(value, value[:12])
 
 
+def test_malformed_63_character_historical_reference_is_retired_without_padding():
+    malformed = "a" * 63
+    entry = RetirementEntry(
+        object_id=malformed,
+        object_kind="invalid_mineclip_reference",
+        reason="historical reference is not a complete SHA-256 identity",
+        identity_complete=False,
+    )
+    registry = InvalidBindingRetirementRegistry(
+        source_commit="s" * 40,
+        entries=(entry,),
+    ).with_id()
+    assert registry.rejects(malformed)
+    with pytest.raises(ValueError, match="completeness"):
+        replace(entry, identity_complete=True)
+
+
 def test_closed_actual_provenance_requires_40_36_27_144_and_no_mutation():
     closure = _closure()
     assert closure.accepted_episode_count == 40
