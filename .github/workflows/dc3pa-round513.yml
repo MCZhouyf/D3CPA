@@ -29,4 +29,5 @@ jobs:
       - run: python scripts_dc3pa/run_round513d_gate.py
       - run: python scripts_dc3pa/run_round513e0_gate.py
       - run: python scripts_dc3pa/run_round513e0r_gate.py
+      - run: python scripts_dc3pa/run_round513e1r_gate.py
       - run: python -m pytest -q tests_dc3pa -m "not minedojo"

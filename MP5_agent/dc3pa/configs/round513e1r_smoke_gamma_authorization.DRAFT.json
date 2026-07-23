@@ -1,0 +1,28 @@
+{
+  "status": "DRAFT_AUTHOR_APPROVAL_REQUIRED",
+  "contract_version": "4.1.2",
+  "v3_status": null,
+  "gamma_case": "G3",
+  "gamma_candidate_selected": false,
+  "smoke_authorization_status": "pending",
+  "minedojo_smoke_permitted": false,
+  "formal_development_permitted": false,
+  "chrm_cdt_fitting_permitted": false,
+  "holdout_final_round6_permitted": false,
+  "public_objects": [
+    "PaperMemoryV5AuthoritativeEvidenceRelease",
+    "SceneExemplarEvidenceReleaseV5R",
+    "MineCLIPPolicyBindingReleaseV5R",
+    "Round513V412DependencyGraph",
+    "Round513V412RegenerationPlan",
+    "Round513V412AlgorithmicEquivalenceAudit",
+    "Round513V412InstrumentationRevalidationAudit",
+    "Round513EPreSmokeIntegrityAuditV3",
+    "CHRMLiteEngineeringSmokePoolV4_1_2",
+    "CHRMLiteEngineeringSmokeAssignmentsV4_1_2",
+    "CHRMLiteEngineeringSmokeExclusionAuditV4_1_2",
+    "CHRMLiteEngineeringSmokeSealV4_1_2",
+    "BilateralGammaProvenanceReport",
+    "CHRMLiteEngineeringSmokeAuthorizationInputV4_1_2"
+  ]
+}
