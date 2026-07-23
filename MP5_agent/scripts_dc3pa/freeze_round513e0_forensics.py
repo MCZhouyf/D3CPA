@@ -66,6 +66,8 @@ def main() -> int:
     parser.add_argument("--lineage-input", type=Path, required=True)
     parser.add_argument("--lineage-audit", type=Path, required=True)
     parser.add_argument("--paper-memory-release", type=Path, required=True)
+    parser.add_argument("--frozen-memory-release", type=Path, required=True)
+    parser.add_argument("--quarantined-prior-scene-release-id")
     args = parser.parse_args()
 
     source = subprocess.check_output(
@@ -106,6 +108,7 @@ def main() -> int:
         lineage_input_path=args.lineage_input,
         lineage_audit_path=args.lineage_audit,
         paper_memory_release_path=args.paper_memory_release,
+        frozen_memory_release_path=args.frozen_memory_release,
         mineclip_checkpoint_manifest_path=args.checkpoint_manifest,
     )
     snapshot_smoke = run_readonly_snapshot_smoke(args.snapshot_manifest)
@@ -151,6 +154,11 @@ def main() -> int:
         "contract_supersession_created": False,
         "smoke_preparation_created": False,
         "minedojo_started": False,
+        "quarantined_prior_scene_release_ids": (
+            [args.quarantined_prior_scene_release_id]
+            if args.quarantined_prior_scene_release_id
+            else []
+        ),
         "artifacts": entries,
     }
     _write_exclusive(output / "manifest.json", manifest)

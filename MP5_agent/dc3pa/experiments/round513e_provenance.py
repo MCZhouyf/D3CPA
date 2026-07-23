@@ -45,6 +45,16 @@ def canonical_policy_id(payload: Mapping[str, Any]) -> str:
     return canonical_sha256(value)
 
 
+def exact_binding_errors(
+    bindings: Mapping[str, tuple[Any, Any]],
+) -> tuple[str, ...]:
+    return tuple(
+        f"{label} binding mismatch: expected={expected}, actual={actual}"
+        for label, (expected, actual) in bindings.items()
+        if expected != actual
+    )
+
+
 def _file_sha(path: str | Path) -> str:
     return sha256_file(Path(path))
 
@@ -430,6 +440,7 @@ def build_scene_exemplar_evidence_release(
     lineage_input_path: str | Path,
     lineage_audit_path: str | Path,
     paper_memory_release_path: str | Path,
+    frozen_memory_release_path: str | Path,
     mineclip_checkpoint_manifest_path: str | Path,
 ) -> tuple[SceneExemplarReleaseForensicAudit, SceneExemplarEvidenceReleaseV5 | None]:
     snapshot_path = Path(snapshot_manifest_path).resolve()
@@ -437,12 +448,14 @@ def build_scene_exemplar_evidence_release(
     lineage_path = Path(lineage_input_path).resolve()
     lineage_audit_path = Path(lineage_audit_path).resolve()
     paper_path = Path(paper_memory_release_path).resolve()
+    frozen_path = Path(frozen_memory_release_path).resolve()
     checkpoint_path = Path(mineclip_checkpoint_manifest_path).resolve()
     manifest = MemorySnapshotManifest.from_json(snapshot_path)
     acquisition = json.loads(acquisition_path.read_text(encoding="utf-8"))
     lineage_payload = json.loads(lineage_path.read_text(encoding="utf-8"))
     lineage_audit = json.loads(lineage_audit_path.read_text(encoding="utf-8"))
     paper = json.loads(paper_path.read_text(encoding="utf-8"))
+    frozen = json.loads(frozen_path.read_text(encoding="utf-8"))
     checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
     errors: list[str] = []
 
@@ -450,6 +463,32 @@ def build_scene_exemplar_evidence_release(
     snapshot_before = manifest.snapshot_root_sha256
     database_before = _file_sha(manifest.database_path)
     asset_manifest_before = canonical_sha256(manifest.asset_files)
+    snapshot_manifest_sha = _file_sha(snapshot_path)
+    acquisition_manifest_sha = _file_sha(acquisition_path)
+    expected_bindings = {
+        "paper snapshot manifest": (paper.get("snapshot_manifest_sha256"), snapshot_manifest_sha),
+        "paper snapshot root": (paper.get("snapshot_root_sha256"), snapshot_before),
+        "paper database": (paper.get("database_sha256"), database_before),
+        "paper checkpoint manifest": (
+            paper.get("mineclip_checkpoint_manifest_id"),
+            checkpoint.get("manifest_id"),
+        ),
+        "frozen snapshot manifest": (
+            frozen.get("snapshot_manifest_sha256"),
+            snapshot_manifest_sha,
+        ),
+        "frozen snapshot root": (frozen.get("snapshot_root_sha256"), snapshot_before),
+        "frozen database": (frozen.get("database_sha256"), database_before),
+        "frozen acquisition manifest": (
+            frozen.get("acquisition_manifest_sha256"),
+            acquisition_manifest_sha,
+        ),
+        "paper/frozen release": (
+            paper.get("frozen_memory_release_id"),
+            frozen.get("release_id"),
+        ),
+    }
+    errors.extend(exact_binding_errors(expected_bindings))
     lineage = {
         str(item["retained_scene_id"]): item
         for item in lineage_payload.get("candidate_lineage", ())
@@ -577,11 +616,11 @@ def build_scene_exemplar_evidence_release(
             paper_memory_v5_release_id=str(paper["release_id"]),
             mineclip_policy_id=str(paper["mineclip_policy_id"]),
             mineclip_checkpoint_manifest_id=str(checkpoint["manifest_id"]),
-            snapshot_manifest_sha256=_file_sha(snapshot_path),
+            snapshot_manifest_sha256=snapshot_manifest_sha,
             snapshot_root_sha256=snapshot_before,
             database_sha256=database_before,
             asset_manifest_sha256=asset_manifest_before,
-            acquisition_manifest_sha256=_file_sha(acquisition_path),
+            acquisition_manifest_sha256=acquisition_manifest_sha,
             acquisition_root_sha256=str(paper["acquisition_root_sha256"]),
             successful_episode_count=len(episodes),
             scene_exemplar_count=len(rows),

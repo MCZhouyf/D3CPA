@@ -14,3 +14,9 @@ supersession and smoke preparation. Aggregate scene counts are insufficient to
 create a Scene Exemplar evidence release; all 144 retained rows require image,
 embedding, source episode, action, subgoal, deduplication, and database-row
 lineage.
+
+The validator also requires the Paper Memory and frozen-memory releases to
+bind the exact snapshot manifest, snapshot root, database, acquisition
+manifest, checkpoint manifest, and release IDs. Matching aggregate counts or a
+matching snapshot-root digest cannot substitute for a missing historical
+manifest file.

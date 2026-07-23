@@ -12,6 +12,7 @@ from dc3pa.experiments.round513e_provenance import (
     audit_mineclip_identity,
     build_blocked_v2_audit,
     canonical_policy_id,
+    exact_binding_errors,
 )
 
 
@@ -159,6 +160,19 @@ def _scene_release(records):
 def test_aggregate_counts_alone_cannot_create_scene_release():
     with pytest.raises(ValueError, match="Aggregate counts alone"):
         _scene_release(())
+
+
+def test_exact_release_binding_rejects_relocated_manifest_even_when_root_matches():
+    errors = exact_binding_errors(
+        {
+            "snapshot manifest": ("old-manifest-sha", "relocated-manifest-sha"),
+            "snapshot root": ("same-root", "same-root"),
+        }
+    )
+    assert errors == (
+        "snapshot manifest binding mismatch: "
+        "expected=old-manifest-sha, actual=relocated-manifest-sha",
+    )
 
 
 def test_scene_release_requires_complete_unique_per_scene_lineage():
