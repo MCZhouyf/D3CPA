@@ -103,6 +103,16 @@ from dc3pa.experiments.round513_instrumentation import (  # noqa: E402
     TrackECollectorV4_1,
     TrackERunBindingV4_1,
 )
+from dc3pa.experiments.round513e2h import (  # noqa: E402
+    AtomicDecisionStoreV4_1_2_R1,
+    CHRMLiteEngineeringSmokeRuntimeReleaseV4_1_2_R1,
+    ContractCompatibilityEntry,
+    Round513E2ContractCompatibilityReleaseR1,
+    TrackEExecutionManifestV4_1_2_R1,
+    TrackERunBindingV4_1_2_R1,
+    load_versioned_contract,
+    validate_track_e_r1_artifacts,
+)
 from dc3pa.integration.providers import ChatModelTextAdapter  # noqa: E402
 from dc3pa.memory import (  # noqa: E402
     HashingTextEncoder,
@@ -841,6 +851,21 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="New empty output root for atomic Track E records.",
     )
+    parser.add_argument(
+        "--round513-track-e-compatibility-release",
+        type=Path,
+        help="Exact V4.1.2-R1 contract compatibility allowlist.",
+    )
+    parser.add_argument(
+        "--round513-track-e-runtime-release",
+        type=Path,
+        help="Frozen V4.1.2-R1 source-hardening runtime release.",
+    )
+    parser.add_argument(
+        "--round513-track-e-execution-manifest",
+        type=Path,
+        help="Author-approved V4.1.2-R1 execution manifest.",
+    )
     return parser
 
 
@@ -877,6 +902,13 @@ def main(argv: Optional[list[str]] = None) -> int:
         parser.error(
             "Round 5.13 Track E requires binding, contract root, and output root"
         )
+    round513_r1_arguments = (
+        args.round513_track_e_compatibility_release,
+        args.round513_track_e_runtime_release,
+        args.round513_track_e_execution_manifest,
+    )
+    if any(round513_r1_arguments) and not round513_track_e_enabled:
+        parser.error("Round 5.13 R1 artifacts require the base Track E arguments")
     if round511_enabled and round5124_holdout_enabled:
         parser.error("Development and holdout shadow collection are mutually exclusive")
     if round513_track_e_enabled and (round511_enabled or round5124_holdout_enabled):
@@ -944,35 +976,128 @@ def main(argv: Optional[list[str]] = None) -> int:
     round513_rule_registry = None
     round513_retrieval_policy = None
     round513_support_policy = None
+    round513_r1_enabled = False
     if round513_track_e_enabled:
         assert args.round513_track_e_binding is not None
         assert args.round513_contract_root is not None
         assert args.round513_track_e_output_root is not None
+        binding_payload = _load_json(args.round513_track_e_binding)
+        round513_r1_enabled = binding_payload.get("runtime_binding_revision") == "R1"
+        if round513_r1_enabled and not all(round513_r1_arguments):
+            parser.error(
+                "Round 5.13 R1 requires compatibility, runtime, and execution releases"
+            )
+        if not round513_r1_enabled and any(round513_r1_arguments):
+            parser.error("R1 release arguments cannot be used with a V4.1 binding")
         try:
-            round513_binding = TrackERunBindingV4_1(
-                **_load_json(args.round513_track_e_binding)
-            )
             contract_root = args.round513_contract_root.resolve()
-            round513_planner_schema = CHRMLitePlannerOutputSchemaV4_1(
-                **_load_json(contract_root / "chrmlite_planner_output_schema_v4_1.json")
-            )
-            rule_payload = _load_json(
-                contract_root / "chrmlite_rule_type_registry_v4_1.json"
-            )
-            rule_payload["rules"] = tuple(
-                RuleTypeDefinition(**item) for item in rule_payload["rules"]
-            )
-            round513_rule_registry = CHRMLiteRuleTypeRegistryV4_1(**rule_payload)
-            round513_retrieval_policy = CHRMLiteBilateralRetrievalPolicyV4_1(
-                **_load_json(
-                    contract_root / "chrmlite_bilateral_retrieval_policy_v4_1.json"
+            if round513_r1_enabled:
+                r1_binding = TrackERunBindingV4_1_2_R1(**binding_payload)
+                compatibility_payload = _load_json(
+                    args.round513_track_e_compatibility_release
                 )
-            )
-            round513_support_policy = CHRMLiteSupportAndDegradationPolicy(
-                **_load_json(
-                    contract_root / "chrmlite_support_and_degradation_policy.json"
+                compatibility_payload["entries"] = tuple(
+                    ContractCompatibilityEntry(
+                        **{
+                            **item,
+                            "allowed_execution_source_commits": tuple(
+                                item["allowed_execution_source_commits"]
+                            ),
+                        }
+                    )
+                    for item in compatibility_payload["entries"]
                 )
-            )
+                compatibility = Round513E2ContractCompatibilityReleaseR1(
+                    **compatibility_payload
+                )
+                runtime_release = CHRMLiteEngineeringSmokeRuntimeReleaseV4_1_2_R1(
+                    **_load_json(args.round513_track_e_runtime_release)
+                )
+                execution_manifest = TrackEExecutionManifestV4_1_2_R1(
+                    **_load_json(args.round513_track_e_execution_manifest)
+                )
+                adapters = {
+                    entry.contract_type: load_versioned_contract(
+                        contract_root / entry.filename,
+                        contract_type=entry.contract_type,
+                        expected_contract_id=entry.contract_id,
+                        expected_file_sha256=entry.file_sha256,
+                    )
+                    for entry in compatibility.entries
+                }
+                validate_track_e_r1_artifacts(
+                    binding=r1_binding,
+                    compatibility=compatibility,
+                    runtime_release=runtime_release,
+                    execution_manifest=execution_manifest,
+                    adapters=adapters,
+                    cli_output_root=str(args.round513_track_e_output_root),
+                )
+                planner_payload = dict(adapters["planner_schema"].raw_contract_payload)
+                round513_planner_schema = CHRMLitePlannerOutputSchemaV4_1(
+                    **planner_payload
+                )
+                rule_payload = dict(adapters["rule_registry"].raw_contract_payload)
+                rule_payload["rules"] = tuple(
+                    RuleTypeDefinition(**item) for item in rule_payload["rules"]
+                )
+                round513_rule_registry = CHRMLiteRuleTypeRegistryV4_1(**rule_payload)
+                round513_retrieval_policy = CHRMLiteBilateralRetrievalPolicyV4_1(
+                    **adapters["bilateral_retrieval_policy"].normalized_runtime_view,
+                )
+                round513_support_policy = CHRMLiteSupportAndDegradationPolicy(
+                    **adapters["support_policy"].raw_contract_payload
+                )
+                round513_binding = TrackERunBindingV4_1(
+                    authorization_id=r1_binding.authorization_receipt_id,
+                    authorization_status="approved",
+                    engineering_smoke_approved=True,
+                    engineering_only=True,
+                    campaign_id=r1_binding.campaign_id,
+                    source_commit=r1_binding.execution_source_commit,
+                    task=r1_binding.task,
+                    terminal_task=r1_binding.terminal_task,
+                    split="engineering_smoke",
+                    group_id=r1_binding.assignment_id,
+                    seed_commitment=r1_binding.seed_commitment,
+                    run_id=r1_binding.run_id,
+                    episode_id=r1_binding.episode_id,
+                    memory_release_id=r1_binding.paper_memory_release_id,
+                    dependency_schema_id=round513_rule_registry.dependency_schema_id,
+                    rule_registry_id=r1_binding.rule_registry_id,
+                    scene_release_id=r1_binding.scene_exemplar_release_id,
+                    mineclip_policy_id=r1_binding.mineclip_policy_id,
+                    planner_schema_id=r1_binding.planner_schema_id,
+                    planner_prompt_id=r1_binding.planner_prompt_id,
+                    planner_parser_id=r1_binding.planner_parser_id,
+                    controller_contract_id=r1_binding.controller_id,
+                    evaluator_contract_id=r1_binding.evaluator_id,
+                    budget_profile_id=r1_binding.budget_profile_id,
+                    gamma_minus=float(r1_binding.gamma_minus_text),
+                    gamma_plus=float(r1_binding.gamma_plus_text),
+                )
+            else:
+                round513_binding = TrackERunBindingV4_1(**binding_payload)
+                round513_planner_schema = CHRMLitePlannerOutputSchemaV4_1(
+                    **_load_json(contract_root / "chrmlite_planner_output_schema_v4_1.json")
+                )
+                rule_payload = _load_json(
+                    contract_root / "chrmlite_rule_type_registry_v4_1.json"
+                )
+                rule_payload["rules"] = tuple(
+                    RuleTypeDefinition(**item) for item in rule_payload["rules"]
+                )
+                round513_rule_registry = CHRMLiteRuleTypeRegistryV4_1(**rule_payload)
+                round513_retrieval_policy = CHRMLiteBilateralRetrievalPolicyV4_1(
+                    **_load_json(
+                        contract_root / "chrmlite_bilateral_retrieval_policy_v4_1.json"
+                    )
+                )
+                round513_support_policy = CHRMLiteSupportAndDegradationPolicy(
+                    **_load_json(
+                        contract_root / "chrmlite_support_and_degradation_policy.json"
+                    )
+                )
             round513_binding.require_execution_authorized()
         except (KeyError, OSError, TypeError, ValueError, PermissionError) as exc:
             parser.error(str(exc))
@@ -985,14 +1110,15 @@ def main(argv: Optional[list[str]] = None) -> int:
         ).stdout.strip()
         if round513_binding.source_commit != current_commit:
             parser.error("Round 5.13 Track E binding/source commit mismatch")
-        contract_sources = {
-            round513_planner_schema.source_commit,
-            round513_rule_registry.source_commit,
-            round513_retrieval_policy.source_commit,
-            round513_support_policy.source_commit,
-        }
-        if contract_sources != {current_commit}:
-            parser.error("Round 5.13 Track E contract/source commit mismatch")
+        if not round513_r1_enabled:
+            contract_sources = {
+                round513_planner_schema.source_commit,
+                round513_rule_registry.source_commit,
+                round513_retrieval_policy.source_commit,
+                round513_support_policy.source_commit,
+            }
+            if contract_sources != {current_commit}:
+                parser.error("Round 5.13 Track E contract/source commit mismatch")
         if any(
             (
                 round513_binding.planner_schema_id
@@ -2240,8 +2366,14 @@ def main(argv: Optional[list[str]] = None) -> int:
                         binding=round513_binding,
                         rule_registry=round513_rule_registry,
                         retrieval_policy=round513_retrieval_policy,
-                        store=AtomicDecisionStoreV4_1(
-                            args.round513_track_e_output_root.resolve()
+                        store=(
+                            AtomicDecisionStoreV4_1_2_R1(
+                                args.round513_track_e_output_root.resolve()
+                            )
+                            if round513_r1_enabled
+                            else AtomicDecisionStoreV4_1(
+                                args.round513_track_e_output_root.resolve()
+                            )
                         ),
                         dependency_support_threshold=(
                             round513_support_policy.dependency_support_threshold
