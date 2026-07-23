@@ -5,6 +5,7 @@ on:
     branches:
       - "round513-chrmlite-cdtlite-v41"
       - "round513cd-chrmlite-data-instrumentation"
+      - "round513e0-memory-provenance-rebind"
   pull_request:
 
 jobs:
@@ -25,4 +26,5 @@ jobs:
       - run: python scripts_dc3pa/run_round513b_gate.py
       - run: python scripts_dc3pa/run_round513c_gate.py
       - run: python scripts_dc3pa/run_round513d_gate.py
+      - run: python scripts_dc3pa/run_round513e0_gate.py
       - run: python -m pytest -q tests_dc3pa -m "not minedojo"

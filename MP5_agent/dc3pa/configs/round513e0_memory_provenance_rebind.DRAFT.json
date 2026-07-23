@@ -1,0 +1,15 @@
+{
+  "status": "DRAFT",
+  "source_commit": null,
+  "mineclip_forensic_case": null,
+  "scene_forensic_case": null,
+  "contract_supersession_created": false,
+  "smoke_preparation_created": false,
+  "minedojo_started": false,
+  "public_objects": [
+    "MineCLIPIdentityForensicAudit",
+    "SceneExemplarReleaseForensicAudit",
+    "SceneExemplarEvidenceReleaseV5",
+    "Round513EPreSmokeIntegrityAuditV2"
+  ]
+}
