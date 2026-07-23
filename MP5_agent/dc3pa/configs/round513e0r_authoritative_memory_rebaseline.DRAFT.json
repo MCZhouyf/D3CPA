@@ -1,0 +1,21 @@
+{
+  "status": "DRAFT_AUTHOR_APPROVAL_REQUIRED",
+  "source_commit": null,
+  "actual_provenance_status": null,
+  "embedding_evidence_path": null,
+  "rebaseline_authorization_status": "pending",
+  "contract_regeneration_permitted": false,
+  "memory_mutation_permitted": false,
+  "minedojo_permitted": false,
+  "formal_development_permitted": false,
+  "chrm_cdt_fitting_permitted": false,
+  "holdout_final_round6_permitted": false,
+  "public_objects": [
+    "ActualPaperMemoryV5ProvenanceClosureAudit",
+    "InvalidBindingRetirementRegistry",
+    "ProspectiveRebaselineImpactAudit",
+    "PaperMemoryV5ActualArtifactCandidateRelease",
+    "SceneExemplarActualArtifactCandidateRelease",
+    "ProspectiveMemoryRebaselineAuthorizationInput"
+  ]
+}
