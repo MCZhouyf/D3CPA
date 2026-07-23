@@ -1,0 +1,22 @@
+{
+  "activation_policy_id": null,
+  "coefficients": null,
+  "comparison_only": true,
+  "confidence_release_id": null,
+  "development_train_sha256": null,
+  "development_tune_sha256": null,
+  "environment_release_id": null,
+  "feature_schema_id": null,
+  "fitting_reopened": false,
+  "fusion_train_sha256": null,
+  "fusion_tune_sha256": null,
+  "holdout_used": false,
+  "intercept": null,
+  "paper_memory_v5_release_id": null,
+  "release_id": null,
+  "release_name": "OldMonotonicLogisticBaselineRelease",
+  "schema_version": 1,
+  "selected_checkpoint": null,
+  "selected_l2": null,
+  "status": "DRAFT"
+}

@@ -1,0 +1,20 @@
+{
+  "decision_id": null,
+  "final_evaluation_open": false,
+  "holdout_outcomes_observed": false,
+  "invalidated_authorization_input_id": null,
+  "old_assignments_generated": false,
+  "old_authorization_approved": false,
+  "old_authorization_reusable": false,
+  "old_bundle_decrypted": false,
+  "old_bundle_read": false,
+  "old_ledger_created": false,
+  "old_minedojo_holdout_started": false,
+  "old_preauthorization_objects_preserved": true,
+  "old_salt_namespace_reusable": false,
+  "round6_open": false,
+  "schema_version": 1,
+  "scientific_holdout_consumed": false,
+  "source_sha": null,
+  "status": "DRAFT"
+}
