@@ -1,0 +1,12 @@
+{
+  "formal_development_generated": false,
+  "gamma_candidate": "B",
+  "gamma_cov_text": "1.0",
+  "gamma_minus_text": "-0.01040883",
+  "gamma_plus_text": "0.00744657",
+  "holdout_final_round6_accessed": false,
+  "minedojo_execution_permitted": false,
+  "runtime_binding_revision": "R1",
+  "scientific_method_version": "V4.1.2",
+  "status": "BLOCKED_PENDING_ZYF_RETRY_CLEANUP_DECISION"
+}

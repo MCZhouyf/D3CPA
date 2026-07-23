@@ -7,6 +7,7 @@ on:
       - "round513cd-chrmlite-data-instrumentation"
       - "round513e0-memory-provenance-rebind"
       - "round513e0r-authoritative-memory-rebaseline"
+      - "round513e2h-runtime-source-hardening"
   pull_request:
 
 jobs:
@@ -30,4 +31,5 @@ jobs:
       - run: python scripts_dc3pa/run_round513e0_gate.py
       - run: python scripts_dc3pa/run_round513e0r_gate.py
       - run: python scripts_dc3pa/run_round513e1r_gate.py
+      - run: python scripts_dc3pa/run_round513e2h_gate.py
       - run: python -m pytest -q tests_dc3pa -m "not minedojo"
