@@ -1,0 +1,17 @@
+{
+  "cdt_historical_identification_permitted": null,
+  "cdt_parameters_estimated": false,
+  "chrm_reconstruction_permitted": null,
+  "decision": null,
+  "decision_id": null,
+  "final_evaluation_open": false,
+  "holdout_accessed": false,
+  "minimum_chrm_row_coverage": 0.95,
+  "minimum_chrm_task_coverage": 1.0,
+  "model_fitted": false,
+  "round6_open": false,
+  "schema_version": 1,
+  "source_commit": null,
+  "status": "DRAFT",
+  "targeted_new_development_collection_required": null
+}

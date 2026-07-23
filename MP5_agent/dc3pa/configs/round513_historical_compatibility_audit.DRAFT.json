@@ -1,0 +1,14 @@
+{
+  "audit_id": null,
+  "cdt_identifiability_audit_id": null,
+  "feature_matrix_id": null,
+  "holdout_accessed": false,
+  "lineage_audit_id": null,
+  "minedojo_started": false,
+  "missing_evidence_registry_id": null,
+  "model_fitted": false,
+  "new_llm_called": false,
+  "schema_version": 1,
+  "source_commit": null,
+  "status": "DRAFT"
+}
