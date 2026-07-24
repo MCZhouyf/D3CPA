@@ -31,16 +31,18 @@ class ChatModelTextAdapter:
     """Small vendor-neutral adapter for LangChain-style or callable chat models."""
 
     model: Any
+    request_kwargs: Mapping[str, Any] | None = None
 
     def complete(self, prompt: str) -> str:
         if not isinstance(prompt, str) or not prompt.strip():
             raise ValueError("prompt must be a non-empty string")
+        request_kwargs = dict(self.request_kwargs or {})
         if hasattr(self.model, "invoke"):
-            return extract_text_response(self.model.invoke(prompt))
+            return extract_text_response(self.model.invoke(prompt, **request_kwargs))
         if hasattr(self.model, "predict"):
-            return extract_text_response(self.model.predict(prompt))
+            return extract_text_response(self.model.predict(prompt, **request_kwargs))
         if callable(self.model):
-            return extract_text_response(self.model(prompt))
+            return extract_text_response(self.model(prompt, **request_kwargs))
         raise TypeError("chat model must expose invoke, predict, or __call__")
 
 

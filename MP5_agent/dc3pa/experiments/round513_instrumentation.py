@@ -208,7 +208,11 @@ class OneCallPlannerV4_1:
         prompt = self.schema.prompt_template.format(
             task_json=json.dumps(task, ensure_ascii=False),
             state_json=json.dumps(state.to_dict(), sort_keys=True, ensure_ascii=False, default=str),
-            schema_json=json.dumps(PLANNER_OUTPUT_SCHEMA, sort_keys=True, ensure_ascii=False),
+            schema_json=json.dumps(
+                self.schema.output_schema,
+                sort_keys=True,
+                ensure_ascii=False,
+            ),
         )
         self.call_count += 1
         if self.call_count < 1:

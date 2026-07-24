@@ -65,6 +65,27 @@ def test_one_call_planner_parses_all_levels_in_same_generation(confidence):
     assert plan.steps[0].actions[0].args == {"obj": "tree"}
 
 
+def test_one_call_planner_prompts_with_its_bound_output_schema():
+    class CapturingProvider:
+        def __init__(self):
+            self.prompt = ""
+
+        def complete(self, prompt):
+            self.prompt = prompt
+            return _planner_response()
+
+    provider = CapturingProvider()
+    schema = CHRMLitePlannerOutputSchemaV4_1(
+        source_commit="a" * 40,
+        output_schema={"bound_schema_marker": "controller-args-v1"},
+    ).with_computed_id()
+    OneCallPlannerV4_1(provider, schema).plan(
+        "find tree",
+        AgentState(task="find tree"),
+    )
+    assert '"bound_schema_marker": "controller-args-v1"' in provider.prompt
+
+
 def test_malformed_confidence_is_audited_without_hidden_retry():
     provider = Provider(_planner_response("0.9"))
     schema = CHRMLitePlannerOutputSchemaV4_1(source_commit="a" * 40).with_computed_id()

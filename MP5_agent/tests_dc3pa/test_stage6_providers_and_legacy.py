@@ -94,3 +94,21 @@ def test_chat_model_adapter_supports_common_interfaces():
     assert ChatModelTextAdapter(InvokeModel()).complete("x") == "x!"
     assert ChatModelTextAdapter(PredictModel()).complete("x") == "x?"
     assert ChatModelTextAdapter(lambda prompt: prompt.upper()).complete("x") == "X"
+
+
+def test_chat_model_adapter_forwards_json_mode_without_changing_default_calls():
+    calls = []
+
+    class PredictModel:
+        def predict(self, prompt, **kwargs):
+            calls.append((prompt, kwargs))
+            return '{"ok":true}'
+
+    adapter = ChatModelTextAdapter(
+        PredictModel(),
+        request_kwargs={"response_format": {"type": "json_object"}},
+    )
+    assert adapter.complete("strict") == '{"ok":true}'
+    assert calls == [
+        ("strict", {"response_format": {"type": "json_object"}}),
+    ]

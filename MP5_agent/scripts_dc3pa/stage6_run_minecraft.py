@@ -2422,7 +2422,12 @@ def main(argv: Optional[list[str]] = None) -> int:
                             "Round 5.13 Track E requires Paper Memory V5 read-only"
                         )
                     chrmlite_plan_source = OneCallPlannerV4_1(
-                        ChatModelTextAdapter(planner_instance.llm),
+                        ChatModelTextAdapter(
+                            planner_instance.llm,
+                            request_kwargs={
+                                "response_format": {"type": "json_object"},
+                            },
+                        ),
                         round513_planner_schema,
                     )
                     development_shadow_observer = TrackECollectorV4_1(

@@ -195,6 +195,35 @@ class CHRMLiteRuleTypeRegistryV4_1(_Hashed):
         return result
 
 
+_ITEM_NAME_SCHEMA = {"type": "string", "minLength": 1}
+_OPTIONAL_ITEM_NAME_SCHEMA = {"type": ["string", "null"]}
+_POSITIVE_QUANTITY_MAP_SCHEMA = {
+    "type": "object",
+    "minProperties": 1,
+    "additionalProperties": {"type": "number", "exclusiveMinimum": 0},
+}
+
+
+def _planner_action_variant(
+    name: str,
+    argument_properties: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        "type": "object",
+        "required": ["name", "arguments"],
+        "additionalProperties": False,
+        "properties": {
+            "name": {"enum": [name]},
+            "arguments": {
+                "type": "object",
+                "required": sorted(argument_properties),
+                "additionalProperties": False,
+                "properties": dict(argument_properties),
+            },
+        },
+    }
+
+
 PLANNER_OUTPUT_SCHEMA = {
     "type": "object",
     "required": ["subgoal", "action", "confidence", "failure_mode"],
@@ -202,13 +231,48 @@ PLANNER_OUTPUT_SCHEMA = {
     "properties": {
         "subgoal": {"type": "string", "minLength": 1},
         "action": {
-            "type": "object",
-            "required": ["name", "arguments"],
-            "additionalProperties": False,
-            "properties": {
-                "name": {"enum": sorted(ALLOWED_ACTIONS)},
-                "arguments": {"type": "object"},
-            },
+            "oneOf": [
+                _planner_action_variant("find", {"obj": _ITEM_NAME_SCHEMA}),
+                _planner_action_variant("move_to", {"obj": _ITEM_NAME_SCHEMA}),
+                _planner_action_variant(
+                    "mine",
+                    {"obj": _ITEM_NAME_SCHEMA, "tool": _OPTIONAL_ITEM_NAME_SCHEMA},
+                ),
+                _planner_action_variant(
+                    "craft",
+                    {
+                        "obj": {
+                            **_POSITIVE_QUANTITY_MAP_SCHEMA,
+                            "maxProperties": 1,
+                        },
+                        "materials": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "number",
+                                "exclusiveMinimum": 0,
+                            },
+                        },
+                        "platform": _OPTIONAL_ITEM_NAME_SCHEMA,
+                    },
+                ),
+                _planner_action_variant(
+                    "fight",
+                    {"obj": _ITEM_NAME_SCHEMA, "tool": _OPTIONAL_ITEM_NAME_SCHEMA},
+                ),
+                _planner_action_variant("equip", {"obj": _ITEM_NAME_SCHEMA}),
+                _planner_action_variant(
+                    "dig_down",
+                    {"y_level": {"type": "integer"}, "tool": _OPTIONAL_ITEM_NAME_SCHEMA},
+                ),
+                _planner_action_variant(
+                    "dig_up",
+                    {"tool": _OPTIONAL_ITEM_NAME_SCHEMA},
+                ),
+                _planner_action_variant(
+                    "apply",
+                    {"obj": _ITEM_NAME_SCHEMA, "tool": _OPTIONAL_ITEM_NAME_SCHEMA},
+                ),
+            ],
         },
         "confidence": {"enum": list(CONFIDENCE_LEVELS)},
         "failure_mode": {"enum": list(FAILURE_MODES)},

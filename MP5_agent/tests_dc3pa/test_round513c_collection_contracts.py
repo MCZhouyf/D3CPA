@@ -1,5 +1,8 @@
 from dc3pa.contracts import ALLOWED_ACTIONS
-from dc3pa.experiments.round513_collection import build_collection_contracts
+from dc3pa.experiments.round513_collection import (
+    PLANNER_OUTPUT_SCHEMA,
+    build_collection_contracts,
+)
 
 
 def _contracts():
@@ -74,6 +77,28 @@ def test_planner_and_bilateral_contracts_forbid_extra_online_calls():
     assert retrieval.minimum_count_per_side == 3
     assert retrieval.online_llm_calls == 0
     assert not retrieval.full_library_max_shortcut_permitted
+
+
+def test_planner_schema_names_exact_controller_arguments_for_every_action():
+    variants = PLANNER_OUTPUT_SCHEMA["properties"]["action"]["oneOf"]
+    required_by_action = {
+        variant["properties"]["name"]["enum"][0]: set(
+            variant["properties"]["arguments"]["required"]
+        )
+        for variant in variants
+    }
+    assert required_by_action == {
+        "find": {"obj"},
+        "move_to": {"obj"},
+        "mine": {"obj", "tool"},
+        "craft": {"obj", "materials", "platform"},
+        "fight": {"obj", "tool"},
+        "equip": {"obj"},
+        "dig_down": {"y_level", "tool"},
+        "dig_up": {"tool"},
+        "apply": {"obj", "tool"},
+    }
+    assert set(required_by_action) == ALLOWED_ACTIONS
 
 
 def test_step_registry_and_exclusion_registry_are_complete():
