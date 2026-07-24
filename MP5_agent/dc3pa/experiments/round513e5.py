@@ -1114,6 +1114,30 @@ class DecisionRecordSchemaV4_1_3(_Hashed):
 
 
 @dataclass(frozen=True)
+class AtomicDecisionStoreContractV4_1_3(_Hashed):
+    dispositions: tuple[str, ...] = RECORD_DISPOSITIONS
+    routing_label: str = "action_outcome_status"
+    goal_label_affects_routing: bool = False
+    controller_status_affects_routing: bool = False
+    pending_write_mode: str = "exclusive_create"
+    final_write_mode: str = "exclusive_temp_then_atomic_replace"
+    cross_disposition_collision_policy: str = "raise"
+    contract_id: str = ""
+
+    _id_field = "contract_id"
+
+    def __post_init__(self) -> None:
+        if self.dispositions != RECORD_DISPOSITIONS:
+            raise ValueError("Atomic Store dispositions changed")
+        if self.routing_label != "action_outcome_status":
+            raise ValueError("Atomic Store does not route on the action label")
+        if self.goal_label_affects_routing or self.controller_status_affects_routing:
+            raise ValueError("Atomic Store conflates independent outcome layers")
+        if self.contract_id and self.contract_id != self.compute_id():
+            raise ValueError("Atomic Store contract hash mismatch")
+
+
+@dataclass(frozen=True)
 class DecisionRecordV4_1_3:
     pre: Any
     post_state: StateEvidenceV4_1
@@ -1317,6 +1341,7 @@ class CHRMLiteInstrumentationRuntimeReleaseV4_1_3(_Hashed):
     outcome_registry_id: str
     signature_registry_id: str
     decision_record_schema_id: str
+    atomic_store_contract_id: str
     paper_memory_release_id: str
     mineclip_policy_id: str
     scene_exemplar_release_id: str
@@ -1399,6 +1424,7 @@ class Round513E5DiagnosticAuthorizationInput(_Hashed):
     signature_audit_id: str
     compatibility_audit_id: str
     decision_record_schema_id: str
+    atomic_store_contract_id: str
     diagnostic_seed_decision_input_id: str
     diagnostic_design_id: str
     assignment_seal_id: str = "PENDING_ZYF_SEED_DECISION"

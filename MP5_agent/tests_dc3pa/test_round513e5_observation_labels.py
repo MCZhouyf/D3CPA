@@ -12,6 +12,7 @@ from dc3pa.experiments.round513_instrumentation import (
 )
 from dc3pa.experiments.round513e5 import (
     ActionTransitionOutcomeV4_1_3,
+    AtomicDecisionStoreContractV4_1_3,
     AtomicDecisionStoreV4_1_3,
     DecisionRecordV4_1_3,
     FindObservationEvidenceV4_1_3,
@@ -294,3 +295,16 @@ def test_atomic_store_uses_action_outcome_only(
     path = store.join_post(record)
     assert path.parent.name == directory
     assert not (tmp_path / "incomplete_pending" / f"{record_id}.json").exists()
+
+
+def test_atomic_store_contract_keeps_four_orthogonal_dispositions():
+    contract = AtomicDecisionStoreContractV4_1_3().with_id()
+    assert contract.dispositions == (
+        "accepted_scientific",
+        "audit_only_ambiguous",
+        "technical_quarantine",
+        "incomplete_pending",
+    )
+    assert contract.routing_label == "action_outcome_status"
+    assert not contract.goal_label_affects_routing
+    assert not contract.controller_status_affects_routing

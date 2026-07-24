@@ -30,6 +30,7 @@ from dc3pa.experiments.round513e5 import (  # noqa: E402
     ActionSignatureCanonicalizationRegistryV4_1_3,
     ActionSignatureProvenanceAuditV4_1_3,
     ActionTransitionLabelPolicyV4_1_3,
+    AtomicDecisionStoreContractV4_1_3,
     CHRMLiteInstrumentationRuntimeReleaseV4_1_3,
     DecisionRecordSchemaV4_1_3,
     DiagnosticSeedStrategyDecisionInput,
@@ -289,6 +290,7 @@ def main() -> int:
         relevant_minedojo_skips=0,
     ).with_id()
     record_schema = DecisionRecordSchemaV4_1_3().with_id()
+    store_contract = AtomicDecisionStoreContractV4_1_3().with_id()
 
     binding = json.loads(args.reference_binding.read_text(encoding="utf-8"))
     runtime = CHRMLiteInstrumentationRuntimeReleaseV4_1_3(
@@ -298,6 +300,7 @@ def main() -> int:
         outcome_registry_id=outcome_registry.registry_id,
         signature_registry_id=signature_registry.registry_id,
         decision_record_schema_id=record_schema.schema_id,
+        atomic_store_contract_id=store_contract.contract_id,
         paper_memory_release_id=binding["paper_memory_release_id"],
         mineclip_policy_id=binding["mineclip_policy_id"],
         scene_exemplar_release_id=binding["scene_exemplar_release_id"],
@@ -316,6 +319,7 @@ def main() -> int:
         signature_audit_id=signature_audit.audit_id,
         compatibility_audit_id=compatibility.audit_id,
         decision_record_schema_id=record_schema.schema_id,
+        atomic_store_contract_id=store_contract.contract_id,
         diagnostic_seed_decision_input_id=seed_decision.decision_input_id,
         diagnostic_design_id=design["design_id"],
     ).with_id()
@@ -337,6 +341,7 @@ def main() -> int:
         "observation_label_hardening_audit.json": (observation_audit.to_dict(), "audit_id"),
         "signature_normalization_audit.json": (signature_audit.to_dict(), "audit_id"),
         "decision_record_schema_v4_1_3.json": (record_schema.to_dict(), "schema_id"),
+        "atomic_decision_store_contract_v4_1_3.json": (store_contract.to_dict(), "contract_id"),
         "instrumentation_runtime_release_v4_1_3.json": (runtime.to_dict(), "release_id"),
         "diagnostic_seed_strategy_decision_input.json": (seed_decision.to_dict(), "decision_input_id"),
         "diagnostic_design.json": (design, "design_id"),
