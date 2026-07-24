@@ -291,6 +291,48 @@ def test_traced_chat_model_captures_metadata_discarded_by_old_langchain():
     assert "secret response" not in repr(observed[0])
 
 
+def test_track_e_configuration_preserves_tracing_and_isolates_inner_model():
+    import scripts_dc3pa.stage6_run_minecraft as launcher
+    from dc3pa.integration.providers import configure_track_e_chat_model
+
+    class LegacyChatModel:
+        temperature = 1
+        max_tokens = None
+        request_timeout = 10
+        max_retries = 6
+        callbacks = []
+        callback_manager = None
+
+        def predict(self, prompt, **kwargs):
+            return "ok"
+
+    class TraceWriter:
+        def __init__(self):
+            self.events = []
+
+        def write(self, event_type, payload):
+            self.events.append(event_type)
+
+    inner = LegacyChatModel()
+    trace = TraceWriter()
+    traced = launcher.TracedChatModel(inner, trace, "planning")
+
+    configured = configure_track_e_chat_model(traced)
+
+    assert isinstance(configured, launcher.TracedChatModel)
+    assert configured is not traced
+    assert configured._model is not inner
+    assert configured._model.callbacks == []
+    assert configured._model.temperature == 0
+    assert configured._model.max_tokens == 2048
+    assert configured._model.request_timeout == 60
+    assert configured._model.max_retries == 0
+    assert inner.temperature == 1
+    assert inner.max_retries == 6
+    assert configured.predict("prompt") == "ok"
+    assert trace.events == ["llm_call_started", "llm_call_completed"]
+
+
 @pytest.mark.parametrize(
     ("provider_alias_policy", "formal_bootstrap_enabled", "expected"),
     (

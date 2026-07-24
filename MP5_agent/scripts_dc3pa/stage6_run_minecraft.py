@@ -136,6 +136,7 @@ from dc3pa.experiments.round513e3h import (  # noqa: E402
 from dc3pa.integration.providers import (  # noqa: E402
     ChatModelTextAdapter,
     configure_track_e_chat_model,
+    isolated_chat_model_copy,
 )
 from dc3pa.memory import (  # noqa: E402
     HashingTextEncoder,
@@ -187,6 +188,25 @@ class TracedChatModel:
         self._requested_model = requested_model
         self._legacy_raw_response_metadata: list[Mapping[str, Any]] = []
         self._install_legacy_response_capture()
+
+    def _dc3pa_clone_for_track_e(self) -> "TracedChatModel":
+        """Clone the traced model without using Pydantic's lossy copy method."""
+
+        cloned_model = isolated_chat_model_copy(self._model)
+        # Reinstall instance-level response capture against the cloned model.
+        if "_create_chat_result" in getattr(cloned_model, "__dict__", {}):
+            object.__delattr__(cloned_model, "_create_chat_result")
+        return type(self)(
+            cloned_model,
+            self._trace_writer,
+            self._purpose,
+            include_error_detail=self._include_error_detail,
+            metadata_observer=self._metadata_observer,
+            requested_model=self._requested_model,
+        )
+
+    def _dc3pa_track_e_configuration_target(self) -> Any:
+        return self._model
 
     def _install_legacy_response_capture(self) -> None:
         """Preserve safe metadata discarded by older LangChain ChatOpenAI."""

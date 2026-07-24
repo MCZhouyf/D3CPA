@@ -12,17 +12,46 @@ TRACK_E_MAX_OUTPUT_TOKENS = 2048
 TRACK_E_TIMEOUT_SECONDS = 60
 
 
+def isolated_chat_model_copy(model: Any) -> Any:
+    """Shallow-copy a chat model while detaching Pydantic instance state."""
+
+    configured = copy.copy(model)
+    if configured is model:
+        raise TypeError("Track-E chat model cannot be copied in isolation")
+    original_state = getattr(model, "__dict__", None)
+    if (
+        isinstance(original_state, dict)
+        and getattr(configured, "__dict__", None) is original_state
+    ):
+        object.__setattr__(configured, "__dict__", dict(original_state))
+    for name in ("__fields_set__", "__pydantic_fields_set__"):
+        original_fields = getattr(model, name, None)
+        if (
+            isinstance(original_fields, set)
+            and getattr(configured, name, None) is original_fields
+        ):
+            object.__setattr__(configured, name, set(original_fields))
+    return configured
+
+
 def configure_track_e_chat_model(model: Any) -> Any:
     """Return an isolated model copy with the E3 Track-E request budget."""
 
-    model_copy = getattr(model, "copy", None)
-    if callable(model_copy):
-        try:
-            configured = model_copy(deep=False)
-        except TypeError:
-            configured = copy.copy(model)
-    else:
-        configured = copy.copy(model)
+    clone_for_track_e = getattr(model, "_dc3pa_clone_for_track_e", None)
+    configured = (
+        clone_for_track_e()
+        if callable(clone_for_track_e)
+        else isolated_chat_model_copy(model)
+    )
+
+    target_getter = getattr(configured, "_dc3pa_track_e_configuration_target", None)
+    target = target_getter() if callable(target_getter) else configured
+    original_target_getter = getattr(model, "_dc3pa_track_e_configuration_target", None)
+    original_target = (
+        original_target_getter()
+        if callable(original_target_getter)
+        else model
+    )
 
     required = {
         "temperature": 0,
@@ -31,11 +60,14 @@ def configure_track_e_chat_model(model: Any) -> Any:
         "max_retries": 0,
     }
     for name, value in required.items():
-        if not hasattr(configured, name):
+        if not hasattr(target, name):
             raise TypeError(f"Track-E chat model does not expose {name}")
-        setattr(configured, name, value)
-        if getattr(configured, name) != value:
+        setattr(target, name, value)
+        if getattr(target, name) != value:
             raise ValueError(f"Track-E chat model did not apply {name}")
+    for name in ("callbacks", "callback_manager"):
+        if hasattr(original_target, name) and not hasattr(target, name):
+            raise TypeError(f"Track-E chat model copy lost {name}")
     return configured
 
 

@@ -168,6 +168,44 @@ def test_track_e_model_configuration_disables_hidden_sdk_retries():
         configure_track_e_chat_model(PlainModel())
 
 
+@pytest.mark.minedojo
+def test_track_e_model_configuration_preserves_legacy_chatopenai_callbacks():
+    from langchain.chat_models import ChatOpenAI
+    from scripts_dc3pa.stage6_run_minecraft import TracedChatModel
+
+    class TraceWriter:
+        def write(self, event_type, payload):
+            pass
+
+    model = ChatOpenAI(
+        model_name="test-model",
+        openai_api_base="https://example.invalid/v1",
+        openai_api_key="test-key",
+        temperature=1,
+        request_timeout=10,
+    )
+    traced = TracedChatModel(
+        model,
+        TraceWriter(),
+        "planning",
+        metadata_observer=lambda metadata: None,
+    )
+
+    configured = configure_track_e_chat_model(traced)
+
+    assert isinstance(configured, TracedChatModel)
+    assert configured is not traced
+    assert configured._model is not model
+    assert hasattr(configured._model, "callbacks")
+    assert hasattr(configured._model, "callback_manager")
+    assert configured._model.temperature == 0
+    assert configured._model.max_tokens == TRACK_E_MAX_OUTPUT_TOKENS
+    assert configured._model.request_timeout == TRACK_E_TIMEOUT_SECONDS
+    assert configured._model.max_retries == 0
+    assert configured._model.__dict__["_create_chat_result"].__self__ is configured._model
+    assert model.temperature == 1
+
+
 def test_json_request_kwargs_are_adapter_local_not_inherited():
     calls = []
 
