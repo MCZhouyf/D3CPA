@@ -11,6 +11,7 @@ on:
       - "round513e3f-freeze-reauthorization"
       - "round513e3h-runtime-contract-hardening"
       - "round513e5-observation-label-signature-hardening"
+      - "round513e6-d2-observability-label-hardening"
   pull_request:
 
 jobs:
@@ -37,4 +38,5 @@ jobs:
       - run: python scripts_dc3pa/run_round513e2h_gate.py
       - run: python scripts_dc3pa/run_round513e3f_gate.py
       - run: python scripts_dc3pa/run_round513e3h_gate.py
+      - run: python scripts_dc3pa/run_round513e6d2_gate.py
       - run: python -m pytest -q tests_dc3pa -m "not minedojo"

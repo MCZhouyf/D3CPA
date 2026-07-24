@@ -50,6 +50,33 @@ def _find_frame_id(events):
     return digest.hexdigest()
 
 
+def _find_image_sha256(events):
+    rgb = events.get("rgb") if isinstance(events, dict) else None
+    if rgb is None:
+        return ""
+    image = np.asarray(rgb)
+    digest = hashlib.sha256()
+    digest.update(str(image.dtype).encode("ascii"))
+    digest.update(str(tuple(image.shape)).encode("ascii"))
+    digest.update(image.tobytes())
+    return digest.hexdigest()
+
+
+def _find_agent_pose(events):
+    location = events.get("location_stats", {}) if isinstance(events, dict) else {}
+    position = np.asarray(location.get("pos", ()), dtype=np.float64).reshape(-1)
+
+    def scalar(name):
+        value = np.asarray(location.get(name, ()), dtype=np.float64).reshape(-1)
+        return float(value[0]) if value.size else None
+
+    return {
+        "position": tuple(float(value) for value in position[:3]),
+        "yaw": scalar("yaw"),
+        "pitch": scalar("pitch"),
+    }
+
+
 def _visible_block_ids(events):
     visible = {
         str(value)
@@ -93,6 +120,7 @@ def begin_find_observation_trace(memory, raw_target, controller_target, budget):
         "search_trace_complete": False,
         "termination_reason": "",
         "technical_failure": "",
+        "observation_steps_v2": [],
     }
     return memory._dc3pa_find_observation
 
@@ -128,6 +156,41 @@ def _record_find_observation(memory, events, controller_target, target_block, sp
                 + target_block["side_offset"] ** 2
             )
         )
+    visible_candidates = _visible_block_ids(events)
+    missing_fields = []
+    if not isinstance(events, dict) or "voxels" not in events:
+        missing_fields.append("voxels")
+    if not isinstance(events, dict) or "location_stats" not in events:
+        missing_fields.append("location_stats")
+    image_sha256 = _find_image_sha256(events)
+    step = {
+        "observation_index": len(trace["observation_steps_v2"]),
+        "observation_id": frame_id,
+        "observation_sha256": frame_id,
+        "image_sha256": image_sha256,
+        "detector_sensor_status": "ok" if not missing_fields else "missing_fields",
+        "raw_detected_target_ids": list(visible_candidates),
+        # Canonical candidates are added by the versioned DC3PA collector.
+        "canonical_target_candidates": [],
+        "target_position_evidence": dict(target_block or {}),
+        "visibility_flag": bool(matched),
+        "line_of_sight_flag": None,
+        "line_of_sight_available": False,
+        "distance_estimate": trace["target_distance"] if matched else None,
+        "distance_unit": "voxel_blocks",
+        "agent_pose": _find_agent_pose(events),
+        "search_frontier_progress": {
+            "observations_recorded": len(trace["observation_steps_v2"]) + 1,
+            "unique_observations": len(trace["observation_frame_ids"]),
+            "frozen_budget": trace["frozen_search_budget"],
+        },
+        "controller_step_result": "target_detected" if matched else "target_absent_continue",
+        "sensor_missing": bool(missing_fields),
+        "sensor_error": "",
+        "missing_sensor_fields": missing_fields,
+        "spatial_relation": spatial_relation if matched else "",
+    }
+    trace["observation_steps_v2"].append(step)
 
 
 def finish_find_observation_trace(memory, termination_reason, *, budget_exhausted=None, complete=True, technical_failure=""):
@@ -138,6 +201,10 @@ def finish_find_observation_trace(memory, termination_reason, *, budget_exhauste
     trace["search_budget_exhausted"] = budget_exhausted
     trace["search_trace_complete"] = bool(complete)
     trace["technical_failure"] = str(technical_failure)
+    if trace.get("observation_steps_v2"):
+        trace["observation_steps_v2"][-1]["controller_step_result"] = str(
+            termination_reason
+        )
     trace["search_seconds_consumed"] = max(
         0.0, time.monotonic() - float(trace["search_started_monotonic"])
     )
@@ -978,9 +1045,18 @@ def _aboveground_clearance_is_safe(events):
     return floor not in unsafe_floor and (body not in passable or head not in passable)
 
 
-def _fresh_aboveground_clearance_is_safe(env):
+def _fresh_aboveground_clearance_is_safe(env, evidence_memory=None, controller_target=""):
     """Do not authorize destructive recovery from a stale movement frame."""
-    return _aboveground_clearance_is_safe(sleep(env))
+    events = sleep(env)
+    if evidence_memory is not None and controller_target:
+        _record_find_observation(
+            evidence_memory,
+            events,
+            controller_target,
+            select_target_block(events, controller_target),
+            "within_frozen_voxel_observation_volume",
+        )
+    return _aboveground_clearance_is_safe(events)
 
 
 def mine_ahead_aboveground(env):
@@ -1788,12 +1864,12 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
                                 observation+='\n'
                             observation +='\n'
                         print(f"had to mine ahead")
-                        if not _fresh_aboveground_clearance_is_safe(env):
+                        if not _fresh_aboveground_clearance_is_safe(env, memory, object):
                             print("refusing blind above-ground clearing without an obstacle and safe footing")
                             finish_find_observation_trace(
                                 memory,
                                 "safety_clearance_stop",
-                                complete=False,
+                                complete=True,
                             )
                             return False
                         move_to_middle(env)
@@ -1810,12 +1886,12 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
                         if (action_tuple[0] == 2):
                             if not (try_leftward(env,memory,underground)):
                                 print(f"had to mine ahead because can't go left")
-                                if not _fresh_aboveground_clearance_is_safe(env):
+                                if not _fresh_aboveground_clearance_is_safe(env, memory, object):
                                     print("refusing unsafe above-ground clearing")
                                     finish_find_observation_trace(
                                         memory,
                                         "safety_clearance_stop",
-                                        complete=False,
+                                        complete=True,
                                     )
                                     return False
                                 move_to_middle(env)
@@ -1829,12 +1905,12 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
                         elif (action_tuple[0] == 0):
                             if (not try_backward(env,memory,underground)):
                                 print(f"had to mine ahead because can't go back")
-                                if not _fresh_aboveground_clearance_is_safe(env):
+                                if not _fresh_aboveground_clearance_is_safe(env, memory, object):
                                     print("refusing unsafe above-ground clearing")
                                     finish_find_observation_trace(
                                         memory,
                                         "safety_clearance_stop",
-                                        complete=False,
+                                        complete=True,
                                     )
                                     return False
                                 move_to_middle(env)
@@ -1849,12 +1925,12 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
                         # move_one_block(env,3-action_tuple[0],0,1-action_tuple[1])
                     if (not action_stack ) and (not mined_ahead):
                         print("Exception encountered, may be stuck permanently!! but i will venture a step forward")# tbd: think of some other way to let agent extricate himself
-                        if not _fresh_aboveground_clearance_is_safe(env):
+                        if not _fresh_aboveground_clearance_is_safe(env, memory, object):
                             print("refusing unsafe above-ground clearing")
                             finish_find_observation_trace(
                                 memory,
                                 "safety_clearance_stop",
-                                complete=False,
+                                complete=True,
                             )
                             return False
                         move_to_middle(env)
