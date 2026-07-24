@@ -118,6 +118,21 @@ from dc3pa.experiments.round513e2h import (  # noqa: E402
     load_versioned_contract,
     validate_track_e_r1_artifacts,
 )
+from dc3pa.experiments.round513e3h import (  # noqa: E402
+    CHRMLiteEngineeringSmokeAssignmentSealE3X_R1,
+    CHRMLiteEngineeringSmokeAssignmentsE3X_R1,
+    CHRMLiteEngineeringSmokeAuthorizationInputE3X_R1,
+    CHRMLiteEngineeringSmokeAuthorizationReceiptE3X_R1,
+    CHRMLiteEngineeringSmokeExecutionManifestE3X_R1,
+    CHRMLiteEngineeringSmokeRuntimeReleaseE3X_R1,
+    Round513E3ContractCompatibilityReleaseR1,
+    Round513E3PolicyCompatibilityReleaseR1,
+    TrackERunBindingE3X_R1,
+    load_e3x_contract,
+    load_frozen_policy,
+    validate_e3x_authorization_assignment_closure,
+    validate_e3x_runtime_artifacts,
+)
 from dc3pa.integration.providers import (  # noqa: E402
     ChatModelTextAdapter,
     configure_track_e_chat_model,
@@ -391,7 +406,9 @@ def _configure_real_experiment_seed(
     return requested_seed
 
 
-def _configure_track_e_r1_seed(binding: TrackERunBindingV4_1_2_R1) -> int:
+def _configure_track_e_r1_seed(
+    binding: TrackERunBindingV4_1_2_R1 | TrackERunBindingE3X_R1,
+) -> int:
     seed = int(binding.seed)
     if seed <= 0:
         raise ValueError("Track E R1 requires a positive numeric seed")
@@ -900,6 +917,46 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Frozen V4.1.2-R1 campaign-owned cleanup policy.",
     )
+    parser.add_argument(
+        "--round513-track-e-policy-compatibility-release",
+        type=Path,
+        help="Exact E3X Retry/Cleanup provenance compatibility allowlist.",
+    )
+    parser.add_argument(
+        "--round513-e3x-authorization-input",
+        type=Path,
+        help="Frozen pending E3H authorization input approved by the receipt.",
+    )
+    parser.add_argument(
+        "--round513-e3x-authorization-receipt",
+        type=Path,
+        help="ZYF E3H authorization receipt for this exact source closure.",
+    )
+    parser.add_argument(
+        "--round513-e3x-assignments",
+        type=Path,
+        help="Frozen E3X nine-assignment contract.",
+    )
+    parser.add_argument(
+        "--round513-e3x-assignment-seal",
+        type=Path,
+        help="Frozen E3X assignment and execution-binding seal.",
+    )
+    for option, help_text in (
+        ("binding", "E3X run binding"),
+        ("authorization-input", "E3X authorization input"),
+        ("authorization-receipt", "E3X authorization receipt"),
+        ("assignments", "E3X assignments"),
+        ("assignment-seal", "E3X assignment seal"),
+        ("compatibility", "E3X contract compatibility release"),
+        ("policy-compatibility", "E3X policy compatibility release"),
+        ("runtime", "E3X runtime release"),
+        ("execution-manifest", "E3X execution manifest"),
+    ):
+        parser.add_argument(
+            f"--round513-e3x-{option}-sha256",
+            help=f"Expected raw file SHA-256 for the {help_text}.",
+        )
     return parser
 
 
@@ -943,8 +1000,26 @@ def main(argv: Optional[list[str]] = None) -> int:
         args.round513_technical_retry_policy,
         args.round513_process_cleanup_policy,
     )
+    round513_e3x_arguments = (
+        args.round513_track_e_policy_compatibility_release,
+        args.round513_e3x_authorization_input,
+        args.round513_e3x_authorization_receipt,
+        args.round513_e3x_assignments,
+        args.round513_e3x_assignment_seal,
+        args.round513_e3x_binding_sha256,
+        args.round513_e3x_authorization_input_sha256,
+        args.round513_e3x_authorization_receipt_sha256,
+        args.round513_e3x_assignments_sha256,
+        args.round513_e3x_assignment_seal_sha256,
+        args.round513_e3x_compatibility_sha256,
+        args.round513_e3x_policy_compatibility_sha256,
+        args.round513_e3x_runtime_sha256,
+        args.round513_e3x_execution_manifest_sha256,
+    )
     if any(round513_r1_arguments) and not round513_track_e_enabled:
         parser.error("Round 5.13 R1 artifacts require the base Track E arguments")
+    if any(round513_e3x_arguments) and not round513_track_e_enabled:
+        parser.error("Round 5.13 E3X artifacts require the base Track E arguments")
     if round511_enabled and round5124_holdout_enabled:
         parser.error("Development and holdout shadow collection are mutually exclusive")
     if round513_track_e_enabled and (round511_enabled or round5124_holdout_enabled):
@@ -1013,22 +1088,269 @@ def main(argv: Optional[list[str]] = None) -> int:
     round513_retrieval_policy = None
     round513_support_policy = None
     round513_r1_enabled = False
+    round513_e3x_enabled = False
     r1_binding = None
     if round513_track_e_enabled:
         assert args.round513_track_e_binding is not None
         assert args.round513_contract_root is not None
         assert args.round513_track_e_output_root is not None
         binding_payload = _load_json(args.round513_track_e_binding)
-        round513_r1_enabled = binding_payload.get("runtime_binding_revision") == "R1"
+        round513_e3x_enabled = (
+            binding_payload.get("contract_type") == "TrackERunBindingE3X_R1"
+        )
+        round513_r1_enabled = (
+            binding_payload.get("runtime_binding_revision") == "R1"
+            or round513_e3x_enabled
+        )
         if round513_r1_enabled and not all(round513_r1_arguments):
             parser.error(
                 "Round 5.13 R1 requires compatibility, runtime, execution, retry, and cleanup releases"
             )
+        if round513_e3x_enabled and not all(round513_e3x_arguments):
+            parser.error(
+                "Round 5.13 E3X requires policy compatibility and every raw SHA-256 binding"
+            )
+        if not round513_e3x_enabled and any(round513_e3x_arguments):
+            parser.error("E3X release arguments cannot be used with an E2H/V4.1 binding")
         if not round513_r1_enabled and any(round513_r1_arguments):
             parser.error("R1 release arguments cannot be used with a V4.1 binding")
+        if round513_e3x_enabled:
+            current_commit = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=ROOT.parent,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            worktree = subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=ROOT.parent,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            if binding_payload.get("execution_source_commit") != current_commit:
+                parser.error("E3X source preflight does not match the current HEAD")
+            if worktree:
+                parser.error("E3X source preflight requires a clean worktree")
         try:
             contract_root = args.round513_contract_root.resolve()
-            if round513_r1_enabled:
+            if round513_e3x_enabled:
+                binding_adapter = load_e3x_contract(
+                    args.round513_track_e_binding,
+                    expected_file_sha256=args.round513_e3x_binding_sha256,
+                    expected_contract_id=str(binding_payload["binding_id"]),
+                )
+                r1_binding = binding_adapter.normalized_runtime_view
+                if not isinstance(r1_binding, TrackERunBindingE3X_R1):
+                    raise TypeError("E3X binding loader returned the wrong contract type")
+
+                authorization_payload = _load_json(
+                    args.round513_e3x_authorization_input
+                )
+                authorization_adapter = load_e3x_contract(
+                    args.round513_e3x_authorization_input,
+                    expected_file_sha256=args.round513_e3x_authorization_input_sha256,
+                    expected_contract_id=str(
+                        authorization_payload["authorization_input_id"]
+                    ),
+                )
+                authorization = authorization_adapter.normalized_runtime_view
+                if not isinstance(
+                    authorization, CHRMLiteEngineeringSmokeAuthorizationInputE3X_R1
+                ):
+                    raise TypeError("E3X authorization loader returned the wrong type")
+
+                receipt_payload = _load_json(
+                    args.round513_e3x_authorization_receipt
+                )
+                receipt_adapter = load_e3x_contract(
+                    args.round513_e3x_authorization_receipt,
+                    expected_file_sha256=args.round513_e3x_authorization_receipt_sha256,
+                    expected_contract_id=str(receipt_payload["receipt_id"]),
+                )
+                authorization_receipt = receipt_adapter.normalized_runtime_view
+                if not isinstance(
+                    authorization_receipt,
+                    CHRMLiteEngineeringSmokeAuthorizationReceiptE3X_R1,
+                ):
+                    raise TypeError("E3X authorization receipt loader returned the wrong type")
+
+                assignments_payload = _load_json(args.round513_e3x_assignments)
+                assignments_adapter = load_e3x_contract(
+                    args.round513_e3x_assignments,
+                    expected_file_sha256=args.round513_e3x_assignments_sha256,
+                    expected_contract_id=str(assignments_payload["assignments_id"]),
+                )
+                e3x_assignments = assignments_adapter.normalized_runtime_view
+                if not isinstance(
+                    e3x_assignments, CHRMLiteEngineeringSmokeAssignmentsE3X_R1
+                ):
+                    raise TypeError("E3X assignments loader returned the wrong type")
+
+                seal_payload = _load_json(args.round513_e3x_assignment_seal)
+                seal_adapter = load_e3x_contract(
+                    args.round513_e3x_assignment_seal,
+                    expected_file_sha256=args.round513_e3x_assignment_seal_sha256,
+                    expected_contract_id=str(seal_payload["seal_id"]),
+                )
+                e3x_seal = seal_adapter.normalized_runtime_view
+                if not isinstance(
+                    e3x_seal, CHRMLiteEngineeringSmokeAssignmentSealE3X_R1
+                ):
+                    raise TypeError("E3X assignment seal loader returned the wrong type")
+                if (
+                    authorization_adapter.raw_file_sha256
+                    != r1_binding.authorization_input_file_sha256
+                    or receipt_adapter.raw_file_sha256
+                    != r1_binding.authorization_receipt_file_sha256
+                ):
+                    raise ValueError("E3X authorization raw file SHA binding mismatch")
+                validate_e3x_authorization_assignment_closure(
+                    authorization=authorization,
+                    receipt=authorization_receipt,
+                    assignments=e3x_assignments,
+                    seal=e3x_seal,
+                    binding=r1_binding,
+                    task_path=args.task,
+                )
+
+                compatibility_payload = _load_json(
+                    args.round513_track_e_compatibility_release
+                )
+                compatibility_adapter = load_e3x_contract(
+                    args.round513_track_e_compatibility_release,
+                    expected_file_sha256=args.round513_e3x_compatibility_sha256,
+                    expected_contract_id=str(compatibility_payload["release_id"]),
+                )
+                compatibility = compatibility_adapter.normalized_runtime_view
+                if not isinstance(compatibility, Round513E3ContractCompatibilityReleaseR1):
+                    raise TypeError("E3X compatibility loader returned the wrong type")
+
+                policy_compatibility_payload = _load_json(
+                    args.round513_track_e_policy_compatibility_release
+                )
+                policy_compatibility_adapter = load_e3x_contract(
+                    args.round513_track_e_policy_compatibility_release,
+                    expected_file_sha256=args.round513_e3x_policy_compatibility_sha256,
+                    expected_contract_id=str(policy_compatibility_payload["release_id"]),
+                )
+                policy_compatibility = (
+                    policy_compatibility_adapter.normalized_runtime_view
+                )
+                if not isinstance(
+                    policy_compatibility, Round513E3PolicyCompatibilityReleaseR1
+                ):
+                    raise TypeError("E3X policy compatibility loader returned the wrong type")
+
+                runtime_payload = _load_json(args.round513_track_e_runtime_release)
+                runtime_adapter = load_e3x_contract(
+                    args.round513_track_e_runtime_release,
+                    expected_file_sha256=args.round513_e3x_runtime_sha256,
+                    expected_contract_id=str(runtime_payload["release_id"]),
+                )
+                runtime_release = runtime_adapter.normalized_runtime_view
+                if not isinstance(
+                    runtime_release, CHRMLiteEngineeringSmokeRuntimeReleaseE3X_R1
+                ):
+                    raise TypeError("E3X runtime loader returned the wrong type")
+
+                manifest_payload = _load_json(
+                    args.round513_track_e_execution_manifest
+                )
+                manifest_adapter = load_e3x_contract(
+                    args.round513_track_e_execution_manifest,
+                    expected_file_sha256=args.round513_e3x_execution_manifest_sha256,
+                    expected_contract_id=str(manifest_payload["manifest_id"]),
+                )
+                execution_manifest = manifest_adapter.normalized_runtime_view
+                if not isinstance(
+                    execution_manifest,
+                    CHRMLiteEngineeringSmokeExecutionManifestE3X_R1,
+                ):
+                    raise TypeError("E3X manifest loader returned the wrong type")
+
+                policy_entries = {
+                    item.policy_type: item for item in policy_compatibility.entries
+                }
+                retry_entry = policy_entries["technical_retry"]
+                cleanup_entry = policy_entries["process_cleanup"]
+                retry_adapter = load_frozen_policy(
+                    args.round513_technical_retry_policy,
+                    policy_type="technical_retry",
+                    expected_policy_id=retry_entry.policy_id,
+                    expected_file_sha256=retry_entry.file_sha256,
+                )
+                cleanup_adapter = load_frozen_policy(
+                    args.round513_process_cleanup_policy,
+                    policy_type="process_cleanup",
+                    expected_policy_id=cleanup_entry.policy_id,
+                    expected_file_sha256=cleanup_entry.file_sha256,
+                )
+                adapters = {
+                    entry.contract_type: load_versioned_contract(
+                        contract_root / entry.filename,
+                        contract_type=entry.contract_type,
+                        expected_contract_id=entry.contract_id,
+                        expected_file_sha256=entry.file_sha256,
+                    )
+                    for entry in compatibility.scientific_contract_entries
+                }
+                validate_e3x_runtime_artifacts(
+                    binding=r1_binding,
+                    compatibility=compatibility,
+                    policy_compatibility=policy_compatibility,
+                    runtime=runtime_release,
+                    manifest=execution_manifest,
+                    retry_adapter=retry_adapter,
+                    cleanup_adapter=cleanup_adapter,
+                    scientific_adapters=adapters,
+                    cli_output_root=str(args.round513_track_e_output_root),
+                )
+                planner_payload = dict(adapters["planner_schema"].raw_contract_payload)
+                round513_planner_schema = CHRMLitePlannerOutputSchemaV4_1(
+                    **planner_payload
+                )
+                rule_payload = dict(adapters["rule_registry"].raw_contract_payload)
+                rule_payload["rules"] = tuple(
+                    RuleTypeDefinition(**item) for item in rule_payload["rules"]
+                )
+                round513_rule_registry = CHRMLiteRuleTypeRegistryV4_1(**rule_payload)
+                round513_retrieval_policy = CHRMLiteBilateralRetrievalPolicyV4_1(
+                    **adapters["bilateral_retrieval_policy"].normalized_runtime_view,
+                )
+                round513_support_policy = CHRMLiteSupportAndDegradationPolicy(
+                    **adapters["support_policy"].raw_contract_payload
+                )
+                round513_binding = TrackERunBindingV4_1(
+                    authorization_id=r1_binding.authorization_receipt_id,
+                    authorization_status="approved",
+                    engineering_smoke_approved=True,
+                    engineering_only=True,
+                    campaign_id=r1_binding.campaign_id,
+                    source_commit=r1_binding.execution_source_commit,
+                    task=r1_binding.task,
+                    terminal_task=r1_binding.terminal_task,
+                    split="engineering_smoke",
+                    group_id=r1_binding.assignment_id,
+                    seed_commitment=r1_binding.seed_commitment,
+                    run_id=r1_binding.run_id,
+                    episode_id=r1_binding.episode_id,
+                    memory_release_id=r1_binding.paper_memory_release_id,
+                    dependency_schema_id=round513_rule_registry.dependency_schema_id,
+                    rule_registry_id=r1_binding.rule_registry_id,
+                    scene_release_id=r1_binding.scene_exemplar_release_id,
+                    mineclip_policy_id=r1_binding.mineclip_policy_id,
+                    planner_schema_id=r1_binding.planner_schema_id,
+                    planner_prompt_id=r1_binding.planner_prompt_id,
+                    planner_parser_id=r1_binding.planner_parser_id,
+                    controller_contract_id=r1_binding.controller_id,
+                    evaluator_contract_id=r1_binding.evaluator_id,
+                    budget_profile_id=r1_binding.budget_profile_id,
+                    gamma_minus=float(r1_binding.gamma_minus_text),
+                    gamma_plus=float(r1_binding.gamma_plus_text),
+                )
+            elif round513_r1_enabled:
                 r1_binding = TrackERunBindingV4_1_2_R1(**binding_payload)
                 compatibility_payload = _load_json(
                     args.round513_track_e_compatibility_release

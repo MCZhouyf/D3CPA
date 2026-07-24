@@ -9,6 +9,7 @@ on:
       - "round513e0r-authoritative-memory-rebaseline"
       - "round513e2h-runtime-source-hardening"
       - "round513e3f-freeze-reauthorization"
+      - "round513e3h-runtime-contract-hardening"
   pull_request:
 
 jobs:
@@ -34,4 +35,5 @@ jobs:
       - run: python scripts_dc3pa/run_round513e1r_gate.py
       - run: python scripts_dc3pa/run_round513e2h_gate.py
       - run: python scripts_dc3pa/run_round513e3f_gate.py
+      - run: python scripts_dc3pa/run_round513e3h_gate.py
       - run: python -m pytest -q tests_dc3pa -m "not minedojo"
