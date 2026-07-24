@@ -16,9 +16,14 @@ from dc3pa.experiments.round513e2h import (
 from dc3pa.experiments.round513e3h import (
     CHRMLiteEngineeringSmokeExecutionManifestE3X_R1,
     CHRMLiteEngineeringSmokeAssignmentsE3X_R1,
+    CHRMLiteEngineeringSmokeAuthorizationInputE3X_R1,
+    CHRMLiteEngineeringSmokeAuthorizationInputE4_R1,
+    CHRMLiteEngineeringSmokeAuthorizationReceiptE4_R1,
     CHRMLiteEngineeringSmokeRuntimeReleaseE3X_R1,
     E3H_PREFLIGHT_ORDER,
     E3H_PREFLIGHT_ORDER_ID,
+    E3H_AUTHORIZATION_DECLARATIONS,
+    E4_RUNTIME_ADAPTER_AUTHORIZATION_DECLARATIONS,
     E3X_CONTRACT_VERSION,
     E3X_POLICY_ADAPTER_VERSION,
     E3X_RUNTIME_ADAPTER_VERSION,
@@ -90,6 +95,78 @@ def _binding(**changes):
 def _write(path, payload):
     path.write_text(json.dumps(payload, sort_keys=True), encoding="utf-8")
     return path
+
+
+def _authorization_values(declarations):
+    omitted = {
+        "authorization_input_id", "contract_type", "contract_version",
+        "declarations", "schema_version", "reauthorization_status",
+        "provider_preflight_permitted", "minedojo_execution_permitted",
+        "formal_development_permitted", "holdout_final_round6_permitted",
+    }
+    values = {
+        item.name: "a" * 64
+        for item in fields(CHRMLiteEngineeringSmokeAuthorizationInputE4_R1)
+        if item.name not in omitted
+    }
+    values.update(
+        source_commit=SOURCE,
+        proxy_policy="P1",
+        gamma_candidate=GAMMA_CANDIDATE_B,
+        gamma_cov_text=GAMMA_TEXT[0],
+        gamma_minus_text=GAMMA_TEXT[1],
+        gamma_plus_text=GAMMA_TEXT[2],
+        declarations=declarations,
+    )
+    return values
+
+
+def test_e4_runtime_adapter_authorization_is_versioned_and_fail_closed(tmp_path):
+    authorization = CHRMLiteEngineeringSmokeAuthorizationInputE4_R1(
+        contract_type="CHRMLiteEngineeringSmokeAuthorizationInputE4_R1",
+        contract_version=E3X_CONTRACT_VERSION,
+        **_authorization_values(E4_RUNTIME_ADAPTER_AUTHORIZATION_DECLARATIONS),
+    ).with_id()
+    path = _write(tmp_path / "e4-authorization.json", authorization.to_dict())
+    adapter = load_e3x_contract(
+        path,
+        expected_file_sha256=file_sha256(path),
+        expected_contract_id=authorization.authorization_input_id,
+    )
+    assert type(adapter.normalized_runtime_view) is CHRMLiteEngineeringSmokeAuthorizationInputE4_R1
+
+    with pytest.raises(ValueError, match="declarations changed"):
+        CHRMLiteEngineeringSmokeAuthorizationInputE4_R1(
+            contract_type="CHRMLiteEngineeringSmokeAuthorizationInputE4_R1",
+            contract_version=E3X_CONTRACT_VERSION,
+            **_authorization_values(E3H_AUTHORIZATION_DECLARATIONS),
+        )
+
+    receipt = CHRMLiteEngineeringSmokeAuthorizationReceiptE4_R1(
+        contract_type="CHRMLiteEngineeringSmokeAuthorizationReceiptE4_R1",
+        contract_version=E3X_CONTRACT_VERSION,
+        source_commit=SOURCE,
+        authorization_input_id=authorization.authorization_input_id,
+        authorization_input_file_sha256=file_sha256(path),
+        source_hardening_audit_id=authorization.source_hardening_audit_id,
+        runtime_release_id=authorization.runtime_release_id,
+        contract_compatibility_release_id=authorization.contract_compatibility_release_id,
+        policy_compatibility_release_id=authorization.policy_compatibility_release_id,
+        assignment_seal_id=authorization.assignment_seal_id,
+        declarations_sha256=canonical_sha256(E4_RUNTIME_ADAPTER_AUTHORIZATION_DECLARATIONS),
+        declaration_count=len(E4_RUNTIME_ADAPTER_AUTHORIZATION_DECLARATIONS),
+        approval_statement_sha256="b" * 64,
+        approved_by="ZYF",
+        provider_preflight_permitted=True,
+        minedojo_execution_permitted=True,
+    ).with_id()
+    receipt_path = _write(tmp_path / "e4-receipt.json", receipt.to_dict())
+    receipt_adapter = load_e3x_contract(
+        receipt_path,
+        expected_file_sha256=file_sha256(receipt_path),
+        expected_contract_id=receipt.receipt_id,
+    )
+    assert type(receipt_adapter.normalized_runtime_view) is CHRMLiteEngineeringSmokeAuthorizationReceiptE4_R1
 
 
 def test_e3x_raw_round_trip_preserves_discriminators_and_identity(tmp_path):

@@ -28,11 +28,13 @@ from dc3pa.experiments.round513e3h import (  # noqa: E402
     CHRMLiteEngineeringSmokeAssignmentSealE3X_R1,
     CHRMLiteEngineeringSmokeAssignmentsE3X_R1,
     CHRMLiteEngineeringSmokeAuthorizationInputE3X_R1,
+    CHRMLiteEngineeringSmokeAuthorizationInputE4_R1,
     CHRMLiteEngineeringSmokeExclusionAuditE3X_R1,
     CHRMLiteEngineeringSmokePoolE3X_R1,
     CHRMLiteEngineeringSmokeRuntimeReleaseE3X_R1,
     CHRMLiteEngineeringSmokeExecutionManifestE3X_R1,
     E3H_AUTHORIZATION_DECLARATIONS,
+    E4_RUNTIME_ADAPTER_AUTHORIZATION_DECLARATIONS,
     E3H_PREFLIGHT_ORDER_ID,
     E3X_CONTRACT_VERSION,
     E3X_POLICY_ADAPTER_VERSION,
@@ -103,6 +105,16 @@ def _verify(path: Path, id_field: str, expected_id: str, expected_sha: str) -> d
     return payload
 
 
+def _verify_canonical(path: Path, id_field: str) -> tuple[dict, str, str]:
+    payload = _load(path)
+    object_id = str(payload.get(id_field, ""))
+    canonical = dict(payload)
+    canonical.pop(id_field, None)
+    if not object_id or canonical_sha256(canonical) != object_id:
+        raise ValueError(f"Frozen canonical ID mismatch: {path.name}")
+    return payload, object_id, file_sha256(path)
+
+
 def _write(path: Path, payload: dict) -> None:
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
@@ -158,6 +170,7 @@ def main() -> int:
     parser.add_argument("--historical-contract-root", type=Path, required=True)
     parser.add_argument("--external-gate-evidence", type=Path, required=True)
     parser.add_argument("--github-actions-evidence", type=Path, required=True)
+    parser.add_argument("--runtime-failure-stop-receipt", type=Path)
     args = parser.parse_args()
 
     source = _git("rev-parse", "HEAD")
@@ -171,36 +184,125 @@ def main() -> int:
     if args.output.exists():
         raise FileExistsError("E3H freeze output already exists")
 
-    old_auth = _verify(
-        args.previous_root / "engineering_smoke_authorization_input.json",
-        "authorization_input_id", OLD_AUTHORIZATION_ID, OLD_AUTHORIZATION_SHA,
-    )
-    _verify(
-        args.previous_receipt, "receipt_id", OLD_RECEIPT_ID, OLD_RECEIPT_SHA,
-    )
-    old_compatibility = _verify(
-        args.previous_root / "contract_compatibility_release.json",
-        "release_id", OLD_COMPATIBILITY_ID, OLD_COMPATIBILITY_SHA,
-    )
-    blocked_manifest = _verify(
-        args.blocked_root / "manifest.json",
-        "manifest_id", BLOCKED_MANIFEST_ID, BLOCKED_MANIFEST_SHA,
-    )
-    closure = _verify(
-        args.blocked_root / "authorization_closure_audit.json",
-        "audit_id", BLOCKED_CLOSURE_ID, BLOCKED_CLOSURE_SHA,
-    )
-    if not (
-        blocked_manifest["provider_preflight_started"] is False
-        and blocked_manifest["minedojo_started"] is False
-        and blocked_manifest["provider_call_count"] == 0
-        and blocked_manifest["environment_actions"] == 0
-        and blocked_manifest["scientific_records"] == 0
-        and closure["status"] == "BLOCKED_AUTHORIZATION_CONTRACT_CLOSURE"
-        and closure["authorized_e3_schema_present_in_compatibility_allowlist"] is False
-        and closure["stage6_would_accept_current_closure"] is False
-    ):
-        raise ValueError("Historical E3X block did not stop before execution")
+    runtime_failure_mode = args.runtime_failure_stop_receipt is not None
+    if runtime_failure_mode:
+        old_auth, old_authorization_id, old_authorization_sha = _verify_canonical(
+            args.previous_root / "engineering_smoke_authorization_input.json",
+            "authorization_input_id",
+        )
+        old_receipt, old_receipt_id, old_receipt_sha = _verify_canonical(
+            args.previous_receipt, "receipt_id",
+        )
+        old_compatibility, old_compatibility_id, old_compatibility_sha = (
+            _verify_canonical(
+                args.previous_root / "contract_compatibility_release.json",
+                "release_id",
+            )
+        )
+        stop, stop_receipt_id, stop_receipt_sha = _verify_canonical(
+            args.runtime_failure_stop_receipt, "receipt_id",
+        )
+        attempts = stop.get("attempts", [])
+        if not (
+            old_auth.get("source_commit") == old_receipt.get("source_commit")
+            and old_receipt.get("authorization_input_id") == old_authorization_id
+            and stop.get("source_commit") == old_auth.get("source_commit")
+            and stop.get("authorization_receipt_id") == old_receipt_id
+            and stop.get("status") == "BLOCKED_RUNTIME_ADAPTER"
+            and stop.get("accepted_scientific_records") == 0
+            and stop.get("planner_provider_calls") == 0
+            and stop.get("evaluation_calls") == 0
+            and stop.get("memory_writes") == 0
+            and stop.get("memory_snapshot_guard") == "PASS"
+            and len(attempts) == 2
+            and all(not item.get("environment_action_started") for item in attempts)
+            and all(not item.get("scientific_outcome_observed") for item in attempts)
+            and attempts[-1].get("category") == "chat_model_runtime_adapter_failure"
+            and attempts[-1].get("retry_permitted") is False
+        ):
+            raise ValueError("Prior E4 runtime failure receipt is not eligible")
+        base_source = str(old_auth["source_commit"])
+        supersession = _with_id({
+            "contract_type": "Round513E4RuntimeAdapterFailureSupersessionDecision",
+            "contract_version": "4.1.2-E4-R2",
+            "source_commit": source,
+            "old_authorization_input_id": old_authorization_id,
+            "old_authorization_input_file_sha256": old_authorization_sha,
+            "old_authorization_receipt_id": old_receipt_id,
+            "old_authorization_receipt_file_sha256": old_receipt_sha,
+            "old_assignment_seal_id": str(old_auth["assignment_seal_id"]),
+            "old_execution_source": base_source,
+            "campaign_stop_receipt_id": stop_receipt_id,
+            "campaign_stop_receipt_file_sha256": stop_receipt_sha,
+            "execution_started": True,
+            "provider_preflight_started": True,
+            "minedojo_started": True,
+            "environment_action_started": False,
+            "planner_provider_calls": 0,
+            "smoke_outcomes_observed": False,
+            "scientific_records_created": 0,
+            "memory_writes": 0,
+            "reusable_after_source_change": False,
+            "historical_objects_preserved": True,
+            "supersession_reason": "legacy_chat_model_runtime_adapter_hardening",
+            "schema_version": 1,
+        }, "decision_id")
+    else:
+        old_auth = _verify(
+            args.previous_root / "engineering_smoke_authorization_input.json",
+            "authorization_input_id", OLD_AUTHORIZATION_ID, OLD_AUTHORIZATION_SHA,
+        )
+        _verify(args.previous_receipt, "receipt_id", OLD_RECEIPT_ID, OLD_RECEIPT_SHA)
+        old_compatibility = _verify(
+            args.previous_root / "contract_compatibility_release.json",
+            "release_id", OLD_COMPATIBILITY_ID, OLD_COMPATIBILITY_SHA,
+        )
+        blocked_manifest = _verify(
+            args.blocked_root / "manifest.json",
+            "manifest_id", BLOCKED_MANIFEST_ID, BLOCKED_MANIFEST_SHA,
+        )
+        closure = _verify(
+            args.blocked_root / "authorization_closure_audit.json",
+            "audit_id", BLOCKED_CLOSURE_ID, BLOCKED_CLOSURE_SHA,
+        )
+        if not (
+            blocked_manifest["provider_preflight_started"] is False
+            and blocked_manifest["minedojo_started"] is False
+            and blocked_manifest["provider_call_count"] == 0
+            and blocked_manifest["environment_actions"] == 0
+            and blocked_manifest["scientific_records"] == 0
+            and closure["status"] == "BLOCKED_AUTHORIZATION_CONTRACT_CLOSURE"
+            and closure["authorized_e3_schema_present_in_compatibility_allowlist"] is False
+            and closure["stage6_would_accept_current_closure"] is False
+        ):
+            raise ValueError("Historical E3X block did not stop before execution")
+        old_authorization_id, old_authorization_sha = OLD_AUTHORIZATION_ID, OLD_AUTHORIZATION_SHA
+        old_receipt_id, old_receipt_sha = OLD_RECEIPT_ID, OLD_RECEIPT_SHA
+        old_compatibility_id, old_compatibility_sha = OLD_COMPATIBILITY_ID, OLD_COMPATIBILITY_SHA
+        base_source = BASE_SOURCE
+        supersession = _with_id({
+            "contract_type": "Round513E4AuthorizationSupersessionDecision",
+            "contract_version": "4.1.2-E4-R1",
+            "source_commit": source,
+            "old_authorization_input_id": old_authorization_id,
+            "old_authorization_input_file_sha256": old_authorization_sha,
+            "old_authorization_receipt_id": old_receipt_id,
+            "old_authorization_receipt_file_sha256": old_receipt_sha,
+            "old_assignment_seal_id": str(old_auth["assignment_seal_id"]),
+            "old_execution_source": base_source,
+            "authorization_closure_audit_id": str(closure["audit_id"]),
+            "blocked_manifest_id": str(blocked_manifest["manifest_id"]),
+            "authorization_content_valid": True,
+            "execution_started": False,
+            "provider_preflight_started": False,
+            "minedojo_started": False,
+            "smoke_outcomes_observed": False,
+            "scientific_records_created": 0,
+            "reusable_after_source_change": False,
+            "historical_objects_preserved": True,
+            "supersession_reason": "planner_schema_compatibility_allowlist_hardening",
+            "schema_version": 1,
+        }, "decision_id")
 
     retry = load_frozen_policy(
         args.retry_policy, policy_type="technical_retry",
@@ -215,43 +317,27 @@ def main() -> int:
     ):
         raise ValueError("Frozen Policy authoring source changed")
 
-    supersession = _with_id({
-        "contract_type": "Round513E4AuthorizationSupersessionDecision",
-        "contract_version": "4.1.2-E4-R1",
-        "source_commit": source,
-        "old_authorization_input_id": OLD_AUTHORIZATION_ID,
-        "old_authorization_input_file_sha256": OLD_AUTHORIZATION_SHA,
-        "old_authorization_receipt_id": OLD_RECEIPT_ID,
-        "old_authorization_receipt_file_sha256": OLD_RECEIPT_SHA,
-        "old_assignment_seal_id": str(old_auth["assignment_seal_id"]),
-        "old_execution_source": BASE_SOURCE,
-        "authorization_closure_audit_id": str(closure["audit_id"]),
-        "blocked_manifest_id": str(blocked_manifest["manifest_id"]),
-        "authorization_content_valid": True,
-        "execution_started": False,
-        "provider_preflight_started": False,
-        "minedojo_started": False,
-        "smoke_outcomes_observed": False,
-        "scientific_records_created": 0,
-        "reusable_after_source_change": False,
-        "historical_objects_preserved": True,
-        "supersession_reason": "planner_schema_compatibility_allowlist_hardening",
-        "schema_version": 1,
-    }, "decision_id")
-
     changed_files = tuple(
-        item for item in _git("diff", "--name-only", f"{BASE_SOURCE}..{source}").splitlines()
+        item for item in _git("diff", "--name-only", f"{base_source}..{source}").splitlines()
         if item
     )
-    allowed_files = {
+    allowed_files = ({
+        "MP5_agent/dc3pa/experiments/round513e3h.py",
+        "MP5_agent/dc3pa/integration/providers.py",
+        "MP5_agent/scripts_dc3pa/freeze_round513e3h_reauthorization.py",
+        "MP5_agent/scripts_dc3pa/stage6_run_minecraft.py",
+        "MP5_agent/tests_dc3pa/test_round513e3f_freeze.py",
+        "MP5_agent/tests_dc3pa/test_round513e3h_runtime_contracts.py",
+        "MP5_agent/tests_dc3pa/test_round58_stage6_profile.py",
+    } if runtime_failure_mode else {
         "MP5_agent/scripts_dc3pa/freeze_round513e3h_reauthorization.py",
         "MP5_agent/tests_dc3pa/test_round513e3h_runtime_contracts.py",
-    }
+    })
     if set(changed_files) != allowed_files:
         raise ValueError(f"E3H source scope drift: {sorted(set(changed_files) ^ allowed_files)}")
     frozen_identity_root = canonical_sha256({
-        "old_authorization": OLD_AUTHORIZATION_ID,
-        "old_receipt": OLD_RECEIPT_ID,
+        "old_authorization": old_authorization_id,
+        "old_receipt": old_receipt_id,
         "old_seal": old_auth["assignment_seal_id"],
         "retry": [RETRY_ID, RETRY_SHA],
         "cleanup": [CLEANUP_ID, CLEANUP_SHA],
@@ -439,8 +525,8 @@ def main() -> int:
         contract_version=E3X_CONTRACT_VERSION,
         source_commit=source,
         source_hardening_audit_id=source_hardening.audit_id,
-        historical_e3_compatibility_release_id=OLD_COMPATIBILITY_ID,
-        historical_e3_compatibility_file_sha256=OLD_COMPATIBILITY_SHA,
+        historical_e3_compatibility_release_id=old_compatibility_id,
+        historical_e3_compatibility_file_sha256=old_compatibility_sha,
         historical_e2h_compatibility_release_id=e2h_id,
         provider_request_policy_id=str(old_auth["provider_request_policy_id"]),
         planner_runtime_request_contract_id=str(old_auth["planner_runtime_request_contract_id"]),
@@ -561,8 +647,18 @@ def main() -> int:
         assignment_count=9,
         proxy_policy="P1",
     ).with_id()
-    authorization = CHRMLiteEngineeringSmokeAuthorizationInputE3X_R1(
-        contract_type="CHRMLiteEngineeringSmokeAuthorizationInputE3X_R1",
+    authorization_class = (
+        CHRMLiteEngineeringSmokeAuthorizationInputE4_R1
+        if runtime_failure_mode
+        else CHRMLiteEngineeringSmokeAuthorizationInputE3X_R1
+    )
+    authorization_declarations = (
+        E4_RUNTIME_ADAPTER_AUTHORIZATION_DECLARATIONS
+        if runtime_failure_mode
+        else E3H_AUTHORIZATION_DECLARATIONS
+    )
+    authorization = authorization_class(
+        contract_type=authorization_class.__name__,
         contract_version=E3X_CONTRACT_VERSION,
         source_commit=source,
         source_hardening_audit_id=source_hardening.audit_id,
@@ -612,7 +708,7 @@ def main() -> int:
         gamma_cov_text=GAMMA_TEXT[0],
         gamma_minus_text=GAMMA_TEXT[1],
         gamma_plus_text=GAMMA_TEXT[2],
-        declarations=E3H_AUTHORIZATION_DECLARATIONS,
+        declarations=authorization_declarations,
     ).with_id()
 
     args.output.mkdir(parents=True, mode=0o700)
@@ -658,10 +754,12 @@ def main() -> int:
             "sha256": file_sha256(contract_output / entry.filename),
         })
     authorization_path = args.output / "engineering_smoke_authorization_input.json"
+    authorization_label = "E4 R1" if runtime_failure_mode else "E3X R1"
+    source_label = "E4_EXECUTION_SOURCE_SHA" if runtime_failure_mode else "E3H_EXECUTION_SOURCE_SHA"
     approval_sentence = (
-        "ZYF approves CHRMLite Engineering Smoke Authorization Input E3X R1 "
+        f"ZYF approves CHRMLite Engineering Smoke Authorization Input {authorization_label} "
         f"{authorization.authorization_input_id} with file SHA-256 {file_sha256(authorization_path)}, "
-        f"binding E3H_EXECUTION_SOURCE_SHA {source}, Runtime Release {runtime.release_id}, "
+        f"binding {source_label} {source}, Runtime Release {runtime.release_id}, "
         f"Contract Compatibility {compatibility.release_id}, Policy Compatibility "
         f"{policy_compatibility.release_id}, Assignment Seal {seal.seal_id}, Candidate B "
         f"{GAMMA_CANDIDATE_B} with gamma_cov={GAMMA_TEXT[0]}, "
@@ -669,7 +767,11 @@ def main() -> int:
         "exactly as frozen; approved_by=ZYF."
     )
     manifest = {
-        "phase": "E4_PLANNER_COMPAT_AUTHOR_BOUNDARY",
+        "phase": (
+            "E4_RUNTIME_ADAPTER_AUTHOR_BOUNDARY"
+            if runtime_failure_mode
+            else "E4_PLANNER_COMPAT_AUTHOR_BOUNDARY"
+        ),
         "source_commit": source,
         "source_frozen": True,
         "assignment_dependency_case": "B",
