@@ -18,7 +18,9 @@ from dc3pa.experiments.round513e6d2 import (
     action_goal_outcome_v2,
     build_label_free_scene_audit,
     canonical_sha256,
+    classify_action_pair_v2,
     controller_canonical_object_v2,
+    expected_action_postcondition_v2,
     find_evidence_from_telemetry_v2,
     outcome_target_canonical_object_v2,
     retrieval_canonical_object_v2,
@@ -78,7 +80,14 @@ def _telemetry(*, step=None, termination="target_visible_in_voxel_volume", exhau
 
 
 def _outcome(evidence, **overrides):
+    action = overrides.pop("action", Action("find", {"obj": "tree"}))
+    expected_target = overrides.pop(
+        "expected_outcome_target",
+        evidence.outcome_target_identity if evidence else "minecraft:block/wood",
+    )
     values = {
+        "action": action,
+        "expected_outcome_target": expected_target,
         "controller_called": True,
         "controller_success": True,
         "controller_exception": "",
@@ -97,6 +106,12 @@ def test_v2_schema_keeps_controller_action_and_goal_independent():
     assert schema.chrm_primary_label == "y_action"
     assert not schema.goal_may_backfill_action
     assert not schema.controller_may_override_labels
+    assert schema.postcondition_policy_version == "action_family_v1"
+    assert schema.target_identity_match_required
+    assert schema.unobserved_action_families_fail_closed
+    assert schema.action_pairing_interpretation == (
+        "stratify_by_normalized_action_signature"
+    )
 
 
 def test_find_success_requires_direct_identity_visibility_distance_and_sensors():
@@ -152,8 +167,61 @@ def test_find_missing_success_evidence_remains_null(missing):
 
 
 def test_sapling_goal_success_does_not_backfill_missing_action_evidence():
-    outcome = _outcome(None, task_completed=True)
+    outcome = _outcome(
+        None,
+        action=Action("find", {"obj": "sapling"}),
+        expected_outcome_target="minecraft:block/sapling",
+        task_completed=True,
+    )
     assert (outcome.y_action, outcome.y_goal) == (None, 1)
+    assert outcome.record_disposition == "audit_only_ambiguous"
+    assert outcome.expected_action_postcondition == "minecraft:block/sapling"
+
+
+def test_dig_down_uses_its_own_postcondition_and_stays_fail_closed():
+    action = Action("dig_down", {"y_level": 15, "tool": None})
+    outcome = _outcome(
+        None,
+        action=action,
+        expected_outcome_target="unknown:outcome:",
+        controller_success=True,
+    )
+    assert expected_action_postcondition_v2(action, "unknown:outcome:") == (
+        "agent_y_position_lte:15"
+    )
+    assert outcome.expected_action_postcondition == "agent_y_position_lte:15"
+    assert outcome.y_action is None
+    assert outcome.y_action_evidence_status == "action_family_evidence_not_collected"
+    assert outcome.record_disposition == "audit_only_ambiguous"
+
+
+def test_action_pairing_does_not_equate_sapling_tree_or_find_dig_down():
+    assert classify_action_pair_v2("find:tree", "find:tree") == (
+        "exact_action_signature"
+    )
+    assert classify_action_pair_v2("find:sapling", "find:tree") == (
+        "same_action_family_different_arguments"
+    )
+    assert classify_action_pair_v2("find:iron_ore", "dig_down:15") == (
+        "different_action_family"
+    )
+    assert classify_action_pair_v2("find:iron_ore", "find:iron ore") == (
+        "exact_action_signature"
+    )
+
+
+def test_find_target_drift_cannot_create_an_action_label():
+    registry = ActionObjectSignatureRegistryV2().with_id()
+    evidence = find_evidence_from_telemetry_v2(
+        Action("find", {"obj": "tree"}), _telemetry(), registry
+    )
+    outcome = _outcome(
+        evidence,
+        action=Action("find", {"obj": "sapling"}),
+        expected_outcome_target="minecraft:block/sapling",
+    )
+    assert outcome.y_action is None
+    assert outcome.observed_action_postcondition == ""
     assert outcome.record_disposition == "audit_only_ambiguous"
 
 
@@ -317,3 +385,44 @@ def test_v2_atomic_store_routes_only_by_action_evidence(tmp_path):
     path = store.join_post(record)
     assert path.parent.name == "audit_only_ambiguous"
     assert not (tmp_path / "accepted_scientific_action" / f"{pre.record_id}.json").exists()
+
+
+def test_v2_record_rejects_a_postcondition_from_another_action_family():
+    pre = PreExecutionRecordV2(
+        record_id="b" * 64,
+        binding={"diagnostic": True},
+        decision_index=0,
+        action={"name": "dig_down", "args": {"y_level": 15, "tool": None}},
+        subgoal="descend",
+        raw_object_signature="dig_down:15",
+        controller_canonical_signature="dig_down:15",
+        retrieval_canonical_signature="dig_down:15",
+        outcome_target_canonical_identity="unknown:outcome:",
+        confidence="likely",
+        failure_mode="depth_not_reached",
+        same_generation_confidence=True,
+        planner_call_count=1,
+        pre_state={},
+        knowledge={"support": 0},
+        raw_environment={"raw_state": "unknown"},
+        environment={"raw_state": "unknown"},
+    )
+    wrong = ActionGoalOutcomeV2(
+        controller_status="success",
+        controller_terminal_reason="",
+        expected_action_postcondition="find_target_directly_observed",
+        observed_action_postcondition="",
+        y_action=None,
+        y_action_evidence_status="action_family_evidence_not_collected",
+        terminal_goal_status="failure",
+        y_goal=0,
+        y_goal_evidence_status="evaluator_complete",
+        record_disposition="audit_only_ambiguous",
+    )
+    with pytest.raises(ValueError, match="postcondition does not match"):
+        DecisionRecordV2(
+            pre=pre,
+            post_state={},
+            controller={"called": True, "success": True},
+            outcome=wrong,
+        )

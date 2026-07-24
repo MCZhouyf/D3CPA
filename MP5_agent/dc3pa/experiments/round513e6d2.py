@@ -246,6 +246,10 @@ class ActionGoalOutcomeSchemaV2(_Hashed):
     controller_may_override_labels: bool = False
     goal_may_backfill_action: bool = False
     action_may_backfill_goal: bool = False
+    postcondition_policy_version: str = "action_family_v1"
+    target_identity_match_required: bool = True
+    unobserved_action_families_fail_closed: bool = True
+    action_pairing_interpretation: str = "stratify_by_normalized_action_signature"
     allowed_dispositions: tuple[str, ...] = RECORD_DISPOSITIONS
     schema_id: str = ""
 
@@ -256,6 +260,12 @@ class ActionGoalOutcomeSchemaV2(_Hashed):
             raise ValueError("V2 outcome layers are not orthogonal")
         if self.chrm_primary_label != "y_action":
             raise ValueError("CHRM-lite primary label changed")
+        if self.postcondition_policy_version != "action_family_v1":
+            raise ValueError("Unknown V2 action postcondition policy")
+        if not self.target_identity_match_required or not self.unobserved_action_families_fail_closed:
+            raise ValueError("V2 action evidence no longer fails closed")
+        if self.action_pairing_interpretation != "stratify_by_normalized_action_signature":
+            raise ValueError("V2 action pairing interpretation changed")
         if self.allowed_dispositions != RECORD_DISPOSITIONS:
             raise ValueError("V2 record lifecycle changed")
         if self.schema_id and self.schema_id != self.compute_id():
@@ -596,6 +606,49 @@ class ActionGoalOutcomeV2:
             raise ValueError("V2 disposition is not driven exclusively by y_action evidence")
 
 
+def expected_action_postcondition_v2(
+    action: Action, outcome_target_identity: str
+) -> str:
+    """Describe the action-family postcondition without inferring its label."""
+
+    target = str(outcome_target_identity or "unknown:outcome:")
+    if action.name == "find":
+        return target
+    if action.name == "dig_down":
+        return f"agent_y_position_lte:{int(action.args['y_level'])}"
+    if action.name == "dig_up":
+        return "agent_y_position_increased_or_not_underground"
+    if action.name in {"mine", "craft"}:
+        return f"inventory_increase:{target}"
+    if action.name == "equip":
+        return f"held_item_equals:{target}"
+    if action.name == "move_to":
+        return f"target_within_interaction_distance:{target}"
+    if action.name == "fight":
+        return f"target_entity_inactive:{target}"
+    if action.name == "apply":
+        return f"object_state_changed:{target}"
+    return f"unsupported_action_family:{_token(action.name)}"
+
+
+def classify_action_pair_v2(reference_signature: str, candidate_signature: str) -> str:
+    """Classify action comparability without declaring different targets equivalent."""
+
+    reference = str(reference_signature).strip()
+    candidate = str(candidate_signature).strip()
+    reference_family, separator, reference_arguments = reference.partition(":")
+    candidate_family, candidate_separator, candidate_arguments = candidate.partition(":")
+    if separator and candidate_separator and _token(reference_family) == _token(
+        candidate_family
+    ):
+        if _token(reference_arguments) == _token(candidate_arguments):
+            return "exact_action_signature"
+        return "same_action_family_different_arguments"
+    if reference == candidate:
+        return "exact_action_signature"
+    return "different_action_family"
+
+
 def _distance_contract_satisfied(step: FindObservationStepEvidenceV2) -> bool:
     if step.distance_estimate is None or step.distance_unit != "voxel_blocks":
         return False
@@ -608,6 +661,8 @@ def _distance_contract_satisfied(step: FindObservationStepEvidenceV2) -> bool:
 
 def action_goal_outcome_v2(
     *,
+    action: Action,
+    expected_outcome_target: str,
     controller_called: bool,
     controller_success: bool,
     controller_exception: str,
@@ -622,7 +677,7 @@ def action_goal_outcome_v2(
     else:
         controller_status = "success" if controller_success else "failure"
     terminal_reason = find_evidence.termination_reason if find_evidence else ""
-    expected = find_evidence.outcome_target_identity if find_evidence else "find_target_directly_observed"
+    expected = expected_action_postcondition_v2(action, expected_outcome_target)
     action_value: int | None = None
     action_status = "evidence_missing"
     observed = ""
@@ -630,13 +685,16 @@ def action_goal_outcome_v2(
     evidence_ids: tuple[str, ...] = ()
     if controller_status == "technical_failure":
         action_status = "technical_failure"
+    elif action.name != "find":
+        action_status = "action_family_evidence_not_collected"
     elif find_evidence is not None:
         evidence_ids = (find_evidence.evidence_id,)
         if find_evidence.technical_failure:
             action_status = "technical_failure"
         else:
-            identity_resolved = not find_evidence.outcome_target_identity.startswith(
-                "unknown:"
+            identity_resolved = (
+                not expected_outcome_target.startswith("unknown:")
+                and find_evidence.outcome_target_identity == expected_outcome_target
             )
             trace_counts_complete = (
                 find_evidence.search_steps_consumed == len(find_evidence.steps)
@@ -649,20 +707,20 @@ def action_goal_outcome_v2(
                 and find_evidence.search_trace_complete
                 and step.required_sensor_complete
                 and step.visibility_flag is True
-                and find_evidence.outcome_target_identity in step.canonical_target_candidates
+                and expected_outcome_target in step.canonical_target_candidates
                 and _distance_contract_satisfied(step)
                 and (not step.line_of_sight_available or step.line_of_sight_flag is True)
             )
             if matching:
                 action_value = 1
                 action_status = "complete_success_evidence"
-                observed = find_evidence.outcome_target_identity
+                observed = expected_outcome_target
             else:
                 all_sensors = bool(find_evidence.steps) and all(
                     step.required_sensor_complete for step in find_evidence.steps
                 )
                 no_match = all(
-                    find_evidence.outcome_target_identity not in step.canonical_target_candidates
+                    expected_outcome_target not in step.canonical_target_candidates
                     or step.visibility_flag is not True
                     for step in find_evidence.steps
                 )
@@ -915,6 +973,16 @@ class DecisionRecordV2:
     formal_fitting_eligible: bool = False
     record_hash: str = ""
 
+    def __post_init__(self) -> None:
+        action = Action.from_dict(self.pre.action)
+        expected = expected_action_postcondition_v2(
+            action, self.pre.outcome_target_canonical_identity
+        )
+        if self.outcome.expected_action_postcondition != expected:
+            raise ValueError("D2 outcome postcondition does not match pre-action family")
+        if action.name != "find" and self.outcome.y_action is not None:
+            raise ValueError("D2 non-find action lacks a dedicated binary evidence contract")
+
     def with_hash(self):
         payload = asdict(self)
         payload.pop("record_hash", None)
@@ -1121,6 +1189,8 @@ class TrackECollectorV2:
             step.actions[0], execution_telemetry, self.signature_registry
         )
         outcome = action_goal_outcome_v2(
+            action=step.actions[0],
+            expected_outcome_target=pre.outcome_target_canonical_identity,
             controller_called=controller.called,
             controller_success=controller.success,
             controller_exception=controller.exception_type,

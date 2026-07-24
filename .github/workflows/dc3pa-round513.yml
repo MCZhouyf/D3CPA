@@ -12,6 +12,7 @@ on:
       - "round513e3h-runtime-contract-hardening"
       - "round513e5-observation-label-signature-hardening"
       - "round513e6-d2-observability-label-hardening"
+      - "round513e6-d2-followup-hardening"
   pull_request:
 
 jobs:
