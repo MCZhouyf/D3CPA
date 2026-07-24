@@ -1260,6 +1260,21 @@ E4_RUNTIME_ADAPTER_AUTHORIZATION_DECLARATIONS = (
     "Any new authorization applies only to the new E4 Source, Runtime, Binding, Assignment, and Seal closure.",
 )
 
+E4_RETRY_OUTPUT_AUTHORIZATION_DECLARATIONS = (
+    "The prior E4 authorization was valid and is retired after the authorized technical retry could not enter execution.",
+    "The first six ordered assignments produced audit-only ambiguous records and no accepted scientific record.",
+    "The diamond first attempt ended in a Provider transport rate limit before any action for that assignment started.",
+    "The one authorized diamond retry made no Provider call or environment action because Stage6 rejected the empty disposition skeleton.",
+    "No third diamond attempt occurred, and the final two ordered assignments did not start.",
+    "No Paper Memory write occurred and the frozen Memory SnapshotGuard passed after campaign closure.",
+    "All nine tasks, seeds, order, task assets, and proxy semantics are unchanged.",
+    "Planner Prompt, Schema, Parser, Controller, Evaluator, Memory, Candidate B, and exact Gamma strings are unchanged.",
+    "The new source only treats known empty disposition directories as a logically empty retry output root.",
+    "Files, unknown directories, nested content, and symbolic links remain fail-closed at preflight.",
+    "Retry and Cleanup Policy IDs, budgets, classifications, and scientific retry semantics are unchanged.",
+    "Any new authorization applies only to a fresh E4 R2 Source, Runtime, Binding, Assignment, and Seal closure.",
+)
+
 
 @dataclass(frozen=True)
 class CHRMLiteEngineeringSmokeAuthorizationInputE3X_R1(_Hashed):
@@ -1443,6 +1458,61 @@ class CHRMLiteEngineeringSmokeAuthorizationReceiptE4_R1(
             raise ValueError("E4 authorization receipt canonical ID mismatch")
 
 
+@dataclass(frozen=True)
+class CHRMLiteEngineeringSmokeAuthorizationInputE4_R2(
+    CHRMLiteEngineeringSmokeAuthorizationInputE3X_R1
+):
+    """Versioned authorization input after the retry-output preflight failure."""
+
+    def __post_init__(self) -> None:
+        _require_contract_header(
+            contract_type=self.contract_type,
+            expected_type=type(self).__name__,
+            contract_version=self.contract_version,
+            schema_version=self.schema_version,
+        )
+        if self.declarations != E4_RETRY_OUTPUT_AUTHORIZATION_DECLARATIONS:
+            raise ValueError("E4 R2 retry-output authorization declarations changed")
+        if self.proxy_policy != "P1" or self.gamma_candidate != GAMMA_CANDIDATE_B:
+            raise ValueError("E4 R2 authorization changed proxy policy or Candidate B")
+        if (self.gamma_cov_text, self.gamma_minus_text, self.gamma_plus_text) != GAMMA_TEXT:
+            raise ValueError("E4 R2 authorization changed exact Gamma strings")
+        if self.reauthorization_status != "pending" or any((
+            self.provider_preflight_permitted, self.minedojo_execution_permitted,
+            self.formal_development_permitted, self.holdout_final_round6_permitted,
+        )):
+            raise ValueError("E4 R2 authorization input crossed the Author Boundary")
+        if self.authorization_input_id and self.authorization_input_id != self.compute_id():
+            raise ValueError("E4 R2 authorization input canonical ID mismatch")
+
+
+@dataclass(frozen=True)
+class CHRMLiteEngineeringSmokeAuthorizationReceiptE4_R2(
+    CHRMLiteEngineeringSmokeAuthorizationReceiptE3X_R1
+):
+    """Versioned author receipt for the E4 R2 retry-output closure."""
+
+    def __post_init__(self) -> None:
+        _require_contract_header(
+            contract_type=self.contract_type,
+            expected_type=type(self).__name__,
+            contract_version=self.contract_version,
+            schema_version=self.schema_version,
+        )
+        if self.approved_by != "ZYF" or not all((
+            self.provider_preflight_permitted, self.minedojo_execution_permitted
+        )):
+            raise PermissionError("E4 R2 authorization receipt does not permit execution")
+        if self.declaration_count != len(E4_RETRY_OUTPUT_AUTHORIZATION_DECLARATIONS):
+            raise ValueError("E4 R2 authorization receipt declaration count mismatch")
+        if self.declarations_sha256 != canonical_sha256(
+            E4_RETRY_OUTPUT_AUTHORIZATION_DECLARATIONS
+        ):
+            raise ValueError("E4 R2 authorization receipt declaration identity mismatch")
+        if self.receipt_id and self.receipt_id != self.compute_id():
+            raise ValueError("E4 R2 authorization receipt canonical ID mismatch")
+
+
 def validate_e3x_authorization_assignment_closure(
     *,
     authorization: CHRMLiteEngineeringSmokeAuthorizationInputE3X_R1,
@@ -1524,6 +1594,12 @@ _E3X_TYPES.update({
     ),
     "CHRMLiteEngineeringSmokeAuthorizationReceiptE4_R1": (
         CHRMLiteEngineeringSmokeAuthorizationReceiptE4_R1, "receipt_id"
+    ),
+    "CHRMLiteEngineeringSmokeAuthorizationInputE4_R2": (
+        CHRMLiteEngineeringSmokeAuthorizationInputE4_R2, "authorization_input_id"
+    ),
+    "CHRMLiteEngineeringSmokeAuthorizationReceiptE4_R2": (
+        CHRMLiteEngineeringSmokeAuthorizationReceiptE4_R2, "receipt_id"
     ),
     "CHRMLiteEngineeringSmokeAssignmentsE3X_R1": (
         CHRMLiteEngineeringSmokeAssignmentsE3X_R1, "assignments_id"
