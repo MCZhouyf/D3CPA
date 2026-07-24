@@ -122,6 +122,21 @@ from dc3pa.experiments.round513e5d1 import (  # noqa: E402
     load_d1_contract,
     validate_d1_execution_closure,
 )
+from dc3pa.experiments.round513e6d2 import (  # noqa: E402
+    ActionObjectSignatureRegistryV2,
+    AtomicDecisionStoreV2,
+    D2PairedDiagnosticAssignments,
+    D2PairedDiagnosticSeal,
+    Round513E6D2DiagnosticAuthorizationInput,
+    Round513E6D2DiagnosticAuthorizationReceiptR1,
+    Round513E6D2DiagnosticExecutionManifestR1,
+    Round513E6D2DiagnosticRunBindingR1,
+    Round513E6D2RuntimeRelease,
+    SafetyTerminationPolicyV2,
+    TrackECollectorV2,
+    load_d2_contract,
+    validate_d2_execution_closure,
+)
 from dc3pa.experiments.round513e2h import (  # noqa: E402
     AtomicDecisionStoreV4_1_2_R1,
     CHRMLiteEngineeringSmokeRuntimeReleaseV4_1_2_R1,
@@ -964,6 +979,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Use prospective V4.1.3 observation/label/signature contracts.",
     )
     parser.add_argument(
+        "--round513e6-d2-contracts",
+        action="store_true",
+        help="Use the source-frozen D2 paired observation/dual-label contracts.",
+    )
+    parser.add_argument(
         "--round513-track-e-compatibility-release",
         type=Path,
         help="Exact V4.1.2-R1 contract compatibility allowlist.",
@@ -1033,6 +1053,10 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Frozen E5 D1 task-seed-order seal.",
     )
+    parser.add_argument("--round513e6-d2-authorization-input", type=Path)
+    parser.add_argument("--round513e6-d2-authorization-receipt", type=Path)
+    parser.add_argument("--round513e6-d2-assignments", type=Path)
+    parser.add_argument("--round513e6-d2-assignment-seal", type=Path)
     for option, help_text in (
         ("binding", "E3X run binding"),
         ("authorization-input", "E3X authorization input"),
@@ -1059,6 +1083,19 @@ def build_parser() -> argparse.ArgumentParser:
     ):
         parser.add_argument(
             f"--round513e5-d1-{option}-sha256",
+            help=f"Expected raw file SHA-256 for the {help_text}.",
+        )
+    for option, help_text in (
+        ("binding", "D2 run binding"),
+        ("authorization-input", "D2 authorization input"),
+        ("authorization-receipt", "D2 authorization receipt"),
+        ("assignments", "D2 paired assignments"),
+        ("assignment-seal", "D2 paired assignment seal"),
+        ("runtime", "D2 runtime release"),
+        ("execution-manifest", "D2 execution manifest"),
+    ):
+        parser.add_argument(
+            f"--round513e6-d2-{option}-sha256",
             help=f"Expected raw file SHA-256 for the {help_text}.",
         )
     return parser
@@ -1101,6 +1138,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         parser.error(
             "Round 5.13E5 diagnostic contracts require the base Track E arguments"
         )
+    if args.round513e6_d2_contracts and not round513_track_e_enabled:
+        parser.error("Round 5.13E6 D2 contracts require the base Track E arguments")
+    if args.round513e6_d2_contracts and args.round513e5_diagnostic_contracts:
+        parser.error("Round 5.13 E5 D1 and E6 D2 collector contracts are mutually exclusive")
     round513_r1_arguments = (
         args.round513_track_e_compatibility_release,
         args.round513_track_e_runtime_release,
@@ -1137,12 +1178,27 @@ def main(argv: Optional[list[str]] = None) -> int:
         args.round513e5_d1_runtime_sha256,
         args.round513e5_d1_execution_manifest_sha256,
     )
+    round513_d2_arguments = (
+        args.round513e6_d2_authorization_input,
+        args.round513e6_d2_authorization_receipt,
+        args.round513e6_d2_assignments,
+        args.round513e6_d2_assignment_seal,
+        args.round513e6_d2_binding_sha256,
+        args.round513e6_d2_authorization_input_sha256,
+        args.round513e6_d2_authorization_receipt_sha256,
+        args.round513e6_d2_assignments_sha256,
+        args.round513e6_d2_assignment_seal_sha256,
+        args.round513e6_d2_runtime_sha256,
+        args.round513e6_d2_execution_manifest_sha256,
+    )
     if any(round513_r1_arguments) and not round513_track_e_enabled:
         parser.error("Round 5.13 R1 artifacts require the base Track E arguments")
     if any(round513_e3x_arguments) and not round513_track_e_enabled:
         parser.error("Round 5.13 E3X artifacts require the base Track E arguments")
     if any(round513_d1_arguments) and not round513_track_e_enabled:
         parser.error("Round 5.13 E5 D1 artifacts require the base Track E arguments")
+    if any(round513_d2_arguments) and not round513_track_e_enabled:
+        parser.error("Round 5.13 E6 D2 artifacts require the base Track E arguments")
     if round511_enabled and round5124_holdout_enabled:
         parser.error("Development and holdout shadow collection are mutually exclusive")
     if round513_track_e_enabled and (round511_enabled or round5124_holdout_enabled):
@@ -1210,9 +1266,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     round513_rule_registry = None
     round513_retrieval_policy = None
     round513_support_policy = None
+    d2_signature_registry = None
+    d2_safety_policy = None
     round513_r1_enabled = False
     round513_e3x_enabled = False
     round513_d1_enabled = False
+    round513_d2_enabled = False
     r1_binding = None
     if round513_track_e_enabled:
         assert args.round513_track_e_binding is not None
@@ -1222,6 +1281,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         round513_d1_enabled = (
             binding_payload.get("contract_type") == "Round513E5DiagnosticRunBindingD1R1"
         )
+        round513_d2_enabled = (
+            binding_payload.get("contract_kind")
+            == "Round513E6D2DiagnosticRunBindingR1"
+        )
         round513_e3x_enabled = (
             binding_payload.get("contract_type") == "TrackERunBindingE3X_R1"
         )
@@ -1229,8 +1292,25 @@ def main(argv: Optional[list[str]] = None) -> int:
             binding_payload.get("runtime_binding_revision") == "R1"
             or round513_e3x_enabled
             or round513_d1_enabled
+            or round513_d2_enabled
         )
-        if round513_d1_enabled:
+        if args.round513e6_d2_contracts and not round513_d2_enabled:
+            parser.error("--round513e6-d2-contracts requires an exact D2 R1 run binding")
+        if round513_d2_enabled:
+            required_d2_runtime = (
+                args.round513_track_e_runtime_release,
+                args.round513_track_e_execution_manifest,
+                args.round513_technical_retry_policy,
+                args.round513_process_cleanup_policy,
+            )
+            if not args.round513e6_d2_contracts:
+                parser.error("A D2 run binding requires --round513e6-d2-contracts")
+            if not all(required_d2_runtime) or not all(round513_d2_arguments):
+                parser.error(
+                    "Round 5.13 E6 D2 requires authorization, paired assignment, "
+                    "runtime, manifest, policy, and every raw SHA-256 binding"
+                )
+        elif round513_d1_enabled:
             required_d1_runtime = (
                 args.round513_track_e_runtime_release,
                 args.round513_track_e_execution_manifest,
@@ -1254,11 +1334,15 @@ def main(argv: Optional[list[str]] = None) -> int:
             parser.error("E3X release arguments cannot be used with an E2H/V4.1 binding")
         if not round513_d1_enabled and any(round513_d1_arguments):
             parser.error("E5 D1 arguments require an E5 D1 run binding")
+        if not round513_d2_enabled and any(round513_d2_arguments):
+            parser.error("E6 D2 arguments require an E6 D2 run binding")
+        if round513_d2_enabled and any(round513_d1_arguments):
+            parser.error("E6 D2 and E5 D1 authorization closures are mutually exclusive")
         if round513_d1_enabled and any(round513_e3x_arguments):
             parser.error("E5 D1 and E3X authorization closures are mutually exclusive")
         if not round513_r1_enabled and any(round513_r1_arguments):
             parser.error("R1 release arguments cannot be used with a V4.1 binding")
-        if round513_e3x_enabled or round513_d1_enabled:
+        if round513_e3x_enabled or round513_d1_enabled or round513_d2_enabled:
             current_commit = subprocess.run(
                 ["git", "rev-parse", "HEAD"],
                 cwd=ROOT.parent,
@@ -1279,7 +1363,152 @@ def main(argv: Optional[list[str]] = None) -> int:
                 parser.error("Track E source preflight requires a clean worktree")
         try:
             contract_root = args.round513_contract_root.resolve()
-            if round513_d1_enabled:
+            if round513_d2_enabled:
+                def _load_d2(path: Path, raw_sha: str, id_field: str, kind: str):
+                    payload = _load_json(path)
+                    return load_d2_contract(
+                        path,
+                        contract_kind=kind,
+                        expected_file_sha256=raw_sha,
+                        expected_contract_id=str(payload[id_field]),
+                    )
+
+                r1_binding = _load_d2(
+                    args.round513_track_e_binding,
+                    args.round513e6_d2_binding_sha256,
+                    "binding_id", "binding",
+                )
+                authorization = _load_d2(
+                    args.round513e6_d2_authorization_input,
+                    args.round513e6_d2_authorization_input_sha256,
+                    "authorization_input_id", "authorization_input",
+                )
+                authorization_receipt = _load_d2(
+                    args.round513e6_d2_authorization_receipt,
+                    args.round513e6_d2_authorization_receipt_sha256,
+                    "receipt_id", "authorization_receipt",
+                )
+                d2_assignments = _load_d2(
+                    args.round513e6_d2_assignments,
+                    args.round513e6_d2_assignments_sha256,
+                    "assignments_id", "assignments",
+                )
+                d2_seal = _load_d2(
+                    args.round513e6_d2_assignment_seal,
+                    args.round513e6_d2_assignment_seal_sha256,
+                    "seal_id", "assignment_seal",
+                )
+                runtime_release = _load_d2(
+                    args.round513_track_e_runtime_release,
+                    args.round513e6_d2_runtime_sha256,
+                    "release_id", "runtime",
+                )
+                execution_manifest = _load_d2(
+                    args.round513_track_e_execution_manifest,
+                    args.round513e6_d2_execution_manifest_sha256,
+                    "manifest_id", "execution_manifest",
+                )
+                expected_types = (
+                    (r1_binding, Round513E6D2DiagnosticRunBindingR1),
+                    (authorization, Round513E6D2DiagnosticAuthorizationInput),
+                    (authorization_receipt, Round513E6D2DiagnosticAuthorizationReceiptR1),
+                    (d2_assignments, D2PairedDiagnosticAssignments),
+                    (d2_seal, D2PairedDiagnosticSeal),
+                    (runtime_release, Round513E6D2RuntimeRelease),
+                    (execution_manifest, Round513E6D2DiagnosticExecutionManifestR1),
+                )
+                if any(not isinstance(item, expected) for item, expected in expected_types):
+                    raise TypeError("E6 D2 loader returned an unexpected contract type")
+                adapters = {
+                    entry.contract_type: load_versioned_contract(
+                        contract_root / entry.filename,
+                        contract_type=entry.contract_type,
+                        expected_contract_id=entry.contract_id,
+                        expected_file_sha256=entry.file_sha256,
+                    )
+                    for entry in runtime_release.scientific_contracts
+                }
+                round513_planner_schema = adapt_e3_canonical_planner(
+                    adapters["planner_schema"]
+                )
+                rule_payload = dict(adapters["rule_registry"].raw_contract_payload)
+                rule_payload["rules"] = tuple(
+                    RuleTypeDefinition(**item) for item in rule_payload["rules"]
+                )
+                round513_rule_registry = CHRMLiteRuleTypeRegistryV4_1(**rule_payload)
+                round513_retrieval_policy = CHRMLiteBilateralRetrievalPolicyV4_1(
+                    **adapters["bilateral_retrieval_policy"].normalized_runtime_view,
+                )
+                round513_support_policy = CHRMLiteSupportAndDegradationPolicy(
+                    **adapters["support_policy"].raw_contract_payload
+                )
+                retry_adapter = load_frozen_policy(
+                    args.round513_technical_retry_policy,
+                    policy_type="technical_retry",
+                    expected_policy_id=runtime_release.technical_retry_policy_id,
+                    expected_file_sha256=runtime_release.technical_retry_policy_file_sha256,
+                )
+                cleanup_adapter = load_frozen_policy(
+                    args.round513_process_cleanup_policy,
+                    policy_type="process_cleanup",
+                    expected_policy_id=runtime_release.process_cleanup_policy_id,
+                    expected_file_sha256=runtime_release.process_cleanup_policy_file_sha256,
+                )
+                if retry_adapter.raw_policy_id != r1_binding.technical_retry_policy_id:
+                    raise ValueError("E6 D2 retry policy lineage mismatch")
+                if cleanup_adapter.raw_policy_id != r1_binding.process_cleanup_policy_id:
+                    raise ValueError("E6 D2 cleanup policy lineage mismatch")
+                validate_d2_execution_closure(
+                    current_source=current_commit,
+                    task_path=Path(args.task),
+                    output_root=args.round513_track_e_output_root,
+                    binding=r1_binding,
+                    authorization=authorization,
+                    receipt=authorization_receipt,
+                    assignments=d2_assignments,
+                    seal=d2_seal,
+                    runtime=runtime_release,
+                    manifest=execution_manifest,
+                    authorization_input_file_sha256=args.round513e6_d2_authorization_input_sha256,
+                    authorization_receipt_file_sha256=args.round513e6_d2_authorization_receipt_sha256,
+                )
+                d2_signature_registry = ActionObjectSignatureRegistryV2().with_id()
+                d2_safety_policy = SafetyTerminationPolicyV2(
+                    semantics_audit_id=runtime_release.safety_semantics_audit_id
+                ).with_id()
+                if d2_signature_registry.registry_id != runtime_release.signature_registry_id:
+                    raise ValueError("E6 D2 signature registry/source mismatch")
+                if d2_safety_policy.policy_id != runtime_release.safety_policy_id:
+                    raise ValueError("E6 D2 safety policy/source mismatch")
+                round513_binding = TrackERunBindingV4_1(
+                    authorization_id=r1_binding.authorization_receipt_id,
+                    authorization_status="approved",
+                    engineering_smoke_approved=True,
+                    engineering_only=True,
+                    campaign_id=r1_binding.campaign_id,
+                    source_commit=r1_binding.execution_source_commit,
+                    task=r1_binding.task,
+                    terminal_task=r1_binding.terminal_task,
+                    split="engineering_smoke",
+                    group_id=r1_binding.assignment_id,
+                    seed_commitment=r1_binding.seed_commitment,
+                    run_id=r1_binding.run_id,
+                    episode_id=r1_binding.episode_id,
+                    memory_release_id=r1_binding.paper_memory_release_id,
+                    dependency_schema_id=r1_binding.dependency_schema_id,
+                    rule_registry_id=r1_binding.rule_registry_id,
+                    scene_release_id=r1_binding.scene_exemplar_release_id,
+                    mineclip_policy_id=r1_binding.mineclip_policy_id,
+                    planner_schema_id=r1_binding.planner_schema_id,
+                    planner_prompt_id=r1_binding.planner_prompt_id,
+                    planner_parser_id=r1_binding.planner_parser_id,
+                    controller_contract_id=r1_binding.controller_id,
+                    evaluator_contract_id=r1_binding.evaluator_id,
+                    budget_profile_id=r1_binding.budget_profile_id,
+                    gamma_minus=float(r1_binding.gamma_minus_text),
+                    gamma_plus=float(r1_binding.gamma_plus_text),
+                )
+            elif round513_d1_enabled:
                 if not args.round513e5_diagnostic_contracts:
                     raise ValueError("E5 D1 requires --round513e5-diagnostic-contracts")
 
@@ -3041,12 +3270,17 @@ def main(argv: Optional[list[str]] = None) -> int:
                         ),
                         round513_planner_schema,
                     )
-                    collector_type = (
-                        TrackECollectorV4_1_3
-                        if args.round513e5_diagnostic_contracts
-                        else TrackECollectorV4_1
-                    )
-                    if args.round513e5_diagnostic_contracts:
+                    if round513_d2_enabled:
+                        collector_type = TrackECollectorV2
+                    elif args.round513e5_diagnostic_contracts:
+                        collector_type = TrackECollectorV4_1_3
+                    else:
+                        collector_type = TrackECollectorV4_1
+                    if round513_d2_enabled:
+                        decision_store = AtomicDecisionStoreV2(
+                            args.round513_track_e_output_root.resolve()
+                        )
+                    elif args.round513e5_diagnostic_contracts:
                         decision_store = AtomicDecisionStoreV4_1_3(
                             args.round513_track_e_output_root.resolve()
                         )
@@ -3058,7 +3292,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                         decision_store = AtomicDecisionStoreV4_1(
                             args.round513_track_e_output_root.resolve()
                         )
-                    development_shadow_observer = collector_type(
+                    collector_kwargs = dict(
                         memory=multimodal_memory,
                         binding=round513_binding,
                         rule_registry=round513_rule_registry,
@@ -3070,6 +3304,14 @@ def main(argv: Optional[list[str]] = None) -> int:
                         gamma_minus=round513_binding.gamma_minus,
                         gamma_plus=round513_binding.gamma_plus,
                     )
+                    if round513_d2_enabled:
+                        assert d2_signature_registry is not None
+                        assert d2_safety_policy is not None
+                        collector_kwargs.update(
+                            signature_registry=d2_signature_registry,
+                            safety_policy=d2_safety_policy,
+                        )
+                    development_shadow_observer = collector_type(**collector_kwargs)
                 bundle = build_stage6_runtime(
                     env=evaluator.env,
                     runtime_config=runtime_config,

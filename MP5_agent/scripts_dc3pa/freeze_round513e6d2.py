@@ -34,6 +34,10 @@ from dc3pa.experiments.round513e6d2 import (  # noqa: E402
     file_sha256,
     load_d1_closeout,
 )
+from dc3pa.experiments.round513e5d1 import (  # noqa: E402
+    ScientificContractReferenceD1,
+    seed_from_commitment,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -41,6 +45,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--repo-root", type=Path, default=ROOT.parent)
     parser.add_argument("--d1-root", type=Path, required=True)
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--execution-output-root-base", type=Path, required=True)
     parser.add_argument("--tests-dc3pa-passed", type=int, required=True)
     parser.add_argument("--minedojo-marked-passed", type=int, required=True)
     parser.add_argument("--relevant-skips", type=int, default=0)
@@ -60,6 +65,75 @@ def write_exclusive(path: Path, payload: Any) -> None:
         json.dumps(payload, sort_keys=True, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+
+
+def pending_binding(
+    *, assignment: D2PairedAssignment, runtime: Round513E6D2RuntimeRelease,
+    seal: D2PairedDiagnosticSeal, output_root_base: Path,
+) -> dict[str, Any]:
+    payload = {
+        "contract_kind": "Round513E6D2PendingRunBindingR1",
+        "execution_source_commit": runtime.source_commit,
+        "assignment_id": assignment.assignment_id,
+        "assignment_order": assignment.order,
+        "task": assignment.runtime_task,
+        "terminal_task": assignment.terminal_task,
+        "task_asset_sha256": assignment.task_asset_sha256,
+        "seed": seed_from_commitment(assignment.seed_commitment),
+        "seed_commitment": assignment.seed_commitment,
+        "runtime_release_id": runtime.release_id,
+        "assignment_seal_id": seal.seal_id,
+        "outcome_schema_id": runtime.outcome_schema_id,
+        "find_contract_id": runtime.find_contract_id,
+        "safety_policy_id": runtime.safety_policy_id,
+        "signature_registry_id": runtime.signature_registry_id,
+        "scene_compatibility_audit_id": runtime.scene_compatibility_audit_id,
+        "planner_schema_id": runtime.planner_schema_id,
+        "planner_prompt_id": runtime.planner_prompt_id,
+        "planner_parser_id": runtime.planner_parser_id,
+        "rule_registry_id": runtime.rule_registry_id,
+        "dependency_schema_id": runtime.dependency_schema_id,
+        "paper_memory_release_id": runtime.paper_memory_release_id,
+        "scene_exemplar_release_id": runtime.scene_exemplar_release_id,
+        "mineclip_policy_id": runtime.mineclip_policy_id,
+        "controller_id": runtime.controller_id,
+        "evaluator_id": runtime.evaluator_id,
+        "budget_profile_id": runtime.budget_profile_id,
+        "technical_retry_policy_id": runtime.technical_retry_policy_id,
+        "process_cleanup_policy_id": runtime.process_cleanup_policy_id,
+        "output_root": str((output_root_base / f"{assignment.order:02d}-{assignment.runtime_task.replace(' ', '_')}").resolve()),
+        "candidate_b_id": runtime.candidate_b_id,
+        "gamma_text": list(runtime.gamma_text),
+        "paired_replay_only": True,
+        "independent_sample": False,
+        "execution_authorized": False,
+        "authorization_receipt_id": "PENDING_EXACT_ZYF_AUTHORIZATION",
+    }
+    payload["pending_binding_id"] = canonical_sha256(payload)
+    return payload
+
+
+def pending_manifest(binding: dict[str, Any]) -> dict[str, Any]:
+    payload = {
+        "contract_kind": "Round513E6D2PendingExecutionManifestR1",
+        "execution_source_commit": binding["execution_source_commit"],
+        "pending_binding_id": binding["pending_binding_id"],
+        "assignment_id": binding["assignment_id"],
+        "assignment_order": binding["assignment_order"],
+        "task": binding["task"],
+        "task_asset_sha256": binding["task_asset_sha256"],
+        "seed_commitment": binding["seed_commitment"],
+        "runtime_release_id": binding["runtime_release_id"],
+        "assignment_seal_id": binding["assignment_seal_id"],
+        "output_root": binding["output_root"],
+        "paired_replay_only": True,
+        "independent_sample": False,
+        "minedojo_execution_permitted": False,
+        "scientific_success_retries": 0,
+        "scientific_failure_retries": 0,
+    }
+    payload["pending_manifest_id"] = canonical_sha256(payload)
+    return payload
 
 
 def main() -> int:
@@ -142,6 +216,7 @@ def main() -> int:
         d1_closeout_release_id=closeout.release_id,
         outcome_schema_id=schema.schema_id,
         find_contract_id=find_contract.contract_id,
+        safety_semantics_audit_id=safety_audit.audit_id,
         safety_policy_id=safety_policy.policy_id,
         signature_registry_id=signature_registry.registry_id,
         tests_dc3pa_passed=args.tests_dc3pa_passed,
@@ -156,6 +231,10 @@ def main() -> int:
     d1_runtime = json.loads(
         (args.d1_root / "source-hardening" / "freeze" / "d1_runtime_release_r1.json").read_text(encoding="utf-8")
     )
+    references = tuple(
+        ScientificContractReferenceD1(**entry)
+        for entry in d1_runtime["scientific_contracts"]
+    )
     runtime = Round513E6D2RuntimeRelease(
         source_commit=head,
         source_hardening_audit_id=source_audit.audit_id,
@@ -168,14 +247,34 @@ def main() -> int:
         planner_schema_id=str(d1_runtime["planner_schema_id"]),
         planner_prompt_id=str(d1_runtime["planner_prompt_id"]),
         planner_parser_id=str(d1_runtime["planner_parser_id"]),
+        rule_registry_id=str(d1_runtime["rule_registry_id"]),
+        dependency_schema_id=str(d1_runtime["dependency_schema_id"]),
+        budget_profile_id=str(d1_runtime["budget_profile_id"]),
         technical_retry_policy_id=str(d1_runtime["technical_retry_policy_id"]),
+        technical_retry_policy_file_sha256=str(d1_runtime["technical_retry_policy_file_sha256"]),
         process_cleanup_policy_id=str(d1_runtime["process_cleanup_policy_id"]),
+        process_cleanup_policy_file_sha256=str(d1_runtime["process_cleanup_policy_file_sha256"]),
         paper_memory_release_id=str(d1_runtime["paper_memory_release_id"]),
         scene_exemplar_release_id=str(d1_runtime["scene_exemplar_release_id"]),
         mineclip_policy_id=str(d1_runtime["mineclip_policy_id"]),
         controller_id=str(d1_runtime["controller_id"]),
         evaluator_id=str(d1_runtime["evaluator_id"]),
+        scientific_contracts=references,
     ).with_id()
+    pending_bindings = tuple(
+        pending_binding(
+            assignment=row, runtime=runtime, seal=seal,
+            output_root_base=args.execution_output_root_base,
+        )
+        for row in d2_rows
+    )
+    pending_manifests = tuple(pending_manifest(item) for item in pending_bindings)
+    pending_binding_root = canonical_sha256(
+        [item["pending_binding_id"] for item in pending_bindings]
+    )
+    pending_manifest_root = canonical_sha256(
+        [item["pending_manifest_id"] for item in pending_manifests]
+    )
     authorization = Round513E6D2DiagnosticAuthorizationInput(
         source_commit=head,
         runtime_release_id=runtime.release_id,
@@ -187,6 +286,9 @@ def main() -> int:
         scene_compatibility_audit_id=scene_audit.audit_id,
         assignments_id=assignments.assignments_id,
         assignment_seal_id=seal.seal_id,
+        ordered_assignment_root=d2_ordered_root,
+        pending_binding_root=pending_binding_root,
+        pending_execution_manifest_root=pending_manifest_root,
         exclusion_audit_id=exclusion.audit_id,
         equivalence_audit_id=equivalence.audit_id,
         technical_retry_policy_id=runtime.technical_retry_policy_id,
@@ -220,6 +322,10 @@ def main() -> int:
         "round513e6d2_runtime_release.json": runtime.to_dict(),
         "round513e6d2_diagnostic_authorization_input.json": authorization.to_dict(),
     }
+    for row, binding, manifest_item in zip(d2_rows, pending_bindings, pending_manifests):
+        stem = f"{row.order:02d}-{row.runtime_task.replace(' ', '_')}"
+        artifacts[f"pending_bindings/{stem}.json"] = binding
+        artifacts[f"pending_manifests/{stem}.json"] = manifest_item
     output = args.output_root.resolve()
     for filename, payload in artifacts.items():
         write_exclusive(output / filename, payload)

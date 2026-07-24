@@ -27,6 +27,7 @@ from .round513_instrumentation import (
     deterministic_record_id,
     extract_knowledge_features_v4_1,
 )
+from .round513e5d1 import ScientificContractReferenceD1, seed_from_commitment
 
 
 D1_EXECUTION_SOURCE_SHA = "4a6a6951838cdb9bfc43032d0febaef3d2be3f2d"
@@ -1294,19 +1295,26 @@ class Round513E6D2RuntimeRelease(_Hashed):
     d1_closeout_release_id: str
     outcome_schema_id: str
     find_contract_id: str
+    safety_semantics_audit_id: str
     safety_policy_id: str
     signature_registry_id: str
     scene_compatibility_audit_id: str
     planner_schema_id: str
     planner_prompt_id: str
     planner_parser_id: str
+    rule_registry_id: str
+    dependency_schema_id: str
+    budget_profile_id: str
     technical_retry_policy_id: str
+    technical_retry_policy_file_sha256: str
     process_cleanup_policy_id: str
+    process_cleanup_policy_file_sha256: str
     paper_memory_release_id: str
     scene_exemplar_release_id: str
     mineclip_policy_id: str
     controller_id: str
     evaluator_id: str
+    scientific_contracts: tuple[ScientificContractReferenceD1, ...]
     candidate_b_id: str = CANDIDATE_B_ID
     gamma_text: tuple[str, str, str] = GAMMA_TEXT
     memory_readonly: bool = True
@@ -1322,6 +1330,11 @@ class Round513E6D2RuntimeRelease(_Hashed):
             raise ValueError("D2 runtime changed Candidate B or Gamma")
         if not self.memory_readonly or self.acquisition_writes or self.evaluation_before_action_calls:
             raise ValueError("D2 runtime changed Memory/Evaluation isolation")
+        if len(self.technical_retry_policy_file_sha256) != 64 or len(self.process_cleanup_policy_file_sha256) != 64:
+            raise ValueError("D2 runtime policy raw SHA binding is incomplete")
+        required = {"planner_schema", "rule_registry", "bilateral_retrieval_policy", "support_policy"}
+        if not required.issubset({item.contract_type for item in self.scientific_contracts}):
+            raise ValueError("D2 runtime scientific contract inventory is incomplete")
         if self.minedojo_execution_permitted:
             raise ValueError("D2 runtime cannot authorize execution")
         if self.release_id and self.release_id != self.compute_id():
@@ -1357,6 +1370,9 @@ class Round513E6D2DiagnosticAuthorizationInput(_Hashed):
     scene_compatibility_audit_id: str
     assignments_id: str
     assignment_seal_id: str
+    ordered_assignment_root: str
+    pending_binding_root: str
+    pending_execution_manifest_root: str
     exclusion_audit_id: str
     equivalence_audit_id: str
     technical_retry_policy_id: str
@@ -1394,6 +1410,317 @@ class Round513E6D2DiagnosticAuthorizationInput(_Hashed):
             raise ValueError("D2 authorization input self-authorized execution")
         if self.authorization_input_id and self.authorization_input_id != self.compute_id():
             raise ValueError("D2 authorization input ID mismatch")
+
+
+@dataclass(frozen=True)
+class Round513E6D2DiagnosticAuthorizationReceiptR1(_Hashed):
+    source_commit: str
+    authorization_input_id: str
+    authorization_input_file_sha256: str
+    runtime_release_id: str
+    assignment_seal_id: str
+    authorized_task_order: tuple[str, ...]
+    approved_by: str
+    approval_statement_sha256: str
+    contract_kind: str = "Round513E6D2DiagnosticAuthorizationReceiptR1"
+    diagnostic_only: bool = True
+    paired_replay_only: bool = True
+    independent_sample: bool = False
+    minedojo_execution_authorized: bool = True
+    full_nine_assignment_rerun_permitted: bool = False
+    development_or_holdout_permitted: bool = False
+    source_change_permitted: bool = False
+    receipt_id: str = ""
+
+    _id_field = "receipt_id"
+
+    def __post_init__(self) -> None:
+        if self.contract_kind != "Round513E6D2DiagnosticAuthorizationReceiptR1":
+            raise ValueError("Unknown D2 authorization receipt contract")
+        if self.approved_by != "ZYF" or not self.diagnostic_only:
+            raise PermissionError("D2 receipt lacks exact author approval")
+        if not self.paired_replay_only or self.independent_sample:
+            raise PermissionError("D2 receipt does not authorize only the paired replay")
+        if not self.minedojo_execution_authorized:
+            raise PermissionError("D2 receipt does not authorize MineDojo")
+        if any((self.full_nine_assignment_rerun_permitted, self.development_or_holdout_permitted, self.source_change_permitted)):
+            raise PermissionError("D2 receipt opened a frozen boundary")
+        if self.authorized_task_order != D1_TASK_ORDER:
+            raise ValueError("D2 receipt task order changed")
+        if any(len(value) != 64 for value in (self.authorization_input_file_sha256, self.approval_statement_sha256)):
+            raise ValueError("D2 receipt raw SHA binding is incomplete")
+        if self.receipt_id and self.receipt_id != self.compute_id():
+            raise ValueError("D2 receipt ID mismatch")
+
+
+@dataclass(frozen=True)
+class Round513E6D2DiagnosticRunBindingR1(_Hashed):
+    execution_source_commit: str
+    campaign_id: str
+    run_id: str
+    episode_id: str
+    assignment_id: str
+    assignment_order: int
+    task: str
+    terminal_task: str
+    task_asset_sha256: str
+    seed: int
+    seed_commitment: str
+    authorization_input_id: str
+    authorization_receipt_id: str
+    authorization_receipt_file_sha256: str
+    runtime_release_id: str
+    assignment_seal_id: str
+    outcome_schema_id: str
+    find_contract_id: str
+    safety_policy_id: str
+    signature_registry_id: str
+    scene_compatibility_audit_id: str
+    planner_schema_id: str
+    planner_prompt_id: str
+    planner_parser_id: str
+    rule_registry_id: str
+    dependency_schema_id: str
+    paper_memory_release_id: str
+    scene_exemplar_release_id: str
+    mineclip_policy_id: str
+    controller_id: str
+    evaluator_id: str
+    budget_profile_id: str
+    technical_retry_policy_id: str
+    process_cleanup_policy_id: str
+    output_root: str
+    contract_kind: str = "Round513E6D2DiagnosticRunBindingR1"
+    candidate_b_id: str = CANDIDATE_B_ID
+    gamma_text: tuple[str, str, str] = GAMMA_TEXT
+    diagnostic_only: bool = True
+    paired_replay_only: bool = True
+    independent_sample: bool = False
+    execution_authorized: bool = True
+    binding_id: str = ""
+
+    _id_field = "binding_id"
+
+    @property
+    def gamma_minus_text(self) -> str:
+        return self.gamma_text[1]
+
+    @property
+    def gamma_plus_text(self) -> str:
+        return self.gamma_text[2]
+
+    def __post_init__(self) -> None:
+        if self.contract_kind != "Round513E6D2DiagnosticRunBindingR1":
+            raise ValueError("Unknown D2 run binding contract")
+        if not self.diagnostic_only or not self.paired_replay_only or self.independent_sample or not self.execution_authorized:
+            raise PermissionError("D2 run binding is not paired-diagnostic authorized")
+        if self.seed != seed_from_commitment(self.seed_commitment):
+            raise ValueError("D2 run seed does not match its frozen commitment")
+        if self.candidate_b_id != CANDIDATE_B_ID or self.gamma_text != GAMMA_TEXT:
+            raise ValueError("D2 run binding changed Candidate B or Gamma")
+        if len(self.authorization_receipt_file_sha256) != 64:
+            raise ValueError("D2 run binding lacks the receipt raw SHA")
+        if self.binding_id and self.binding_id != self.compute_id():
+            raise ValueError("D2 run binding ID mismatch")
+
+
+@dataclass(frozen=True)
+class Round513E6D2DiagnosticExecutionManifestR1(_Hashed):
+    execution_source_commit: str
+    binding_id: str
+    authorization_receipt_id: str
+    runtime_release_id: str
+    assignment_seal_id: str
+    assignment_id: str
+    assignment_order: int
+    task: str
+    task_asset_sha256: str
+    seed_commitment: str
+    output_root: str
+    contract_kind: str = "Round513E6D2DiagnosticExecutionManifestR1"
+    diagnostic_only: bool = True
+    paired_replay_only: bool = True
+    independent_sample: bool = False
+    minedojo_execution_permitted: bool = True
+    scientific_success_retries: int = 0
+    scientific_failure_retries: int = 0
+    manifest_id: str = ""
+
+    _id_field = "manifest_id"
+
+    def __post_init__(self) -> None:
+        if self.contract_kind != "Round513E6D2DiagnosticExecutionManifestR1":
+            raise ValueError("Unknown D2 execution manifest contract")
+        if not self.diagnostic_only or not self.paired_replay_only or self.independent_sample:
+            raise PermissionError("D2 manifest is not paired-diagnostic only")
+        if not self.minedojo_execution_permitted:
+            raise PermissionError("D2 manifest does not authorize MineDojo")
+        if self.scientific_success_retries or self.scientific_failure_retries:
+            raise ValueError("D2 manifest permits scientific retries")
+        if self.manifest_id and self.manifest_id != self.compute_id():
+            raise ValueError("D2 execution manifest ID mismatch")
+
+
+_D2_CONTRACT_TYPES: dict[str, tuple[type[_Hashed], str]] = {
+    "assignments": (D2PairedDiagnosticAssignments, "assignments_id"),
+    "assignment_seal": (D2PairedDiagnosticSeal, "seal_id"),
+    "runtime": (Round513E6D2RuntimeRelease, "release_id"),
+    "authorization_input": (Round513E6D2DiagnosticAuthorizationInput, "authorization_input_id"),
+    "authorization_receipt": (Round513E6D2DiagnosticAuthorizationReceiptR1, "receipt_id"),
+    "binding": (Round513E6D2DiagnosticRunBindingR1, "binding_id"),
+    "execution_manifest": (Round513E6D2DiagnosticExecutionManifestR1, "manifest_id"),
+}
+
+
+def d2_contract_from_mapping(contract_kind: str, payload: Mapping[str, Any]) -> _Hashed:
+    if contract_kind not in _D2_CONTRACT_TYPES:
+        raise ValueError("Unknown D2 contract kind")
+    item = dict(payload)
+    if contract_kind == "assignments":
+        item["rows"] = tuple(D2PairedAssignment(**row) for row in item["rows"])
+    elif contract_kind == "runtime":
+        item["scientific_contracts"] = tuple(
+            ScientificContractReferenceD1(**entry) for entry in item["scientific_contracts"]
+        )
+        item["gamma_text"] = tuple(item["gamma_text"])
+    elif contract_kind in {"authorization_input", "binding"}:
+        item["gamma_text"] = tuple(item["gamma_text"])
+    elif contract_kind == "authorization_receipt":
+        item["authorized_task_order"] = tuple(item["authorized_task_order"])
+    cls, _ = _D2_CONTRACT_TYPES[contract_kind]
+    return cls(**item)
+
+
+def load_d2_contract(
+    path: Path,
+    *,
+    contract_kind: str,
+    expected_file_sha256: str,
+    expected_contract_id: str,
+) -> _Hashed:
+    if file_sha256(path) != expected_file_sha256:
+        raise ValueError("D2 raw file SHA-256 mismatch")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("D2 contract payload must be an object")
+    contract = d2_contract_from_mapping(contract_kind, payload)
+    _, id_field = _D2_CONTRACT_TYPES[contract_kind]
+    if getattr(contract, id_field) != expected_contract_id:
+        raise ValueError("D2 expected contract ID mismatch")
+    return contract
+
+
+def validate_d2_execution_closure(
+    *,
+    current_source: str,
+    task_path: Path,
+    output_root: Path,
+    binding: Round513E6D2DiagnosticRunBindingR1,
+    authorization: Round513E6D2DiagnosticAuthorizationInput,
+    receipt: Round513E6D2DiagnosticAuthorizationReceiptR1,
+    assignments: D2PairedDiagnosticAssignments,
+    seal: D2PairedDiagnosticSeal,
+    runtime: Round513E6D2RuntimeRelease,
+    manifest: Round513E6D2DiagnosticExecutionManifestR1,
+    authorization_input_file_sha256: str,
+    authorization_receipt_file_sha256: str,
+) -> D2PairedAssignment:
+    sources = {
+        binding.execution_source_commit, authorization.source_commit, receipt.source_commit,
+        assignments.source_commit, seal.source_commit, runtime.source_commit,
+        manifest.execution_source_commit,
+    }
+    if sources != {current_source}:
+        raise ValueError("D2 source closure mismatch")
+    ordered_root = canonical_sha256([row.assignment_id for row in assignments.rows])
+    if seal.assignments_id != assignments.assignments_id or seal.ordered_assignment_root != ordered_root:
+        raise ValueError("D2 assignments/seal closure mismatch")
+    if (authorization.assignments_id, authorization.assignment_seal_id, authorization.ordered_assignment_root) != (
+        assignments.assignments_id, seal.seal_id, ordered_root
+    ):
+        raise ValueError("D2 authorization assignment closure mismatch")
+    if authorization.runtime_release_id != runtime.release_id:
+        raise ValueError("D2 authorization/runtime release mismatch")
+    if authorization.d1_closeout_release_id != runtime.d1_closeout_release_id:
+        raise ValueError("D2 authorization/D1 closeout lineage mismatch")
+    if receipt.authorization_input_id != authorization.authorization_input_id:
+        raise ValueError("D2 authorization input/receipt mismatch")
+    if receipt.authorization_input_file_sha256 != authorization_input_file_sha256:
+        raise ValueError("D2 authorization raw file SHA mismatch")
+    if binding.authorization_receipt_file_sha256 != authorization_receipt_file_sha256:
+        raise ValueError("D2 authorization receipt raw file SHA mismatch")
+    if (receipt.runtime_release_id, receipt.assignment_seal_id) != (runtime.release_id, seal.seal_id):
+        raise ValueError("D2 receipt runtime/seal mismatch")
+    if (binding.authorization_input_id, binding.authorization_receipt_id,
+        binding.runtime_release_id, binding.assignment_seal_id) != (
+        authorization.authorization_input_id, receipt.receipt_id, runtime.release_id, seal.seal_id
+    ):
+        raise ValueError("D2 binding authorization/runtime closure mismatch")
+    if (manifest.binding_id, manifest.authorization_receipt_id,
+        manifest.runtime_release_id, manifest.assignment_seal_id) != (
+        binding.binding_id, receipt.receipt_id, runtime.release_id, seal.seal_id
+    ):
+        raise ValueError("D2 manifest binding/authorization closure mismatch")
+    if Path(binding.output_root).resolve() != output_root.resolve() or Path(manifest.output_root).resolve() != output_root.resolve():
+        raise ValueError("D2 output root mismatch")
+    selected = tuple(row for row in assignments.rows if row.assignment_id == binding.assignment_id)
+    if len(selected) != 1:
+        raise ValueError("D2 binding does not select exactly one assignment")
+    assignment = selected[0]
+    expected = (assignment.order, assignment.runtime_task, assignment.terminal_task,
+                assignment.seed_commitment, assignment.task_asset_sha256)
+    if (binding.assignment_order, binding.task, binding.terminal_task,
+        binding.seed_commitment, binding.task_asset_sha256) != expected:
+        raise ValueError("D2 selected assignment binding mismatch")
+    if (manifest.assignment_id, manifest.assignment_order, manifest.task,
+        manifest.seed_commitment, manifest.task_asset_sha256) != (
+        assignment.assignment_id, assignment.order, assignment.runtime_task,
+        assignment.seed_commitment, assignment.task_asset_sha256
+    ):
+        raise ValueError("D2 selected assignment manifest mismatch")
+    if file_sha256(task_path) != assignment.task_asset_sha256:
+        raise ValueError("D2 task asset SHA-256 mismatch")
+    runtime_ids = (
+        runtime.outcome_schema_id, runtime.find_contract_id, runtime.safety_policy_id,
+        runtime.signature_registry_id, runtime.scene_compatibility_audit_id,
+        runtime.planner_schema_id, runtime.planner_prompt_id, runtime.planner_parser_id,
+        runtime.rule_registry_id, runtime.dependency_schema_id, runtime.paper_memory_release_id,
+        runtime.scene_exemplar_release_id, runtime.mineclip_policy_id, runtime.controller_id,
+        runtime.evaluator_id, runtime.budget_profile_id, runtime.technical_retry_policy_id,
+        runtime.process_cleanup_policy_id,
+    )
+    binding_ids = (
+        binding.outcome_schema_id, binding.find_contract_id, binding.safety_policy_id,
+        binding.signature_registry_id, binding.scene_compatibility_audit_id,
+        binding.planner_schema_id, binding.planner_prompt_id, binding.planner_parser_id,
+        binding.rule_registry_id, binding.dependency_schema_id, binding.paper_memory_release_id,
+        binding.scene_exemplar_release_id, binding.mineclip_policy_id, binding.controller_id,
+        binding.evaluator_id, binding.budget_profile_id, binding.technical_retry_policy_id,
+        binding.process_cleanup_policy_id,
+    )
+    if runtime_ids != binding_ids:
+        raise ValueError("D2 runtime/binding scientific lineage mismatch")
+    if (authorization.action_goal_outcome_schema_id, authorization.find_observation_contract_id,
+        authorization.safety_termination_policy_id, authorization.signature_registry_id,
+        authorization.scene_compatibility_audit_id) != runtime_ids[:5]:
+        raise ValueError("D2 authorization/runtime instrumentation mismatch")
+    authorization_ids = (
+        authorization.planner_schema_id, authorization.planner_prompt_id,
+        authorization.planner_parser_id, authorization.paper_memory_release_id,
+        authorization.scene_exemplar_release_id, authorization.mineclip_policy_id,
+        authorization.controller_id, authorization.evaluator_id,
+        authorization.technical_retry_policy_id, authorization.process_cleanup_policy_id,
+    )
+    expected_authorization_ids = (
+        runtime.planner_schema_id, runtime.planner_prompt_id,
+        runtime.planner_parser_id, runtime.paper_memory_release_id,
+        runtime.scene_exemplar_release_id, runtime.mineclip_policy_id,
+        runtime.controller_id, runtime.evaluator_id,
+        runtime.technical_retry_policy_id, runtime.process_cleanup_policy_id,
+    )
+    if authorization_ids != expected_authorization_ids:
+        raise ValueError("D2 authorization/runtime scientific lineage mismatch")
+    return assignment
 
 
 def load_d1_closeout(d1_root: Path) -> tuple[

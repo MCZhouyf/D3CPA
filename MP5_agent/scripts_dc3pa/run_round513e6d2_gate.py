@@ -24,6 +24,7 @@ def main() -> int:
         "-m",
         "not minedojo",
         "tests_dc3pa/test_round513e6d2_contracts.py",
+        "tests_dc3pa/test_round513e6d2_runtime.py",
     ]
     if args.junit:
         args.junit.parent.mkdir(parents=True, exist_ok=True)
