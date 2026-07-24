@@ -59,6 +59,7 @@ def _verify_hashed_file(path, id_field, expected):
     assert canonical_sha256(canonical) == expected
 
 
+@pytest.mark.minedojo
 def test_historical_e2h_objects_remain_reconstructable_and_immutable():
     root = E2H / "source-hardened-smoke-prep"
     _verify_hashed_file(
@@ -78,6 +79,7 @@ def test_historical_e2h_objects_remain_reconstructable_and_immutable():
     )
 
 
+@pytest.mark.minedojo
 def test_e2_campaign_closeout_cannot_become_scientific_data():
     summary = E2H / "campaigns/e45d2cc6a1ab/final_campaign_summary.json"
     report = E2H / "campaigns/e45d2cc6a1ab/FINAL_CAMPAIGN_REPORT.md"
