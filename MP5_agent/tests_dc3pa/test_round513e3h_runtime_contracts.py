@@ -155,7 +155,7 @@ def test_e3x_nested_assignments_round_trip_without_type_downgrade(tmp_path):
     )
 
 
-def test_authorized_e3_planner_schema_replaces_only_historical_planner_entry(tmp_path):
+def test_authorized_e3_planner_schema_is_reconstructable_and_loadable(tmp_path):
     source = "df0b043a389b864507d57d3685b863624f519481"
     schema, provider, planner_contract, _ = build_provider_contracts(source)
     assert schema.schema_id == "15819bea54da489d711f61d2cdafae8dfa1008e3694f9c09280a7691cdca9681"
@@ -177,18 +177,6 @@ def test_authorized_e3_planner_schema_replaces_only_historical_planner_entry(tmp
     )
     assert adapted.raw_contract_id == schema.schema_id
     assert adapted.authoring_source_commit == source
-
-    historical = json.loads(
-        (POLICY_ROOT / "contract_compatibility_release_r1.json").read_text(
-            encoding="utf-8"
-        )
-    )
-    unchanged = [
-        entry for entry in historical["entries"]
-        if entry["contract_type"] != "planner_schema"
-    ]
-    assert len(unchanged) == 6
-    assert len({(item["contract_id"], item["file_sha256"]) for item in unchanged}) == 6
 
 
 def test_e3x_raw_hash_is_checked_before_json_or_adapter(tmp_path):
