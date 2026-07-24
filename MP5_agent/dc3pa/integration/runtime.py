@@ -924,11 +924,15 @@ class Stage6ClosedLoopRunner:
                 )
             underground = bool(execution.underground)
             goal_success = False
+            goal_check_called = False
+            goal_check_error = ""
             if execution.success:
                 if self.config.require_goal_check:
+                    goal_check_called = True
                     try:
                         goal_success = self.goal_checker.is_done(task_information)
                     except Exception as exc:
+                        goal_check_error = f"{type(exc).__name__}: {exc}"
                         if self.config.goal_check_exception_policy == "raise":
                             raise
                         goal_success = False
@@ -972,13 +976,25 @@ class Stage6ClosedLoopRunner:
             )
             if self.development_shadow_observer is not None:
                 try:
-                    self.development_shadow_observer.finalize_attempt(
+                    finalize_kwargs = dict(
                         plan=plan,
                         episode_id=episode_id,
                         execution_telemetry=execution.telemetry,
                         confidence_observations=confidence_observations,
                         task_completed=goal_success,
                         attempt=attempt_index,
+                    )
+                    if getattr(
+                        self.development_shadow_observer,
+                        "supports_dual_level_outcomes",
+                        False,
+                    ):
+                        finalize_kwargs.update(
+                            evaluator_called=goal_check_called,
+                            evaluator_error=goal_check_error,
+                        )
+                    self.development_shadow_observer.finalize_attempt(
+                        **finalize_kwargs
                     )
                 except Exception as exc:
                     if self.config.mode == "chrmlite_estimation_collection_v41":

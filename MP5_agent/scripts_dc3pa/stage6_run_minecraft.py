@@ -106,6 +106,10 @@ from dc3pa.experiments.round513_instrumentation import (  # noqa: E402
     TrackECollectorV4_1,
     TrackERunBindingV4_1,
 )
+from dc3pa.experiments.round513e5 import (  # noqa: E402
+    AtomicDecisionStoreV4_1_3,
+    TrackECollectorV4_1_3,
+)
 from dc3pa.experiments.round513e2h import (  # noqa: E402
     AtomicDecisionStoreV4_1_2_R1,
     CHRMLiteEngineeringSmokeRuntimeReleaseV4_1_2_R1,
@@ -943,6 +947,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="New empty output root for atomic Track E records.",
     )
     parser.add_argument(
+        "--round513e5-diagnostic-contracts",
+        action="store_true",
+        help="Use prospective V4.1.3 observation/label/signature contracts.",
+    )
+    parser.add_argument(
         "--round513-track-e-compatibility-release",
         type=Path,
         help="Exact V4.1.2-R1 contract compatibility allowlist.",
@@ -1042,6 +1051,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     if round513_track_e_enabled and not all(round513_arguments):
         parser.error(
             "Round 5.13 Track E requires binding, contract root, and output root"
+        )
+    if args.round513e5_diagnostic_contracts and not round513_track_e_enabled:
+        parser.error(
+            "Round 5.13E5 diagnostic contracts require the base Track E arguments"
         )
     round513_r1_arguments = (
         args.round513_track_e_compatibility_release,
@@ -2808,20 +2821,29 @@ def main(argv: Optional[list[str]] = None) -> int:
                         ),
                         round513_planner_schema,
                     )
-                    development_shadow_observer = TrackECollectorV4_1(
+                    collector_type = (
+                        TrackECollectorV4_1_3
+                        if args.round513e5_diagnostic_contracts
+                        else TrackECollectorV4_1
+                    )
+                    if args.round513e5_diagnostic_contracts:
+                        decision_store = AtomicDecisionStoreV4_1_3(
+                            args.round513_track_e_output_root.resolve()
+                        )
+                    elif round513_r1_enabled:
+                        decision_store = AtomicDecisionStoreV4_1_2_R1(
+                            args.round513_track_e_output_root.resolve()
+                        )
+                    else:
+                        decision_store = AtomicDecisionStoreV4_1(
+                            args.round513_track_e_output_root.resolve()
+                        )
+                    development_shadow_observer = collector_type(
                         memory=multimodal_memory,
                         binding=round513_binding,
                         rule_registry=round513_rule_registry,
                         retrieval_policy=round513_retrieval_policy,
-                        store=(
-                            AtomicDecisionStoreV4_1_2_R1(
-                                args.round513_track_e_output_root.resolve()
-                            )
-                            if round513_r1_enabled
-                            else AtomicDecisionStoreV4_1(
-                                args.round513_track_e_output_root.resolve()
-                            )
-                        ),
+                        store=decision_store,
                         dependency_support_threshold=(
                             round513_support_policy.dependency_support_threshold
                         ),

@@ -1153,13 +1153,45 @@ class Controller:
                     emit_action_started(step, step_index, action_index, action, events)
 
                     if name == "find":
+                        obj = normalize_inventory_name(args["obj"])
+                        find_obj = update_find_obj_name(obj)
+                        configured_find_budget = 10000
+                        configured_find_budget_raw = os.environ.get(
+                            "DC3PA_MAX_EXPLORE_STEPS", ""
+                        ).strip()
+                        if configured_find_budget_raw:
+                            try:
+                                configured_find_budget = max(
+                                    1, int(configured_find_budget_raw)
+                                )
+                            except ValueError:
+                                # The existing search path remains responsible for
+                                # rejecting malformed runtime configuration.
+                                configured_find_budget = 1
+                        begin_find_observation_trace(
+                            self.memory,
+                            args["obj"],
+                            find_obj,
+                            configured_find_budget,
+                        )
                         check_result = self.check_action_preparation(env,"find", args,task_information,events)
                         if check_result["success"]:
+                            finish_find_observation_trace(
+                                self.memory,
+                                "preparation_satisfied_without_find_observation",
+                                complete=False,
+                            )
+                            check_result = {
+                                **check_result,
+                                "post_state_evidence": {
+                                    "find_observation": consume_find_observation_trace(
+                                        self.memory
+                                    )
+                                },
+                            }
                             emit_action_finished(step, step_index, action_index, action, "success", check_result)
                             continue
                         
-                        obj = normalize_inventory_name(args["obj"])
-                        find_obj = update_find_obj_name(obj)
                         print(f"find_obj is {find_obj}")
                         find_success = explore_above_ground(
                             env=env,
@@ -1178,6 +1210,11 @@ class Controller:
                                 ),
                                 "success": False,
                                 "suggestion": f"Try a different bounded search for {obj}.",
+                                "post_state_evidence": {
+                                    "find_observation": consume_find_observation_trace(
+                                        self.memory
+                                    )
+                                },
                             }
                             return finish_failure(
                                 step,
@@ -1187,7 +1224,20 @@ class Controller:
                                 check_result,
                                 underground,
                             )
-                        emit_action_finished(step, step_index, action_index, action, "success")
+                        emit_action_finished(
+                            step,
+                            step_index,
+                            action_index,
+                            action,
+                            "success",
+                            {
+                                "post_state_evidence": {
+                                    "find_observation": consume_find_observation_trace(
+                                        self.memory
+                                    )
+                                }
+                            },
+                        )
                     
                     elif name == "move_to":
                         check_result = self.check_action_preparation(env,"move_to",  args,task_information,events)

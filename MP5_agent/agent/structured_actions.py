@@ -1,6 +1,8 @@
 # generate data of different biomes at different times of the day
 from re import T
+import hashlib
 import os
+import time
 import minedojo
 import random
 import string
@@ -36,6 +38,120 @@ try_steps = 0
 action_stack = []# each element is a tuple with 2 dimensions (dir,jumpornot)
 stuck = 0
 recently_approached_object_position = []# stores the position of the recently approached object
+find_trace_sequence = 0
+
+
+def _find_frame_id(events):
+    blocks = np.asarray(events['voxels']['block_name'])
+    position = np.asarray(events['location_stats']['pos'], dtype=np.float64)
+    digest = hashlib.sha256()
+    digest.update(blocks.tobytes())
+    digest.update(position.tobytes())
+    return digest.hexdigest()
+
+
+def _visible_block_ids(events):
+    visible = {
+        str(value)
+        for value in np.asarray(events['voxels']['block_name']).reshape(-1)
+        if str(value) and str(value) != "air"
+    }
+    rays = events.get("rays", {})
+    if isinstance(rays, dict) and "entity_name" in rays:
+        visible.update(
+            str(value)
+            for value in np.asarray(rays["entity_name"]).reshape(-1)
+            if str(value) and str(value) not in {"air", "none"}
+        )
+    return tuple(sorted(visible))
+
+
+def begin_find_observation_trace(memory, raw_target, controller_target, budget):
+    """Start telemetry for a find action without changing environment behavior."""
+    global find_trace_sequence
+    find_trace_sequence += 1
+    trace_id = hashlib.sha256(
+        f"{os.getpid()}:{find_trace_sequence}:{raw_target}:{controller_target}".encode("utf-8")
+    ).hexdigest()
+    memory._dc3pa_find_observation = {
+        "raw_requested_target": str(raw_target),
+        "raw_controller_target": str(controller_target),
+        "observation_frame_ids": [],
+        "visible_candidate_ids": [],
+        "matched_candidate_id": "",
+        "target_identity_matched": None,
+        "target_visible": None,
+        "target_distance": None,
+        "spatial_relation": "",
+        "target_offsets": {},
+        "search_trace_id": trace_id,
+        "search_steps_consumed": 0,
+        "search_started_monotonic": time.monotonic(),
+        "search_seconds_consumed": 0.0,
+        "frozen_search_budget": int(budget),
+        "search_budget_exhausted": None,
+        "search_trace_complete": False,
+        "termination_reason": "",
+        "technical_failure": "",
+    }
+    return memory._dc3pa_find_observation
+
+
+def _record_find_observation(memory, events, controller_target, target_block, spatial_relation):
+    trace = getattr(memory, "_dc3pa_find_observation", None)
+    if not isinstance(trace, dict):
+        return
+    frame_id = _find_frame_id(events)
+    if frame_id not in trace["observation_frame_ids"]:
+        trace["observation_frame_ids"].append(frame_id)
+    trace["visible_candidate_ids"] = sorted(
+        set(trace["visible_candidate_ids"]) | set(_visible_block_ids(events))
+    )
+    trace["search_steps_consumed"] += 1
+    matched = target_block is not None
+    trace["target_identity_matched"] = bool(
+        trace["target_identity_matched"] is True or matched
+    )
+    trace["target_visible"] = bool(trace["target_visible"] is True or matched)
+    if matched:
+        trace["matched_candidate_id"] = str(controller_target)
+        trace["spatial_relation"] = spatial_relation
+        trace["target_offsets"] = {
+            "forward_offset": int(target_block["forward_offset"]),
+            "vertical_offset": int(target_block["vertical_offset"]),
+            "side_offset": int(target_block["side_offset"]),
+        }
+        trace["target_distance"] = float(
+            math.sqrt(
+                target_block["forward_offset"] ** 2
+                + target_block["vertical_offset"] ** 2
+                + target_block["side_offset"] ** 2
+            )
+        )
+
+
+def finish_find_observation_trace(memory, termination_reason, *, budget_exhausted=None, complete=True, technical_failure=""):
+    trace = getattr(memory, "_dc3pa_find_observation", None)
+    if not isinstance(trace, dict):
+        return None
+    trace["termination_reason"] = str(termination_reason)
+    trace["search_budget_exhausted"] = budget_exhausted
+    trace["search_trace_complete"] = bool(complete)
+    trace["technical_failure"] = str(technical_failure)
+    trace["search_seconds_consumed"] = max(
+        0.0, time.monotonic() - float(trace["search_started_monotonic"])
+    )
+    return trace
+
+
+def consume_find_observation_trace(memory):
+    trace = getattr(memory, "_dc3pa_find_observation", None)
+    if not isinstance(trace, dict):
+        return None
+    result = dict(trace)
+    result.pop("search_started_monotonic", None)
+    memory._dc3pa_find_observation = None
+    return result
 
 # Create_observation creates a txt file containing ground-truth observations provided by the minedojo interface
 # under the directory SA_observation, note that you will have to create the SA_observation directory under the  
@@ -144,34 +260,66 @@ def lidar_detect(env,object):
     else:
         return False
     
-def surrounding_voxel_detect(env,object):
+def surrounding_voxel_detect(env,object,evidence_memory=None):
     events  = sleep(env)
     detect_success = False
+    selected_indices = None
     # print(events['voxels']['block_name'])
     # right down
     if (events['voxels']['block_name'][vradius][vradius][vradius+1]==object):
         detect_success = True
+        selected_indices = selected_indices or (vradius, vradius, vradius + 1)
     # right top
     if (events['voxels']['block_name'][vradius][vradius+1][vradius+1]==object):
         detect_success = True
+        selected_indices = selected_indices or (vradius, vradius + 1, vradius + 1)
     # forward down
     if (events['voxels']['block_name'][vradius+1][vradius][vradius]==object):
         detect_success = True
+        selected_indices = selected_indices or (vradius + 1, vradius, vradius)
     # forward top
     if (events['voxels']['block_name'][vradius+1][vradius+1][vradius]==object):
         detect_success = True
+        selected_indices = selected_indices or (vradius + 1, vradius + 1, vradius)
     # left down
     if (events['voxels']['block_name'][vradius][vradius][vradius-1]==object):
         detect_success = True
+        selected_indices = selected_indices or (vradius, vradius, vradius - 1)
     # left top
     if (events['voxels']['block_name'][vradius][vradius+1][vradius-1]==object):
         detect_success = True
+        selected_indices = selected_indices or (vradius, vradius + 1, vradius - 1)
     # top 
     if (events['voxels']['block_name'][vradius][vradius+2][vradius]==object):
         detect_success = True
+        selected_indices = selected_indices or (vradius, vradius + 2, vradius)
     # down
     if (events['voxels']['block_name'][vradius][vradius-1][vradius]==object):
         detect_success = True
+        selected_indices = selected_indices or (vradius, vradius - 1, vradius)
+    if evidence_memory is not None:
+        selected = None
+        if selected_indices is not None:
+            x_index, y_index, z_index = selected_indices
+            current_x, current_y, current_z = events['location_stats']['pos']
+            selected = {
+                "world_x": x_index - vradius + current_x,
+                "world_y": y_index - vradius + current_y,
+                "world_z": z_index - vradius + current_z,
+                "x_index": x_index,
+                "y_index": y_index,
+                "z_index": z_index,
+                "forward_offset": x_index - vradius,
+                "vertical_offset": y_index - vradius,
+                "side_offset": z_index - vradius,
+            }
+        _record_find_observation(
+            evidence_memory,
+            events,
+            object,
+            selected,
+            "within_frozen_adjacent_voxel_set",
+        )
     return detect_success
 
     
@@ -1532,6 +1680,8 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
         if configured_steps <= 0:
             raise ValueError("DC3PA_MAX_EXPLORE_STEPS must be positive")
         max_try_steps = min(max_try_steps, configured_steps)
+    if not isinstance(getattr(memory, "_dc3pa_find_observation", None), dict):
+        begin_find_observation_trace(memory, args.get("obj", object), object, max_try_steps)
     events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
     print(f"exploring once, front floor{events['voxels']['block_name'][vradius+1][vradius-1][vradius]}\n block in front of body is {events['voxels']['block_name'][vradius+1][vradius][vradius]} \n and block in front of head is {events['voxels']['block_name'][vradius+1][vradius+1][vradius]}\n ")
     
@@ -1555,6 +1705,11 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
 
             if check_result["success"]:
                             print("222")
+                            finish_find_observation_trace(
+                                memory,
+                                "preparation_satisfied_without_find_observation",
+                                complete=False,
+                            )
                             return True
             stuck = 0
             if i >= 2 and dontstop == 1:
@@ -1578,6 +1733,11 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
                 find_result=check_find(env,memory,object,underground)
                 if find_result == True:
                     print("Find successfully!")
+                    finish_find_observation_trace(
+                        memory,
+                        "target_visible_in_voxel_volume",
+                        budget_exhausted=False,
+                    )
                     return True
                 
 
@@ -1585,6 +1745,11 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
             if explore_steps >= 10000 :
                 print("explore steps exceed limit")
                 explore_steps = 0
+                finish_find_observation_trace(
+                    memory,
+                    "legacy_global_explore_limit",
+                    complete=False,
+                )
                 return False
             
             events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
@@ -1625,6 +1790,11 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
                         print(f"had to mine ahead")
                         if not _fresh_aboveground_clearance_is_safe(env):
                             print("refusing blind above-ground clearing without an obstacle and safe footing")
+                            finish_find_observation_trace(
+                                memory,
+                                "safety_clearance_stop",
+                                complete=False,
+                            )
                             return False
                         move_to_middle(env)
                         mine_ahead_aboveground(env)
@@ -1642,6 +1812,11 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
                                 print(f"had to mine ahead because can't go left")
                                 if not _fresh_aboveground_clearance_is_safe(env):
                                     print("refusing unsafe above-ground clearing")
+                                    finish_find_observation_trace(
+                                        memory,
+                                        "safety_clearance_stop",
+                                        complete=False,
+                                    )
                                     return False
                                 move_to_middle(env)
                                 mine_ahead_aboveground(env)
@@ -1656,6 +1831,11 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
                                 print(f"had to mine ahead because can't go back")
                                 if not _fresh_aboveground_clearance_is_safe(env):
                                     print("refusing unsafe above-ground clearing")
+                                    finish_find_observation_trace(
+                                        memory,
+                                        "safety_clearance_stop",
+                                        complete=False,
+                                    )
                                     return False
                                 move_to_middle(env)
                                 mine_ahead_aboveground(env)
@@ -1671,6 +1851,11 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
                         print("Exception encountered, may be stuck permanently!! but i will venture a step forward")# tbd: think of some other way to let agent extricate himself
                         if not _fresh_aboveground_clearance_is_safe(env):
                             print("refusing unsafe above-ground clearing")
+                            finish_find_observation_trace(
+                                memory,
+                                "safety_clearance_stop",
+                                complete=False,
+                            )
                             return False
                         move_to_middle(env)
                         mine_ahead_aboveground(env)
@@ -1736,6 +1921,11 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
                     direction = 0
                     continue
         print("end of exploration")
+        finish_find_observation_trace(
+            memory,
+            "bounded_search_budget_exhausted",
+            budget_exhausted=True,
+        )
         return False
     else:
         if(args['obj']=="log"):
@@ -1751,20 +1941,40 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
             print(f"try step is {i} and dir is {direction}")
             print(f"explore step is {explore_steps} and position is {events['location_stats']['pos']}")
             
-            if surrounding_voxel_detect(env, object):
+            if surrounding_voxel_detect(env, object, evidence_memory=memory):
                 print("Found object {object}!!!yay")
+                finish_find_observation_trace(
+                    memory,
+                    "target_visible_in_adjacent_voxel_set",
+                    budget_exhausted=False,
+                )
                 return True
             if explore_steps >= 10000:
                 print("explore steps exceed limit")
                 explore_steps = 0
+                finish_find_observation_trace(
+                    memory,
+                    "legacy_global_explore_limit",
+                    complete=False,
+                )
                 return False
             if args['obj'] in memory.inventory:
+                finish_find_observation_trace(
+                    memory,
+                    "inventory_satisfied_without_find_observation",
+                    complete=False,
+                )
                 return True
             #print(f"object is {object},{events['voxels']['block_name']}")
             print(f"args obj is {args['obj']},object is {object}")
             #print(f"my inventory is {memory.inventory}")
             #left
             move_one_block(env,memory,0,1,1)
+        finish_find_observation_trace(
+            memory,
+            "bounded_search_budget_exhausted",
+            budget_exhausted=True,
+        )
 
 # go out to top             
 def go_out(env):
@@ -2842,6 +3052,13 @@ def check_find(env,memory,object,underground):# tbd: scanning blocknames not eno
     object = update_find_obj_name(object)
 
     target_block = select_target_block(events, object)
+    _record_find_observation(
+        memory,
+        events,
+        object,
+        target_block,
+        "within_frozen_voxel_observation_volume",
+    )
     if target_block is not None:
         object_x = target_block["world_x"]
         object_y = target_block["world_y"]
