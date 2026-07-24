@@ -265,6 +265,18 @@ def test_d2_raw_loader_rejects_tampering(tmp_path: Path):
         )
 
 
+def test_d2_authorization_loader_round_trips_json_sequences(tmp_path: Path):
+    values = _closure(tmp_path)
+    loaded = load_d2_contract(
+        values[9], contract_kind="authorization_input",
+        expected_file_sha256=file_sha256(values[9]),
+        expected_contract_id=values[3].authorization_input_id,
+    )
+    assert loaded == values[3]
+    assert isinstance(loaded.declarations, tuple)
+    assert isinstance(loaded.secondary_diagnostics, tuple)
+
+
 def test_stage6_exposes_d2_fail_closed_arguments():
     from scripts_dc3pa.stage6_run_minecraft import build_parser
 

@@ -1585,6 +1585,9 @@ def d2_contract_from_mapping(contract_kind: str, payload: Mapping[str, Any]) -> 
         item["gamma_text"] = tuple(item["gamma_text"])
     elif contract_kind in {"authorization_input", "binding"}:
         item["gamma_text"] = tuple(item["gamma_text"])
+        if contract_kind == "authorization_input":
+            item["secondary_diagnostics"] = tuple(item["secondary_diagnostics"])
+            item["declarations"] = tuple(item["declarations"])
     elif contract_kind == "authorization_receipt":
         item["authorized_task_order"] = tuple(item["authorized_task_order"])
     cls, _ = _D2_CONTRACT_TYPES[contract_kind]
