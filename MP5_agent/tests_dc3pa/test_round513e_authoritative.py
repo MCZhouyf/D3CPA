@@ -14,6 +14,7 @@ from dc3pa.experiments.round513e_authoritative import (
     SMOKE_DECLARATIONS,
     algorithmic_payload,
     build_gamma_candidates,
+    derive_formal_50_task_smoke_assignments,
     derive_smoke_assignments,
     expected_rebaseline_approval_statement,
     formal_fitting_accepts_smoke_row,
@@ -243,6 +244,7 @@ def test_smoke_pool_is_deterministic_covers_actions_and_five_difficulties():
     }
     assert sum(item.coverage_feasibility == "feasible" for item in first) == 5
     assert sum(item.coverage_feasibility == "proxy_only" for item in first) == 4
+    assert any(item.terminal_task == "creature" for item in first)
     pool = CHRMLiteEngineeringSmokePoolV4_1_2(
         source_commit="s" * 40,
         v3_audit_id="a" * 64,
@@ -253,6 +255,30 @@ def test_smoke_pool_is_deterministic_covers_actions_and_five_difficulties():
     assert not pool.outcome_selected and not pool.fitting_eligible
     with pytest.raises(ValueError, match="requires eligible V3"):
         replace(pool, v3_status="BLOCKED", pool_id="")
+
+
+def test_formal_50_task_smoke_replaces_creature_without_rewriting_history():
+    historical_namespace, historical = derive_smoke_assignments(
+        source_commit="s" * 40,
+        namespace_label="round513e1r-engineering-smoke-v412",
+    )
+    aligned_namespace, aligned = derive_formal_50_task_smoke_assignments(
+        source_commit="s" * 40,
+        namespace_label="round513e3-formal50-engineering-smoke-v412",
+    )
+    assert historical_namespace != aligned_namespace
+    assert len(historical) == len(aligned) == 9
+    assert any(item.terminal_task == "creature" for item in historical)
+    assert not any(item.terminal_task == "creature" for item in aligned)
+    assert {item.difficulty for item in aligned} == {
+        "basic", "easy", "medium", "hard", "complex"
+    }
+    assert {item.target_action_family for item in aligned} == ALLOWED_ACTIONS - {"fight"}
+    iron_ingot = next(item for item in aligned if item.terminal_task == "iron ingot")
+    assert iron_ingot.task_path_label == "agent/tasks/creative/iron_ingot.json"
+    assert iron_ingot.difficulty == "hard"
+    assert iron_ingot.target_action_family == "craft"
+    assert iron_ingot.coverage_feasibility == "feasible"
 
 
 def test_gamma_g3_candidates_are_not_automatically_selected():

@@ -40,6 +40,7 @@ from dc3pa.experiments.round513e_authoritative import (
     build_authoritative_releases,
     build_gamma_candidates,
     canonical_sha256,
+    derive_formal_50_task_smoke_assignments,
     derive_smoke_assignments,
     regenerate_v412_contracts,
     verify_rebaseline_approval,
@@ -186,6 +187,11 @@ def main() -> int:
     parser.add_argument("--historical-gate-count", type=int, required=True)
     parser.add_argument("--actions-url", required=True)
     parser.add_argument("--actions-green", action="store_true")
+    parser.add_argument(
+        "--formal-50-task-smoke",
+        action="store_true",
+        help="Freeze the successor smoke using only formal 50-task catalog entries.",
+    )
     args = parser.parse_args()
 
     source = subprocess.check_output(
@@ -377,16 +383,34 @@ def main() -> int:
         eligible_for_smoke_preparation=True,
     ).with_id()
 
-    smoke_task_paths = (
+    historical_smoke_task_paths = (
         "agent/tasks/creative/log.json", "agent/tasks/creative/cobblestone.json",
         "agent/tasks/creative/iron_ore.json", "agent/tasks/creative/crafting_table.json",
         "agent/tasks/creative/creature.json", "agent/tasks/creative/wooden_pickaxe.json",
         "agent/tasks/creative/diamond.json", "agent/tasks/creative/redstone.json",
         "agent/tasks/creative/sapling.json",
     )
-    namespace, smoke_items = derive_smoke_assignments(
+    formal_50_task_paths = tuple(
+        "agent/tasks/creative/iron_ingot.json" if path.endswith("creature.json") else path
+        for path in historical_smoke_task_paths
+    )
+    smoke_task_paths = (
+        formal_50_task_paths
+        if args.formal_50_task_smoke
+        else historical_smoke_task_paths
+    )
+    assignment_factory = (
+        derive_formal_50_task_smoke_assignments
+        if args.formal_50_task_smoke
+        else derive_smoke_assignments
+    )
+    namespace, smoke_items = assignment_factory(
         source_commit=source,
-        namespace_label="dc3pa-round513e1r-engineering-smoke-v4.1.2",
+        namespace_label=(
+            "dc3pa-round513e3-formal50-engineering-smoke-v4.1.2"
+            if args.formal_50_task_smoke
+            else "dc3pa-round513e1r-engineering-smoke-v4.1.2"
+        ),
         task_file_sha256_by_path={path: _sha(ROOT / path) for path in smoke_task_paths},
     )
     smoke_pool = CHRMLiteEngineeringSmokePoolV4_1_2(

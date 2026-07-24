@@ -900,6 +900,71 @@ def derive_smoke_assignments(
     return namespace_id, tuple(assignments)
 
 
+def derive_formal_50_task_smoke_assignments(
+    *,
+    source_commit: str,
+    namespace_label: str,
+    task_file_sha256_by_path: Mapping[str, str] | None = None,
+) -> tuple[str, tuple[SmokeAssignment, ...]]:
+    """Create the taskset-aligned successor without rewriting E1R history."""
+
+    namespace_id = canonical_sha256({"namespace_label": namespace_label})
+    specs = (
+        ("log", "agent/tasks/creative/log.json", "basic", "find", "feasible", "formal task 'mine log' naturally requires search", "soft", "known", "positive_support"),
+        ("cobblestone", "agent/tasks/creative/cobblestone.json", "easy", "move_to", "feasible", "formal task 'mine cobblestone' naturally requires approach", "hard", "known", "negative_support"),
+        ("iron ore", "agent/tasks/creative/iron_ore.json", "medium", "mine", "feasible", "formal task 'mine iron ore' naturally requires mining", "hard", "known", "both_sides"),
+        ("crafting table", "agent/tasks/creative/crafting_table.json", "basic", "craft", "feasible", "formal task 'craft crafting table' naturally requires crafting", "soft", "known", "positive_support"),
+        ("iron ingot", "agent/tasks/creative/iron_ingot.json", "hard", "craft", "feasible", "formal task 'smelt iron ingot' uses the legacy craft action for furnace processing", "hard", "known", "both_sides"),
+        ("wooden pickaxe", "agent/tasks/creative/wooden_pickaxe.json", "easy", "equip", "proxy_only", "formal task crafts the tool but does not require equip", "hard", "known", "positive_support"),
+        ("diamond", "agent/tasks/creative/diamond.json", "complex", "dig_down", "feasible", "formal task 'obtain diamond' naturally requires descent", "hard", "known", "negative_support"),
+        ("redstone", "agent/tasks/creative/redstone.json", "complex", "dig_up", "proxy_only", "formal task 'mine redstone' does not guarantee ascent", "unknown", "unknown", "insufficient_side"),
+        ("sapling", "agent/tasks/creative/sapling.json", "medium", "apply", "proxy_only", "formal task obtains a sapling but does not require apply", "soft", "known", "both_sides"),
+    )
+    assignments = []
+    for index, spec in enumerate(specs):
+        (
+            task, path, difficulty, action, feasibility, feasibility_reason,
+            rule, knowledge, bilateral,
+        ) = spec
+        seed_digest = canonical_sha256(
+            {"namespace_id": namespace_id, "terminal_task": task, "replicate_index": index}
+        )
+        seed = int(seed_digest[:8], 16) & 0x7FFFFFFF
+        task_hash = (
+            task_file_sha256_by_path[path]
+            if task_file_sha256_by_path is not None
+            else canonical_sha256({"task_path_label": path})
+        )
+        assignment_payload = {
+            "namespace_id": namespace_id,
+            "terminal_task": task,
+            "difficulty": difficulty,
+            "target_action_family": action,
+            "coverage_feasibility": feasibility,
+            "replicate_index": index,
+            "seed_commitment": seed_digest,
+            "task_file_sha256": task_hash,
+        }
+        assignments.append(
+            SmokeAssignment(
+                assignment_id=canonical_sha256(assignment_payload),
+                terminal_task=task,
+                task_path_label=path,
+                task_file_sha256=task_hash,
+                difficulty=difficulty,
+                target_action_family=action,
+                coverage_feasibility=feasibility,
+                feasibility_reason=feasibility_reason,
+                rule_case=rule,
+                knowledge_case=knowledge,
+                bilateral_case=bilateral,
+                seed_commitment=seed_digest,
+                seed=seed,
+            )
+        )
+    return namespace_id, tuple(assignments)
+
+
 def build_gamma_candidates(quantiles: Mapping[str, float]) -> tuple[GammaCandidate, ...]:
     pairs = (
         (quantiles["q25"], quantiles["q75"], "label_free_q25_q75"),
