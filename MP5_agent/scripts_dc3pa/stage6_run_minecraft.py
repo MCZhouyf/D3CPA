@@ -167,6 +167,36 @@ from dc3pa.reliability import (  # noqa: E402
 )
 
 
+_ROUND513_DISPOSITION_DIRECTORIES = frozenset(
+    {
+        "accepted_scientific",
+        "audit_only_ambiguous",
+        "technical_quarantine",
+        "incomplete_pending",
+    }
+)
+
+
+def _round513_output_root_is_logically_empty(output_root: Path) -> bool:
+    """Accept an empty root or the empty disposition skeleton from a prior attempt."""
+
+    if not output_root.exists():
+        return True
+    if not output_root.is_dir() or output_root.is_symlink():
+        return False
+    try:
+        children = tuple(output_root.iterdir())
+        return all(
+            child.name in _ROUND513_DISPOSITION_DIRECTORIES
+            and child.is_dir()
+            and not child.is_symlink()
+            and not any(child.iterdir())
+            for child in children
+        )
+    except OSError:
+        return False
+
+
 class TracedChatModel:
     """Trace LLM request counts without recording prompts, responses, or credentials."""
 
@@ -1555,8 +1585,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             parser.error(
                 "Round 5.13 Track E cannot mount Acquisition, Holdout, or final-phase inputs"
             )
-        if args.round513_track_e_output_root.exists() and any(
-            args.round513_track_e_output_root.iterdir()
+        if not _round513_output_root_is_logically_empty(
+            args.round513_track_e_output_root
         ):
             parser.error("Round 5.13 Track E output root must be empty")
 
