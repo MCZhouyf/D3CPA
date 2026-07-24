@@ -110,6 +110,18 @@ from dc3pa.experiments.round513e5 import (  # noqa: E402
     AtomicDecisionStoreV4_1_3,
     TrackECollectorV4_1_3,
 )
+from dc3pa.experiments.round513e5d1 import (  # noqa: E402
+    DiagnosticAssignmentSealD1,
+    DiagnosticAssignmentsD1,
+    DiagnosticAuthorizationInputD1,
+    DiagnosticAuthorizationReceiptD1,
+    DiagnosticExecutionManifestD1,
+    DiagnosticRunBindingD1,
+    DiagnosticRuntimeReleaseD1,
+    adapt_e3_canonical_planner,
+    load_d1_contract,
+    validate_d1_execution_closure,
+)
 from dc3pa.experiments.round513e2h import (  # noqa: E402
     AtomicDecisionStoreV4_1_2_R1,
     CHRMLiteEngineeringSmokeRuntimeReleaseV4_1_2_R1,
@@ -1001,6 +1013,26 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         help="Frozen E3X assignment and execution-binding seal.",
     )
+    parser.add_argument(
+        "--round513e5-d1-authorization-input",
+        type=Path,
+        help="Frozen E5 D1 authorization input for the amended source.",
+    )
+    parser.add_argument(
+        "--round513e5-d1-authorization-receipt",
+        type=Path,
+        help="Exact ZYF authorization receipt for the amended E5 D1 source.",
+    )
+    parser.add_argument(
+        "--round513e5-d1-assignments",
+        type=Path,
+        help="Frozen three-assignment E5 D1 contract.",
+    )
+    parser.add_argument(
+        "--round513e5-d1-assignment-seal",
+        type=Path,
+        help="Frozen E5 D1 task-seed-order seal.",
+    )
     for option, help_text in (
         ("binding", "E3X run binding"),
         ("authorization-input", "E3X authorization input"),
@@ -1014,6 +1046,19 @@ def build_parser() -> argparse.ArgumentParser:
     ):
         parser.add_argument(
             f"--round513-e3x-{option}-sha256",
+            help=f"Expected raw file SHA-256 for the {help_text}.",
+        )
+    for option, help_text in (
+        ("binding", "D1 run binding"),
+        ("authorization-input", "D1 authorization input"),
+        ("authorization-receipt", "D1 authorization receipt"),
+        ("assignments", "D1 assignments"),
+        ("assignment-seal", "D1 assignment seal"),
+        ("runtime", "D1 runtime release"),
+        ("execution-manifest", "D1 execution manifest"),
+    ):
+        parser.add_argument(
+            f"--round513e5-d1-{option}-sha256",
             help=f"Expected raw file SHA-256 for the {help_text}.",
         )
     return parser
@@ -1079,10 +1124,25 @@ def main(argv: Optional[list[str]] = None) -> int:
         args.round513_e3x_runtime_sha256,
         args.round513_e3x_execution_manifest_sha256,
     )
+    round513_d1_arguments = (
+        args.round513e5_d1_authorization_input,
+        args.round513e5_d1_authorization_receipt,
+        args.round513e5_d1_assignments,
+        args.round513e5_d1_assignment_seal,
+        args.round513e5_d1_binding_sha256,
+        args.round513e5_d1_authorization_input_sha256,
+        args.round513e5_d1_authorization_receipt_sha256,
+        args.round513e5_d1_assignments_sha256,
+        args.round513e5_d1_assignment_seal_sha256,
+        args.round513e5_d1_runtime_sha256,
+        args.round513e5_d1_execution_manifest_sha256,
+    )
     if any(round513_r1_arguments) and not round513_track_e_enabled:
         parser.error("Round 5.13 R1 artifacts require the base Track E arguments")
     if any(round513_e3x_arguments) and not round513_track_e_enabled:
         parser.error("Round 5.13 E3X artifacts require the base Track E arguments")
+    if any(round513_d1_arguments) and not round513_track_e_enabled:
+        parser.error("Round 5.13 E5 D1 artifacts require the base Track E arguments")
     if round511_enabled and round5124_holdout_enabled:
         parser.error("Development and holdout shadow collection are mutually exclusive")
     if round513_track_e_enabled and (round511_enabled or round5124_holdout_enabled):
@@ -1152,20 +1212,37 @@ def main(argv: Optional[list[str]] = None) -> int:
     round513_support_policy = None
     round513_r1_enabled = False
     round513_e3x_enabled = False
+    round513_d1_enabled = False
     r1_binding = None
     if round513_track_e_enabled:
         assert args.round513_track_e_binding is not None
         assert args.round513_contract_root is not None
         assert args.round513_track_e_output_root is not None
         binding_payload = _load_json(args.round513_track_e_binding)
+        round513_d1_enabled = (
+            binding_payload.get("contract_type") == "Round513E5DiagnosticRunBindingD1R1"
+        )
         round513_e3x_enabled = (
             binding_payload.get("contract_type") == "TrackERunBindingE3X_R1"
         )
         round513_r1_enabled = (
             binding_payload.get("runtime_binding_revision") == "R1"
             or round513_e3x_enabled
+            or round513_d1_enabled
         )
-        if round513_r1_enabled and not all(round513_r1_arguments):
+        if round513_d1_enabled:
+            required_d1_runtime = (
+                args.round513_track_e_runtime_release,
+                args.round513_track_e_execution_manifest,
+                args.round513_technical_retry_policy,
+                args.round513_process_cleanup_policy,
+            )
+            if not all(required_d1_runtime) or not all(round513_d1_arguments):
+                parser.error(
+                    "Round 5.13 E5 D1 requires authorization, assignment, runtime, "
+                    "manifest, policy, and every raw SHA-256 binding"
+                )
+        elif round513_r1_enabled and not all(round513_r1_arguments):
             parser.error(
                 "Round 5.13 R1 requires compatibility, runtime, execution, retry, and cleanup releases"
             )
@@ -1175,9 +1252,13 @@ def main(argv: Optional[list[str]] = None) -> int:
             )
         if not round513_e3x_enabled and any(round513_e3x_arguments):
             parser.error("E3X release arguments cannot be used with an E2H/V4.1 binding")
+        if not round513_d1_enabled and any(round513_d1_arguments):
+            parser.error("E5 D1 arguments require an E5 D1 run binding")
+        if round513_d1_enabled and any(round513_e3x_arguments):
+            parser.error("E5 D1 and E3X authorization closures are mutually exclusive")
         if not round513_r1_enabled and any(round513_r1_arguments):
             parser.error("R1 release arguments cannot be used with a V4.1 binding")
-        if round513_e3x_enabled:
+        if round513_e3x_enabled or round513_d1_enabled:
             current_commit = subprocess.run(
                 ["git", "rev-parse", "HEAD"],
                 cwd=ROOT.parent,
@@ -1193,12 +1274,151 @@ def main(argv: Optional[list[str]] = None) -> int:
                 text=True,
             ).stdout.strip()
             if binding_payload.get("execution_source_commit") != current_commit:
-                parser.error("E3X source preflight does not match the current HEAD")
+                parser.error("Track E source preflight does not match the current HEAD")
             if worktree:
-                parser.error("E3X source preflight requires a clean worktree")
+                parser.error("Track E source preflight requires a clean worktree")
         try:
             contract_root = args.round513_contract_root.resolve()
-            if round513_e3x_enabled:
+            if round513_d1_enabled:
+                if not args.round513e5_diagnostic_contracts:
+                    raise ValueError("E5 D1 requires --round513e5-diagnostic-contracts")
+
+                def _load_d1(path: Path, raw_sha: str, id_field: str):
+                    payload = _load_json(path)
+                    return load_d1_contract(
+                        path,
+                        expected_file_sha256=raw_sha,
+                        expected_contract_id=str(payload[id_field]),
+                    )
+
+                r1_binding = _load_d1(
+                    args.round513_track_e_binding,
+                    args.round513e5_d1_binding_sha256,
+                    "binding_id",
+                )
+                authorization = _load_d1(
+                    args.round513e5_d1_authorization_input,
+                    args.round513e5_d1_authorization_input_sha256,
+                    "authorization_input_id",
+                )
+                authorization_receipt = _load_d1(
+                    args.round513e5_d1_authorization_receipt,
+                    args.round513e5_d1_authorization_receipt_sha256,
+                    "receipt_id",
+                )
+                d1_assignments = _load_d1(
+                    args.round513e5_d1_assignments,
+                    args.round513e5_d1_assignments_sha256,
+                    "assignments_id",
+                )
+                d1_seal = _load_d1(
+                    args.round513e5_d1_assignment_seal,
+                    args.round513e5_d1_assignment_seal_sha256,
+                    "seal_id",
+                )
+                runtime_release = _load_d1(
+                    args.round513_track_e_runtime_release,
+                    args.round513e5_d1_runtime_sha256,
+                    "release_id",
+                )
+                execution_manifest = _load_d1(
+                    args.round513_track_e_execution_manifest,
+                    args.round513e5_d1_execution_manifest_sha256,
+                    "manifest_id",
+                )
+                expected_types = (
+                    (r1_binding, DiagnosticRunBindingD1),
+                    (authorization, DiagnosticAuthorizationInputD1),
+                    (authorization_receipt, DiagnosticAuthorizationReceiptD1),
+                    (d1_assignments, DiagnosticAssignmentsD1),
+                    (d1_seal, DiagnosticAssignmentSealD1),
+                    (runtime_release, DiagnosticRuntimeReleaseD1),
+                    (execution_manifest, DiagnosticExecutionManifestD1),
+                )
+                if any(not isinstance(item, expected) for item, expected in expected_types):
+                    raise TypeError("E5 D1 loader returned an unexpected contract type")
+
+                adapters = {
+                    entry.contract_type: load_versioned_contract(
+                        contract_root / entry.filename,
+                        contract_type=entry.contract_type,
+                        expected_contract_id=entry.contract_id,
+                        expected_file_sha256=entry.file_sha256,
+                    )
+                    for entry in runtime_release.scientific_contracts
+                }
+                round513_planner_schema = adapt_e3_canonical_planner(
+                    adapters["planner_schema"]
+                )
+                rule_payload = dict(adapters["rule_registry"].raw_contract_payload)
+                rule_payload["rules"] = tuple(
+                    RuleTypeDefinition(**item) for item in rule_payload["rules"]
+                )
+                round513_rule_registry = CHRMLiteRuleTypeRegistryV4_1(**rule_payload)
+                round513_retrieval_policy = CHRMLiteBilateralRetrievalPolicyV4_1(
+                    **adapters["bilateral_retrieval_policy"].normalized_runtime_view,
+                )
+                round513_support_policy = CHRMLiteSupportAndDegradationPolicy(
+                    **adapters["support_policy"].raw_contract_payload
+                )
+                retry_adapter = load_frozen_policy(
+                    args.round513_technical_retry_policy,
+                    policy_type="technical_retry",
+                    expected_policy_id=runtime_release.technical_retry_policy_id,
+                    expected_file_sha256=runtime_release.technical_retry_policy_file_sha256,
+                )
+                cleanup_adapter = load_frozen_policy(
+                    args.round513_process_cleanup_policy,
+                    policy_type="process_cleanup",
+                    expected_policy_id=runtime_release.process_cleanup_policy_id,
+                    expected_file_sha256=runtime_release.process_cleanup_policy_file_sha256,
+                )
+                if retry_adapter.raw_policy_id != r1_binding.technical_retry_policy_id:
+                    raise ValueError("E5 D1 retry policy lineage mismatch")
+                if cleanup_adapter.raw_policy_id != r1_binding.process_cleanup_policy_id:
+                    raise ValueError("E5 D1 cleanup policy lineage mismatch")
+                validate_d1_execution_closure(
+                    current_source=current_commit,
+                    task_path=Path(args.task),
+                    output_root=args.round513_track_e_output_root,
+                    binding=r1_binding,
+                    authorization=authorization,
+                    receipt=authorization_receipt,
+                    assignments=d1_assignments,
+                    seal=d1_seal,
+                    runtime=runtime_release,
+                    manifest=execution_manifest,
+                    authorization_input_file_sha256=args.round513e5_d1_authorization_input_sha256,
+                )
+                round513_binding = TrackERunBindingV4_1(
+                    authorization_id=r1_binding.authorization_receipt_id,
+                    authorization_status="approved",
+                    engineering_smoke_approved=True,
+                    engineering_only=True,
+                    campaign_id=r1_binding.campaign_id,
+                    source_commit=r1_binding.execution_source_commit,
+                    task=r1_binding.task,
+                    terminal_task=r1_binding.terminal_task,
+                    split="engineering_smoke",
+                    group_id=r1_binding.assignment_id,
+                    seed_commitment=r1_binding.seed_commitment,
+                    run_id=r1_binding.run_id,
+                    episode_id=r1_binding.episode_id,
+                    memory_release_id=r1_binding.paper_memory_release_id,
+                    dependency_schema_id=round513_rule_registry.dependency_schema_id,
+                    rule_registry_id=r1_binding.rule_registry_id,
+                    scene_release_id=r1_binding.scene_exemplar_release_id,
+                    mineclip_policy_id=r1_binding.mineclip_policy_id,
+                    planner_schema_id=r1_binding.planner_schema_id,
+                    planner_prompt_id=r1_binding.planner_prompt_id,
+                    planner_parser_id=r1_binding.planner_parser_id,
+                    controller_contract_id=r1_binding.controller_id,
+                    evaluator_contract_id=r1_binding.evaluator_id,
+                    budget_profile_id=r1_binding.budget_profile_id,
+                    gamma_minus=float(r1_binding.gamma_minus_text),
+                    gamma_plus=float(r1_binding.gamma_plus_text),
+                )
+            elif round513_e3x_enabled:
                 binding_adapter = load_e3x_contract(
                     args.round513_track_e_binding,
                     expected_file_sha256=args.round513_e3x_binding_sha256,
