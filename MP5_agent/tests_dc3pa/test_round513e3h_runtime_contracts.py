@@ -41,6 +41,7 @@ from dc3pa.experiments.round513e3h import (
     validate_e3x_runtime_artifacts,
 )
 from dc3pa.experiments.round513e3f import build_provider_contracts
+from scripts_dc3pa.freeze_round513e3h_reauthorization import rebind_smoke_assignment
 
 
 EXTERNAL = (
@@ -153,6 +154,39 @@ def test_e3x_nested_assignments_round_trip_without_type_downgrade(tmp_path):
         isinstance(item, SmokeAssignmentE3X_R1)
         for item in adapter.normalized_runtime_view.assignments
     )
+
+
+def test_e3x_assignment_rebind_changes_only_source_and_derived_identity():
+    original = SmokeAssignmentE3X_R1(
+        contract_type="SmokeAssignmentE3X_R1",
+        contract_version=E3X_CONTRACT_VERSION,
+        source_commit="1" * 40,
+        namespace_id="2" * 64,
+        terminal_task="log",
+        formal_task_name="find log",
+        formal_catalog_row_id="3" * 64,
+        task_path_label="agent/tasks/creative/log.json",
+        task_file_sha256="4" * 64,
+        difficulty="basic",
+        target_action_family="find",
+        coverage_naturalness="natural",
+        natural_action_coverage_eligible=True,
+        instrumentation_target_eligible=True,
+        observed_runtime_coverage="not_observed_before_execution",
+        seed_commitment="5" * 64,
+        seed=12345,
+        order=0,
+    ).with_id()
+    rebound = rebind_smoke_assignment(original.to_dict(), "6" * 40)
+
+    assert rebound.source_commit == "6" * 40
+    assert rebound.assignment_id != original.assignment_id
+    ignored = {"assignment_id", "source_commit"}
+    assert {
+        key: value for key, value in rebound.to_dict().items() if key not in ignored
+    } == {
+        key: value for key, value in original.to_dict().items() if key not in ignored
+    }
 
 
 def test_authorized_e3_planner_schema_is_reconstructable_and_loadable(tmp_path):

@@ -132,6 +132,19 @@ def _count_changes(old: list[dict], new: list[dict], names: tuple[str, ...]) -> 
     )
 
 
+def rebind_smoke_assignment(payload: dict, source_commit: str) -> SmokeAssignmentE3X_R1:
+    identity_fields = {
+        "assignment_id", "contract_type", "contract_version", "schema_version",
+        "source_commit",
+    }
+    return SmokeAssignmentE3X_R1(
+        contract_type="SmokeAssignmentE3X_R1",
+        contract_version=E3X_CONTRACT_VERSION,
+        source_commit=source_commit,
+        **{key: value for key, value in payload.items() if key not in identity_fields},
+    ).with_id()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
@@ -466,15 +479,7 @@ def main() -> int:
     ).with_id()
 
     rows = tuple(
-        SmokeAssignmentE3X_R1(
-            contract_type="SmokeAssignmentE3X_R1",
-            contract_version=E3X_CONTRACT_VERSION,
-            source_commit=source,
-            **{
-                key: value for key, value in old.items()
-                if key not in {"source_commit", "schema_version", "assignment_id"}
-            },
-        ).with_id()
+        rebind_smoke_assignment(old, source)
         for old in old_assignments["assignments"]
     )
     assignments = CHRMLiteEngineeringSmokeAssignmentsE3X_R1(
