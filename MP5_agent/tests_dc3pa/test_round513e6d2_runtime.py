@@ -1,4 +1,5 @@
 import json
+import inspect
 from dataclasses import replace
 from pathlib import Path
 
@@ -278,3 +279,16 @@ def test_stage6_exposes_d2_fail_closed_arguments():
         "round513e6_d2_runtime_sha256",
         "round513e6_d2_execution_manifest_sha256",
     }.issubset(destinations)
+
+
+def test_freeze_binds_safety_semantics_to_runtime_not_source_audit():
+    from dc3pa.experiments.round513e6d2 import Round513E6D2SourceHardeningAudit
+    from scripts_dc3pa import freeze_round513e6d2
+
+    source_parameters = inspect.signature(Round513E6D2SourceHardeningAudit).parameters
+    runtime_parameters = inspect.signature(Round513E6D2RuntimeRelease).parameters
+    freeze_source = inspect.getsource(freeze_round513e6d2.main)
+    assert "safety_semantics_audit_id" not in source_parameters
+    assert "safety_semantics_audit_id" in runtime_parameters
+    runtime_call = freeze_source.split("runtime = Round513E6D2RuntimeRelease(", 1)[1]
+    assert "safety_semantics_audit_id=safety_audit.audit_id" in runtime_call
