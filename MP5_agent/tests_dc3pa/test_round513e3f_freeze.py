@@ -9,6 +9,9 @@ from dc3pa.experiments.round513_collection import CHRMLitePlannerOutputSchemaV4_
 from dc3pa.experiments.round513_instrumentation import OneCallPlannerV4_1, PlannerOutputError
 from dc3pa.experiments.round513e2h import canonical_sha256, file_sha256
 from dc3pa.experiments.round513e3f import (
+    BOUNDARY_A_APPROVAL_REQUIRED_LITERALS,
+    CHRMLiteEngineeringSmokeAssignmentsV4_1_2_E3,
+    CHRMLiteEngineeringSmokePoolV4_1_2_E3,
     CONTROLLER_ACTION_ARGUMENTS,
     FORMAL_CATALOG_CANONICAL_SHA256,
     FORMAL_TASKSET_RELEASE_ID,
@@ -16,10 +19,16 @@ from dc3pa.experiments.round513e3f import (
     HISTORICAL_E2H_AUTHORIZATION_INPUT_ID,
     HISTORICAL_E2H_SEAL_ID,
     Round513E2TechnicalCampaignCloseout,
+    Round513E3ContractCompatibilityRelease,
     build_decision_inputs,
     build_provider_contracts,
     build_task_asset_audit,
+    derive_authorized_e3_assignments,
+    validate_boundary_a_approval,
     validate_action_schema,
+)
+from dc3pa.experiments.round513e_authoritative import (
+    derive_formal_50_task_smoke_assignments,
 )
 from dc3pa.integration.providers import (
     TRACK_E_MAX_OUTPUT_TOKENS,
@@ -209,4 +218,78 @@ def test_new_pipeline_is_independent_and_cannot_overwrite_historical_paths():
     assert "O_EXCL" in text
     assert "stage6_run_minecraft" not in text
     assert '"minedojo_execution_permitted": False' in text
-    assert "source_freeze_permitted\": False" in text
+
+
+@pytest.mark.minedojo
+def test_authorized_alignment_preserves_task_seed_order_and_binds_formal_assets():
+    namespace_label = "dc3pa-round513e3-formal50-engineering-smoke-v4.1.2"
+    old_namespace, old = derive_formal_50_task_smoke_assignments(
+        source_commit=SOURCE, namespace_label=namespace_label,
+    )
+    namespace, aligned = derive_authorized_e3_assignments(
+        source_commit=SOURCE, formal_root=FORMAL, namespace_label=namespace_label,
+    )
+    assert namespace == old_namespace
+    assert [item.terminal_task for item in aligned] == [item.terminal_task for item in old]
+    assert [item.seed for item in aligned] == [item.seed for item in old]
+    assert [item.order for item in aligned] == list(range(9))
+    assert [item.target_action_family for item in aligned] == [item.target_action_family for item in old]
+    assert {item.formal_task_name: item.difficulty for item in aligned}["mine cobblestone"] == "medium"
+    assert {item.formal_task_name: item.difficulty for item in aligned}["mine sapling"] == "basic"
+    for item in aligned:
+        asset = FORMAL / item.task_path_label
+        assert asset.is_file()
+        assert file_sha256(asset) == item.task_file_sha256
+    proxies = [item for item in aligned if item.coverage_naturalness == "proxy_only"]
+    assert len(proxies) == 3
+    assert all(not item.natural_action_coverage_eligible for item in proxies)
+    assert all(item.observed_runtime_coverage == "not_observed_before_execution" for item in aligned)
+
+
+def test_boundary_a_approval_validation_is_exact_and_fail_closed():
+    validate_boundary_a_approval(" ".join(BOUNDARY_A_APPROVAL_REQUIRED_LITERALS))
+    with pytest.raises(ValueError, match="incomplete"):
+        validate_boundary_a_approval("selecting P1; approved_by=ZYF")
+
+
+@pytest.mark.minedojo
+def test_e3_pool_and_assignments_remain_engineering_only():
+    namespace, rows = derive_authorized_e3_assignments(
+        source_commit=SOURCE,
+        formal_root=FORMAL,
+        namespace_label="dc3pa-round513e3-formal50-engineering-smoke-v4.1.2",
+    )
+    pool = CHRMLiteEngineeringSmokePoolV4_1_2_E3(
+        source_commit=SOURCE, namespace_id=namespace,
+        task_asset_audit_id="a" * 64, proxy_policy="P1", assignment_count=9,
+    ).with_id()
+    assignments = CHRMLiteEngineeringSmokeAssignmentsV4_1_2_E3(
+        source_commit=SOURCE, namespace_id=namespace,
+        runtime_release_id="b" * 64, assignments=rows,
+    ).with_id()
+    assert pool.engineering_only and not pool.fitting_eligible
+    assert all(item.engineering_only for item in assignments.assignments)
+    assert all(not item.formal_fitting_eligible for item in assignments.assignments)
+
+
+def test_e3_compatibility_rejects_old_authorization_and_silent_downgrade():
+    release = Round513E3ContractCompatibilityRelease(
+        source_commit=SOURCE, source_freeze_audit_id="a" * 64,
+        historical_compatibility_release_id="b" * 64,
+        provider_request_policy_id="c" * 64,
+        planner_runtime_request_contract_id="d" * 64,
+        planner_schema_id="e" * 64, parser_id="f" * 64,
+        historical_e1r_e2h_reconstructable=True,
+    ).with_id()
+    assert not release.old_authorization_accepted
+    with pytest.raises(ValueError, match="weakens version isolation"):
+        replace(release, release_id="", old_authorization_accepted=True)
+
+
+def test_final_freeze_script_stops_at_boundary_b_without_launching_runner():
+    text = (ROOT / "scripts_dc3pa/freeze_round513e3_final_authorization.py").read_text(
+        encoding="utf-8"
+    )
+    assert "stage6_run_minecraft" not in text
+    assert '"minedojo_started": False' in text
+    assert '"authorization_status": "pending_ZYF_boundary_B"' in text

@@ -582,3 +582,464 @@ def scientific_payload_root_without_seed_disclosure(assignments: Sequence[Any]) 
         }
         for index, item in enumerate(assignments)
     ])
+
+
+BOUNDARY_A_APPROVAL_REQUIRED_LITERALS = (
+    "ProxyActionCoverageDecisionInput 085c53aea5a629cfb5d6e220f52136bfdb357aa6b9c42aa2516abb5d04565512",
+    "file SHA-256 93d228dcf98d801513f7d734e89ba19bd6b6976d8e34f42876ffcd3d6bcfd6fe",
+    "selecting P1",
+    "IronIngotTaskAssetDecisionInput c7a0827769b36d48e67f5899d4af79a76e2b886267504d5c5fe8bb83e8327857",
+    "file SHA-256 3c4b4680ebdf427d0255845b8a90f061aeb2f23a39f344bbada408367ca4c634",
+    "selecting I1",
+    "deterministic alignment of all nine candidate bindings to the immutable formal assets and formal catalog difficulties",
+    "approved_by=ZYF",
+)
+
+
+E3_AUTHORIZATION_DECLARATIONS = (
+    "The prior E2H campaign is a pre-action technical failure with zero scientific records.",
+    "E3 uses a new source, namespace, assignments, seal, and authorization.",
+    "Every E3 task is bound to the immutable formal 50-task catalog and asset.",
+    "Proxy-only items are never represented as natural or observed action coverage.",
+    "The iron-ingot task uses the immutable formal asset; no formal task asset was modified.",
+    "Track-E uses JSON-object mode, the strict parser, one Planner call, and same-generation confidence.",
+    "Plain-text fallback, field alias repair, fence stripping, and hidden Planner retry are forbidden.",
+    "Controller, Evaluator, Memory, CHRM, CDT, and the scientific method are unchanged.",
+    "Candidate B and the three exact Gamma decimal strings are unchanged.",
+    "Every Smoke record is engineering-only and excluded from all fitting and calibration.",
+    "Scientific failures receive no retry; technical failures follow only the frozen pre-action policy.",
+    "Formal Development, Holdout, Final Evaluation, and Round 6 remain closed.",
+)
+
+
+@dataclass(frozen=True)
+class Round513E3AuthorBoundaryAReceipt(_Hashed):
+    source_commit: str
+    proxy_decision_input_id: str
+    proxy_decision_input_file_sha256: str
+    proxy_choice: str
+    iron_decision_input_id: str
+    iron_decision_input_file_sha256: str
+    iron_choice: str
+    approval_statement_sha256: str
+    deterministic_formal_alignment_authorized: bool
+    approved_by: str
+    schema_version: int = E3F_SCHEMA_VERSION
+    receipt_id: str = ""
+
+    _id_field = "receipt_id"
+
+    def __post_init__(self) -> None:
+        if self.proxy_choice != "P1" or self.iron_choice != "I1":
+            raise ValueError("Boundary-A choices do not match the approval")
+        if not self.deterministic_formal_alignment_authorized or self.approved_by != "ZYF":
+            raise ValueError("Boundary-A approval is incomplete")
+        if self.receipt_id and self.receipt_id != self.compute_id():
+            raise ValueError("Boundary-A receipt hash mismatch")
+
+
+def validate_boundary_a_approval(statement: str) -> None:
+    normalized = " ".join(statement.split())
+    missing = [item for item in BOUNDARY_A_APPROVAL_REQUIRED_LITERALS if item not in normalized]
+    if missing:
+        raise ValueError(f"Boundary-A approval is incomplete: {missing}")
+
+
+@dataclass(frozen=True)
+class SmokeAssignmentV4_1_2_E3(_Hashed):
+    source_commit: str
+    namespace_id: str
+    terminal_task: str
+    formal_task_name: str
+    formal_catalog_row_id: str
+    task_path_label: str
+    task_file_sha256: str
+    difficulty: str
+    target_action_family: str
+    coverage_naturalness: str
+    natural_action_coverage_eligible: bool
+    instrumentation_target_eligible: bool
+    observed_runtime_coverage: str
+    seed_commitment: str
+    seed: int
+    order: int
+    engineering_only: bool = True
+    formal_fitting_eligible: bool = False
+    channel_calibration_eligible: bool = False
+    CHRM_fitting_eligible: bool = False
+    CDT_identification_eligible: bool = False
+    holdout_eligible: bool = False
+    final_evaluation_eligible: bool = False
+    schema_version: int = E3F_SCHEMA_VERSION
+    assignment_id: str = ""
+
+    _id_field = "assignment_id"
+
+    def __post_init__(self) -> None:
+        if self.coverage_naturalness not in {"natural", "proxy_only"}:
+            raise ValueError("Unknown action coverage naturalness")
+        if self.coverage_naturalness == "proxy_only" and self.natural_action_coverage_eligible:
+            raise ValueError("Proxy-only assignment claims natural coverage")
+        if self.observed_runtime_coverage != "not_observed_before_execution":
+            raise ValueError("Prospective assignment fabricated observed coverage")
+        eligibility = (
+            self.formal_fitting_eligible, self.channel_calibration_eligible,
+            self.CHRM_fitting_eligible, self.CDT_identification_eligible,
+            self.holdout_eligible, self.final_evaluation_eligible,
+        )
+        if not self.engineering_only or any(eligibility):
+            raise ValueError("E3 assignment entered a protected scientific split")
+        if self.assignment_id and self.assignment_id != self.compute_id():
+            raise ValueError("E3 assignment hash mismatch")
+
+
+def derive_authorized_e3_assignments(
+    *, source_commit: str, formal_root: Path, namespace_label: str,
+) -> tuple[str, tuple[SmokeAssignmentV4_1_2_E3, ...]]:
+    namespace_id = canonical_sha256({"namespace_label": namespace_label})
+    catalog_path = formal_root / "schema_v2" / "final_tasks.csv"
+    with catalog_path.open(encoding="utf-8", newline="") as handle:
+        catalog = {row["task"]: row for row in csv.DictReader(handle)}
+    assignments = []
+    for order, (terminal, formal_task, _, action, feasibility, _, formal_name) in enumerate(FORMAL_SMOKE_ROWS):
+        row = catalog[formal_task]
+        asset = formal_root / "creative_task_jsons" / formal_name
+        seed_commitment = canonical_sha256({
+            "namespace_id": namespace_id,
+            "terminal_task": terminal,
+            "replicate_index": order,
+        })
+        coverage = "proxy_only" if feasibility == "proxy_only" else "natural"
+        item = SmokeAssignmentV4_1_2_E3(
+            source_commit=source_commit,
+            namespace_id=namespace_id,
+            terminal_task=terminal,
+            formal_task_name=formal_task,
+            formal_catalog_row_id=canonical_sha256(row),
+            task_path_label=f"creative_task_jsons/{formal_name}",
+            task_file_sha256=file_sha256(asset),
+            difficulty=row["difficulty"],
+            target_action_family=action,
+            coverage_naturalness=coverage,
+            natural_action_coverage_eligible=coverage == "natural",
+            instrumentation_target_eligible=True,
+            observed_runtime_coverage="not_observed_before_execution",
+            seed_commitment=seed_commitment,
+            seed=int(seed_commitment[:8], 16) & 0x7FFFFFFF,
+            order=order,
+        ).with_id()
+        assignments.append(item)
+    return namespace_id, tuple(assignments)
+
+
+@dataclass(frozen=True)
+class Round513E3ResolvedTaskAssetAudit(_Hashed):
+    source_commit: str
+    boundary_a_receipt_id: str
+    original_blocked_asset_audit_id: str
+    formal_taskset_release_id: str
+    formal_catalog_file_sha256: str
+    assignment_count: int
+    catalog_match_count: int
+    difficulty_match_count: int
+    immutable_asset_binding_count: int
+    formal_assets_modified: bool
+    status: str
+    schema_version: int = E3F_SCHEMA_VERSION
+    audit_id: str = ""
+
+    _id_field = "audit_id"
+
+    def __post_init__(self) -> None:
+        eligible = (
+            self.assignment_count == self.catalog_match_count
+            == self.difficulty_match_count == self.immutable_asset_binding_count == 9
+            and not self.formal_assets_modified
+        )
+        if self.status != ("PASS" if eligible else "BLOCKED"):
+            raise ValueError("Resolved task asset audit conclusion is inconsistent")
+        if self.audit_id and self.audit_id != self.compute_id():
+            raise ValueError("Resolved task asset audit hash mismatch")
+
+
+@dataclass(frozen=True)
+class Round513E3ExternalManifestGateAudit(_Hashed):
+    source_commit: str
+    round511_assignment_manifest_id: str
+    round511_assignment_manifest_file_sha256: str
+    relevant_tests_passed: int
+    relevant_tests_failed: int
+    relevant_tests_skipped: int
+    snapshot_guard_passed: bool
+    memory_write_probe_rejected: bool
+    minedojo_launch_count: int
+    schema_version: int = E3F_SCHEMA_VERSION
+    audit_id: str = ""
+
+    _id_field = "audit_id"
+
+    def __post_init__(self) -> None:
+        if self.relevant_tests_passed < 1 or self.relevant_tests_failed or self.relevant_tests_skipped:
+            raise ValueError("External manifest gate is not clean")
+        if not self.snapshot_guard_passed or not self.memory_write_probe_rejected:
+            raise ValueError("Frozen Memory integrity gate failed")
+        if self.minedojo_launch_count:
+            raise ValueError("E3F gate launched MineDojo")
+        if self.audit_id and self.audit_id != self.compute_id():
+            raise ValueError("External manifest gate hash mismatch")
+
+
+@dataclass(frozen=True)
+class Round513E3SourceFreezeAudit(_Hashed):
+    source_commit: str
+    source_change_audit_id: str
+    boundary_a_receipt_id: str
+    external_manifest_gate_audit_id: str
+    github_actions_run_id: str
+    github_actions_url: str
+    github_actions_conclusion: str
+    remote_branch_contains_source: bool
+    worktree_clean: bool
+    diff_check_passed: bool
+    schema_version: int = E3F_SCHEMA_VERSION
+    audit_id: str = ""
+
+    _id_field = "audit_id"
+
+    def __post_init__(self) -> None:
+        if self.github_actions_conclusion != "success" or not self.github_actions_url:
+            raise ValueError("GitHub Actions is not green")
+        if not all((self.remote_branch_contains_source, self.worktree_clean, self.diff_check_passed)):
+            raise ValueError("Source is not eligible for freeze")
+        if self.audit_id and self.audit_id != self.compute_id():
+            raise ValueError("Source freeze audit hash mismatch")
+
+
+@dataclass(frozen=True)
+class Round513E3ContractCompatibilityRelease(_Hashed):
+    source_commit: str
+    source_freeze_audit_id: str
+    historical_compatibility_release_id: str
+    provider_request_policy_id: str
+    planner_runtime_request_contract_id: str
+    planner_schema_id: str
+    parser_id: str
+    historical_e1r_e2h_reconstructable: bool
+    old_authorization_accepted: bool = False
+    exact_source_and_contract_match_required: bool = True
+    schema_version: int = E3F_SCHEMA_VERSION
+    release_id: str = ""
+
+    _id_field = "release_id"
+
+    def __post_init__(self) -> None:
+        if not self.historical_e1r_e2h_reconstructable or self.old_authorization_accepted:
+            raise ValueError("E3 compatibility release weakens version isolation")
+        if not self.exact_source_and_contract_match_required:
+            raise ValueError("E3 compatibility release permits silent downgrade")
+        if self.release_id and self.release_id != self.compute_id():
+            raise ValueError("Compatibility release hash mismatch")
+
+
+@dataclass(frozen=True)
+class CHRMLiteEngineeringSmokeRuntimeReleaseV4_1_2_E3(_Hashed):
+    source_commit: str
+    source_freeze_audit_id: str
+    compatibility_release_id: str
+    provider_request_policy_id: str
+    planner_runtime_request_contract_id: str
+    technical_retry_policy_id: str
+    process_cleanup_policy_id: str
+    controller_id: str
+    evaluator_id: str
+    budget_profile_id: str
+    memory_no_write: bool
+    evaluation_chain_changed: bool
+    minedojo_started: bool
+    schema_version: int = E3F_SCHEMA_VERSION
+    release_id: str = ""
+
+    _id_field = "release_id"
+
+    def __post_init__(self) -> None:
+        if not self.memory_no_write or self.evaluation_chain_changed or self.minedojo_started:
+            raise ValueError("E3 runtime release changed frozen behavior")
+        if self.release_id and self.release_id != self.compute_id():
+            raise ValueError("Runtime release hash mismatch")
+
+
+@dataclass(frozen=True)
+class CHRMLiteEngineeringSmokeAssignmentsV4_1_2_E3(_Hashed):
+    source_commit: str
+    namespace_id: str
+    runtime_release_id: str
+    assignments: tuple[SmokeAssignmentV4_1_2_E3, ...]
+    fixed_before_outcomes: bool = True
+    observed_coverage_can_expand_set: bool = False
+    schema_version: int = E3F_SCHEMA_VERSION
+    assignments_id: str = ""
+
+    _id_field = "assignments_id"
+
+    def __post_init__(self) -> None:
+        if len(self.assignments) != 9 or len({item.assignment_id for item in self.assignments}) != 9:
+            raise ValueError("E3 requires nine unique P1 assignments")
+        if not self.fixed_before_outcomes or self.observed_coverage_can_expand_set:
+            raise ValueError("E3 assignments are adaptive")
+        if self.assignments_id and self.assignments_id != self.compute_id():
+            raise ValueError("E3 assignments hash mismatch")
+
+    def payload_without_id(self) -> dict[str, Any]:
+        payload = super().payload_without_id()
+        payload["assignments"] = [item.to_dict() for item in self.assignments]
+        return payload
+
+
+@dataclass(frozen=True)
+class CHRMLiteEngineeringSmokePoolV4_1_2_E3(_Hashed):
+    source_commit: str
+    namespace_id: str
+    task_asset_audit_id: str
+    proxy_policy: str
+    assignment_count: int
+    engineering_only: bool = True
+    fitting_eligible: bool = False
+    outcome_selected: bool = False
+    schema_version: int = E3F_SCHEMA_VERSION
+    pool_id: str = ""
+
+    _id_field = "pool_id"
+
+    def __post_init__(self) -> None:
+        if self.proxy_policy != "P1" or self.assignment_count != 9:
+            raise ValueError("E3 pool does not match author policy")
+        if not self.engineering_only or self.fitting_eligible or self.outcome_selected:
+            raise ValueError("E3 pool entered fitting or selected outcomes")
+        if self.pool_id and self.pool_id != self.compute_id():
+            raise ValueError("E3 pool hash mismatch")
+
+
+@dataclass(frozen=True)
+class CHRMLiteEngineeringSmokeExclusionAuditV4_1_2_E3(_Hashed):
+    source_commit: str
+    assignments_id: str
+    namespace_id: str
+    protected_namespace_root: str
+    acquisition_overlap_count: int
+    historical_development_overlap_count: int
+    previous_smoke_overlap_count: int
+    future_formal_v412_overlap_count: int
+    holdout_overlap_count: int
+    final_overlap_count: int
+    proof_method: str
+    eligible: bool
+    schema_version: int = E3F_SCHEMA_VERSION
+    audit_id: str = ""
+
+    _id_field = "audit_id"
+
+    def __post_init__(self) -> None:
+        counts = (
+            self.acquisition_overlap_count, self.historical_development_overlap_count,
+            self.previous_smoke_overlap_count, self.future_formal_v412_overlap_count,
+            self.holdout_overlap_count, self.final_overlap_count,
+        )
+        if any(counts) or not self.eligible:
+            raise ValueError("E3 assignments overlap a protected split")
+        if self.proof_method != "cryptographic_namespace_and_assignment_id_domain_separation":
+            raise ValueError("Unknown E3 exclusion proof")
+        if self.audit_id and self.audit_id != self.compute_id():
+            raise ValueError("E3 exclusion audit hash mismatch")
+
+
+@dataclass(frozen=True)
+class CHRMLiteEngineeringSmokeSealV4_1_2_E3(_Hashed):
+    source_commit: str
+    pool_id: str
+    assignments_id: str
+    assignments_root_sha256: str
+    exclusion_audit_id: str
+    compatibility_release_id: str
+    runtime_release_id: str
+    assignment_count: int
+    proxy_policy: str
+    permanently_engineering_only: bool = True
+    fitting_ineligible: bool = True
+    sealed: bool = True
+    schema_version: int = E3F_SCHEMA_VERSION
+    seal_id: str = ""
+
+    _id_field = "seal_id"
+
+    def __post_init__(self) -> None:
+        if self.assignment_count != 9 or self.proxy_policy != "P1":
+            raise ValueError("E3 seal does not match approved assignment policy")
+        if not all((self.permanently_engineering_only, self.fitting_ineligible, self.sealed)):
+            raise ValueError("E3 seal is incomplete")
+        if self.seal_id and self.seal_id != self.compute_id():
+            raise ValueError("E3 seal hash mismatch")
+
+
+@dataclass(frozen=True)
+class CHRMLiteEngineeringSmokeAuthorizationInputV4_1_2_E3(_Hashed):
+    source_commit: str
+    source_freeze_audit_id: str
+    e2_closeout_id: str
+    boundary_a_receipt_id: str
+    runtime_release_id: str
+    compatibility_release_id: str
+    provider_request_policy_id: str
+    planner_runtime_request_contract_id: str
+    planner_schema_id: str
+    planner_prompt_id: str
+    planner_parser_id: str
+    formal_taskset_release_id: str
+    formal_catalog_sha256: str
+    task_asset_audit_id: str
+    proxy_policy: str
+    pool_id: str
+    assignments_id: str
+    exclusion_audit_id: str
+    seal_id: str
+    paper_memory_release_id: str
+    paper_memory_root: str
+    mineclip_policy_id: str
+    scene_exemplar_release_id: str
+    rule_registry_id: str
+    bilateral_policy_id: str
+    decision_record_schema_id: str
+    step_outcome_registry_id: str
+    instrumentation_release_id: str
+    controller_id: str
+    evaluator_id: str
+    budget_profile_id: str
+    technical_retry_policy_id: str
+    process_cleanup_policy_id: str
+    gamma_candidate: str
+    gamma_cov_text: str
+    gamma_minus_text: str
+    gamma_plus_text: str
+    declarations: tuple[str, ...]
+    authorization_status: str = "pending_ZYF_boundary_B"
+    minedojo_execution_permitted: bool = False
+    formal_development_permitted: bool = False
+    holdout_final_round6_permitted: bool = False
+    approved_by: str | None = None
+    schema_version: int = E3F_SCHEMA_VERSION
+    authorization_input_id: str = ""
+
+    _id_field = "authorization_input_id"
+
+    def __post_init__(self) -> None:
+        if self.declarations != E3_AUTHORIZATION_DECLARATIONS:
+            raise ValueError("E3 authorization declarations changed")
+        if self.proxy_policy != "P1" or self.gamma_candidate != GAMMA_CANDIDATE_B:
+            raise ValueError("E3 authorization changed approved policy or Gamma candidate")
+        if (self.gamma_cov_text, self.gamma_minus_text, self.gamma_plus_text) != GAMMA_TEXT:
+            raise ValueError("E3 authorization changed exact Gamma strings")
+        if self.authorization_status != "pending_ZYF_boundary_B" or self.approved_by is not None:
+            raise ValueError("E3 authorization fabricated Boundary-B approval")
+        if any((self.minedojo_execution_permitted, self.formal_development_permitted, self.holdout_final_round6_permitted)):
+            raise ValueError("Pending E3 authorization opened execution")
+        if self.authorization_input_id and self.authorization_input_id != self.compute_id():
+            raise ValueError("E3 authorization input hash mismatch")
