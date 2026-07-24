@@ -118,7 +118,10 @@ from dc3pa.experiments.round513e2h import (  # noqa: E402
     load_versioned_contract,
     validate_track_e_r1_artifacts,
 )
-from dc3pa.integration.providers import ChatModelTextAdapter  # noqa: E402
+from dc3pa.integration.providers import (  # noqa: E402
+    ChatModelTextAdapter,
+    configure_track_e_chat_model,
+)
 from dc3pa.memory import (  # noqa: E402
     HashingTextEncoder,
     MultimodalMemory,
@@ -2421,9 +2424,12 @@ def main(argv: Optional[list[str]] = None) -> int:
                         raise RuntimeError(
                             "Round 5.13 Track E requires Paper Memory V5 read-only"
                         )
+                    track_e_chat_model = configure_track_e_chat_model(
+                        planner_instance.llm
+                    )
                     chrmlite_plan_source = OneCallPlannerV4_1(
                         ChatModelTextAdapter(
-                            planner_instance.llm,
+                            track_e_chat_model,
                             request_kwargs={
                                 "response_format": {"type": "json_object"},
                             },
