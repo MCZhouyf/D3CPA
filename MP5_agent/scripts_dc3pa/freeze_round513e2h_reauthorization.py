@@ -36,6 +36,9 @@ from dc3pa.experiments.round513e2h import (  # noqa: E402
     load_versioned_contract,
     ordered_scientific_payload_root,
 )
+from dc3pa.experiments.round513_collection import (  # noqa: E402
+    CHRMLitePlannerOutputSchemaV4_1,
+)
 
 
 DECISION_INPUT_ID = "e5c2d8df67d3448a3c7792fac1abc900033cb2b932eeefee408d65a15b3035ab"
@@ -363,6 +366,7 @@ def main() -> int:
     scene = _load(args.scene_release)
     retrieval = adapters["bilateral_retrieval_policy"].raw_contract_payload
     planner = adapters["planner_schema"].raw_contract_payload
+    planner_contract = CHRMLitePlannerOutputSchemaV4_1(**dict(planner))
     outcome = adapters["step_outcome_registry"].raw_contract_payload
     authorization = CHRMLiteEngineeringSmokeAuthorizationInputV4_1_2_R1(
         source_commit=source,
@@ -380,9 +384,9 @@ def main() -> int:
         paper_memory_root=str(paper["snapshot_root_sha256"]),
         mineclip_policy_id=str(retrieval["mineclip_policy_id"]),
         scene_exemplar_release_id=str(scene["release_id"]),
-        planner_prompt_id=canonical_sha256(planner["prompt_template"]),
+        planner_prompt_id=planner_contract.prompt_id,
         planner_schema_id=str(planner["schema_id"]),
-        planner_parser_id=canonical_sha256(planner["parser_policy"]),
+        planner_parser_id=planner_contract.parser_id,
         rule_registry_id=adapters["rule_registry"].raw_contract_id,
         bilateral_policy_id=adapters["bilateral_retrieval_policy"].raw_contract_id,
         decision_record_schema_id=adapters["decision_record_schema"].raw_contract_id,

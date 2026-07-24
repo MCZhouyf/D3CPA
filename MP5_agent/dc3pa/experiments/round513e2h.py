@@ -14,6 +14,8 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
+from .round513_collection import CHRMLitePlannerOutputSchemaV4_1
+
 
 ADAPTER_VERSION = "ContractRuntimeAdapterV4_1_2_R1"
 SCIENTIFIC_METHOD_VERSION = "V4.1.2"
@@ -566,6 +568,14 @@ def validate_track_e_r1_artifacts(
     }
     if any(ids[name] != expected for name, expected in expected_ids.items()):
         raise ValueError("Run binding/contract ID mismatch")
+    planner = CHRMLitePlannerOutputSchemaV4_1(
+        **dict(adapters["planner_schema"].raw_contract_payload)
+    )
+    if (
+        binding.planner_prompt_id != planner.prompt_id
+        or binding.planner_parser_id != planner.parser_id
+    ):
+        raise ValueError("Planner Prompt/Parser identity mismatch")
     outcome = adapters["step_outcome_registry"].raw_contract_payload
     if (
         outcome["controller_contract_id"] != binding.controller_id

@@ -34,6 +34,10 @@ from dc3pa.experiments.round513e2h import (
     validate_all_before_environment_launch,
     validate_track_e_r1_artifacts,
 )
+from dc3pa.experiments.round513_collection import (
+    CHRMLitePlannerOutputSchemaV4_1,
+)
+from dc3pa.experiments.round513_instrumentation import parse_planner_output_v4_1
 
 
 EXTERNAL = (
@@ -357,11 +361,16 @@ def test_full_r1_preflight_validates_lineage_and_controller_evaluator_budget(tmp
         effective_environment_seed_validation=True,
     ).with_id()
     outcome = adapters["step_outcome_registry"].raw_contract_payload
+    planner = CHRMLitePlannerOutputSchemaV4_1(
+        **dict(adapters["planner_schema"].raw_contract_payload)
+    )
     output = str((tmp_path / "output").resolve())
     binding = _binding(
         compatibility_release_id=compatibility.release_id,
         runtime_release_id=runtime.release_id,
         planner_schema_id=adapters["planner_schema"].raw_contract_id,
+        planner_prompt_id=planner.prompt_id,
+        planner_parser_id=planner.parser_id,
         rule_registry_id=adapters["rule_registry"].raw_contract_id,
         bilateral_policy_id=adapters["bilateral_retrieval_policy"].raw_contract_id,
         decision_record_schema_id=adapters["decision_record_schema"].raw_contract_id,
@@ -416,6 +425,22 @@ def test_full_r1_preflight_validates_lineage_and_controller_evaluator_budget(tmp
             adapters=adapters,
             cli_output_root=output,
         )
+    legacy_identity_mutations = (
+        {"planner_prompt_id": canonical_sha256(planner.prompt_template)},
+        {"planner_parser_id": canonical_sha256(planner.parser_policy)},
+    )
+    for mutation in legacy_identity_mutations:
+        with pytest.raises(ValueError, match="Planner Prompt/Parser identity"):
+            validate_track_e_r1_artifacts(
+                binding=replace(binding, **mutation, binding_id="").with_id(),
+                compatibility=compatibility,
+                runtime_release=runtime,
+                technical_retry_policy=retry_policy,
+                process_cleanup_policy=cleanup_policy,
+                execution_manifest=manifest,
+                adapters=adapters,
+                cli_output_root=output,
+            )
     bad_binding = _binding(
         **{
             **binding.payload_without_id(),
@@ -433,6 +458,32 @@ def test_full_r1_preflight_validates_lineage_and_controller_evaluator_budget(tmp
             adapters=adapters,
             cli_output_root=output,
         )
+
+
+@pytest.mark.minedojo
+def test_planner_identity_round_trip_matches_one_call_metadata():
+    payload = _payload(V41 / "chrmlite_planner_output_schema_v4_1.json")
+    planner = CHRMLitePlannerOutputSchemaV4_1(**payload)
+    decision = parse_planner_output_v4_1(
+        json.dumps({
+            "subgoal": "locate one log",
+            "action": {"name": "find", "arguments": {"obj": "log"}},
+            "confidence": "likely",
+            "failure_mode": "none",
+        }),
+        planner,
+    )
+    metadata = decision.to_plan("log").steps[0].metadata
+    assert metadata["v4_1_prompt_id"] == planner.prompt_id
+    assert metadata["v4_1_parser_id"] == planner.parser_id
+    assert planner.prompt_id == canonical_sha256(
+        {"prompt_template": payload["prompt_template"]}
+    )
+    assert planner.parser_id == canonical_sha256({
+        "parser_policy": payload["parser_policy"],
+        "malformed_policy": payload["malformed_policy"],
+        "output_schema": payload["output_schema"],
+    })
 
 
 def test_old_authorization_supersession_is_pre_execution_only():

@@ -30,3 +30,10 @@ in both the R1 Run Binding and Execution Manifest. The runner requires the same
 environment construction, and verifies the effective simulator values. Track-E
 state snapshots derive their pre-action image vector only through the injected
 frozen MineCLIP image encoder; malformed vectors fail closed.
+
+Planner identity uses the canonical definitions exposed by
+`CHRMLitePlannerOutputSchemaV4_1`: Prompt ID hashes the object containing
+`prompt_template`; Parser ID hashes `parser_policy`, `malformed_policy`, and
+`output_schema`. Freeze, R1 preflight, and OneCallPlanner metadata use these
+same properties. Hashing only the raw prompt or parser-policy string is
+rejected before environment construction.
