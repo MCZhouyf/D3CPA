@@ -468,10 +468,10 @@ def d3_contract_from_mapping(contract_kind: str, payload: Mapping[str, Any]) -> 
             ScientificContractReferenceD1(**entry) for entry in item["scientific_contracts"]
         )
         item["gamma_text"] = tuple(item["gamma_text"])
-    elif contract_kind in {"authorization_input", "binding"}:
+    elif contract_kind == "binding":
         item["gamma_text"] = tuple(item["gamma_text"])
-        if contract_kind == "authorization_input":
-            item["declarations"] = tuple(item["declarations"])
+    elif contract_kind == "authorization_input":
+        item["declarations"] = tuple(item["declarations"])
     elif contract_kind == "authorization_receipt":
         item["authorized_task_order"] = tuple(item["authorized_task_order"])
     cls, _ = _D3_CONTRACT_TYPES[contract_kind]

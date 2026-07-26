@@ -254,6 +254,18 @@ def test_d3_loader_round_trips_runtime(tmp_path: Path):
     assert loaded == runtime
 
 
+def test_d3_loader_round_trips_authorization_without_gamma_text(tmp_path: Path):
+    values = _closure(tmp_path)
+    loaded = load_d3_contract(
+        values[9],
+        contract_kind="authorization_input",
+        expected_file_sha256=file_sha256(values[9]),
+        expected_contract_id=values[3].authorization_input_id,
+    )
+    assert loaded == values[3]
+    assert isinstance(loaded.declarations, tuple)
+
+
 def test_d3_closure_rejects_manifest_task_drift(tmp_path: Path):
     values = list(_closure(tmp_path))
     values[8] = replace(values[8], task="log", manifest_id="").with_id()
