@@ -144,6 +144,7 @@ from dc3pa.experiments.round513e7d3 import (  # noqa: E402
     D3TreeDiagnosticExecutionManifestR1,
     D3TreeDiagnosticRunBindingR1,
     D3TreeDiagnosticRuntimeRelease,
+    D3TreeDiagnosticSeal,
     load_d3_contract,
     validate_d3_execution_closure,
 )
