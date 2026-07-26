@@ -52,6 +52,9 @@ def configure_track_e_chat_model(model: Any) -> Any:
         if callable(original_target_getter)
         else model
     )
+    exposes_chat_call = any(
+        hasattr(target, name) for name in ("invoke", "predict", "__call__")
+    )
 
     required = {
         "temperature": 0,
@@ -61,7 +64,12 @@ def configure_track_e_chat_model(model: Any) -> Any:
     }
     for name, value in required.items():
         if not hasattr(target, name):
-            raise TypeError(f"Track-E chat model does not expose {name}")
+            if not exposes_chat_call:
+                raise TypeError(f"Track-E chat model does not expose {name}")
+            setattr(target, name, value)
+            if getattr(target, name) != value:
+                raise ValueError(f"Track-E chat model did not apply {name}")
+            continue
         setattr(target, name, value)
         if getattr(target, name) != value:
             raise ValueError(f"Track-E chat model did not apply {name}")

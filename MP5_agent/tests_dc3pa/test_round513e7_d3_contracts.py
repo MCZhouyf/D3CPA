@@ -300,3 +300,23 @@ def test_stage6_exposes_d3_fail_closed_arguments():
         "round513e7_d3_runtime_sha256",
         "round513e7_d3_execution_manifest_sha256",
     }.issubset(destinations)
+
+
+def test_track_e_configuration_accepts_callable_wrapper_without_optional_attrs():
+    from dc3pa.integration.providers import (
+        TRACK_E_MAX_OUTPUT_TOKENS,
+        TRACK_E_TIMEOUT_SECONDS,
+        configure_track_e_chat_model,
+    )
+
+    class CallableWrapper:
+        def predict(self, prompt, **kwargs):
+            return "ok"
+
+    model = CallableWrapper()
+    configured = configure_track_e_chat_model(model)
+    assert configured is not model
+    assert configured.temperature == 0
+    assert configured.max_tokens == TRACK_E_MAX_OUTPUT_TOKENS
+    assert configured.request_timeout == TRACK_E_TIMEOUT_SECONDS
+    assert configured.max_retries == 0
