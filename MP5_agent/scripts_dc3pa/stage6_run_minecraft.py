@@ -2305,6 +2305,21 @@ def main(argv: Optional[list[str]] = None) -> int:
         runtime_config = replace(
             runtime_config, planner_failure_policy=args.planner_failure_policy
         )
+    if os.environ.get("MP5_DISABLE_MEMORY", "").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }:
+        runtime_config = replace(
+            runtime_config,
+            memory_mode=MemoryMode.DISABLED.value,
+            record_legacy_workflow_memory=False,
+            record_multimodal_memory=False,
+            acquisition_log_dir="",
+            calibration_log_dir="",
+            memory_snapshot_manifest="",
+        )
     if shadow_enabled:
         runtime_config = replace(
             runtime_config,

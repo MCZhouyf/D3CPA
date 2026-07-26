@@ -582,3 +582,132 @@ def test_minecraft_entrypoint_writes_dry_run_receipt_without_formal_memory(
     assert receipt.excluded_from_formal_fitting is True
     assert receipt.formal_memory_used is False
     assert audit_dry_run(campaign, [receipt]).eligible
+
+
+def test_mp5_disable_memory_env_disables_legacy_and_multimodal_writes(
+    monkeypatch, tmp_path
+):
+    import scripts_dc3pa.stage6_run_minecraft as launcher
+
+    task_path = tmp_path / "task.json"
+    task_path.write_text(json.dumps([{"task": "log", "quantity": 1}]), encoding="utf-8")
+    config_path = tmp_path / "config.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "runtime": {
+                    "mode": "reasoning_only",
+                    "max_execution_attempts": 1,
+                    "memory_mode": "acquire",
+                    "record_legacy_workflow_memory": True,
+                    "record_multimodal_memory": True,
+                },
+                "hybrid_probability": {},
+                "dual_chain": {},
+                "adaptive_trigger": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+    observed = {}
+
+    class FakeEnv:
+        def reset(self):
+            pass
+
+        def set_inventory(self, inventory):
+            pass
+
+        def step(self, action):
+            return {
+                "inventory": {
+                    "name": SimpleNamespace(tolist=lambda: []),
+                    "quantity": SimpleNamespace(tolist=lambda: []),
+                }
+            }, 0, False, {}
+
+    class FakeEvaluator:
+        def __init__(self):
+            self.env = FakeEnv()
+
+    class FakeMemory:
+        llm = None
+        inventory = {}
+
+        def __init__(self, *args, **kwargs):
+            observed["use_history_workflow"] = kwargs.get("use_history_workflow")
+
+    class FakePlanner:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class FakeReflexion:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    class FakeController:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    fake_module = SimpleNamespace(
+        Evaluator=FakeEvaluator,
+        Work_Memory=FakeMemory,
+        Reflexion=FakeReflexion,
+        Planner=FakePlanner,
+        Controller=FakeController,
+        share_memory=lambda memory, events: None,
+        args=None,
+    )
+
+    class FakeRuntime:
+        def run_task(self, task_information, underground=False):
+            return SimpleNamespace(
+                success=True,
+                final_underground=False,
+                to_dict=lambda: {
+                    "success": True,
+                    "task": task_information["task"],
+                    "memory_recorded": False,
+                },
+            )
+
+    def fake_build_runtime(**kwargs):
+        observed["runtime_config"] = kwargs["runtime_config"]
+        observed["multimodal_memory"] = kwargs["multimodal_memory"]
+        return SimpleNamespace(runtime=FakeRuntime())
+
+    monkeypatch.setenv("MP5_DISABLE_MEMORY", "1")
+    monkeypatch.setattr(launcher.importlib, "import_module", lambda name: fake_module)
+    monkeypatch.setattr(launcher, "_validate_display_available", lambda: None)
+    monkeypatch.setattr(
+        launcher,
+        "build_legacy_state_provider",
+        lambda **kwargs: object(),
+    )
+    monkeypatch.setattr(launcher, "build_stage6_runtime", fake_build_runtime)
+
+    rc = launcher.main(
+        [
+            "--mode",
+            "reasoning_only",
+            "--openai_key",
+            "test-key",
+            "--gpt_model_name",
+            "gpt-4-turbo",
+            "--task",
+            str(task_path),
+            "--config",
+            str(config_path),
+            "--memory-root",
+            str(tmp_path / "memory"),
+            "--trace",
+            str(tmp_path / "trace.jsonl"),
+        ]
+    )
+
+    assert rc == 0
+    assert observed["runtime_config"].memory_mode == "disabled"
+    assert observed["runtime_config"].record_legacy_workflow_memory is False
+    assert observed["runtime_config"].record_multimodal_memory is False
+    assert observed["use_history_workflow"] is False
+    assert observed["multimodal_memory"] is None
