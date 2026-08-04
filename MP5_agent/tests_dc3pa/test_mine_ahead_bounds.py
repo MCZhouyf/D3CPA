@@ -174,3 +174,69 @@ def test_mine_ahead_does_not_clear_tunnel_after_active_resource_goal_is_met(monk
 
     assert not structured_actions.mine_ahead(env, memory, max_hits=2)
     assert all(action[5] != 3 for action in env.calls)
+
+
+class _DirectionalGoUpEnv:
+    def __init__(self, successful_heading=None):
+        self.successful_heading = successful_heading
+        self.heading = 0
+        self.y_level = 50.0
+        self.x_level = 0.0
+        self.z_level = 0.0
+        self.calls = []
+
+    def _events(self):
+        return {
+            "location_stats": {
+                "pos": np.array([self.x_level, self.y_level, self.z_level])
+            },
+            "inventory": {
+                "name": np.array(["wooden pickaxe"]),
+                "quantity": np.array([1.0]),
+            },
+        }
+
+    def step(self, action):
+        action = list(action)
+        self.calls.append(action)
+        if action[4] == 15 and action[3] == 12:
+            self.heading += 1
+        if action[0] == 1 and action[2] == 1:
+            self.x_level += 0.15
+        if (
+            action[0] == 0
+            and action[2] == 1
+            and self.successful_heading is not None
+            and self.heading == self.successful_heading
+        ):
+            self.y_level = 60.0
+        return self._events(), 0.0, False, {}
+
+
+def test_go_up_tries_escape_headings_until_one_gains_elevation(monkeypatch):
+    env = _DirectionalGoUpEnv(successful_heading=3)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda _events: None)
+
+    assert structured_actions.go_up(
+        env,
+        60,
+        max_vertical_attempts=3,
+        stalled_limit=2,
+    )
+    heading_turns = [action for action in env.calls if action[3:5] == [12, 15]]
+    assert len(heading_turns) == 3
+    assert env.y_level == 60.0
+
+
+def test_go_up_exhausts_exactly_eight_headings_when_all_are_blocked(monkeypatch):
+    env = _DirectionalGoUpEnv(successful_heading=None)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda _events: None)
+
+    assert not structured_actions.go_up(
+        env,
+        60,
+        max_vertical_attempts=2,
+        stalled_limit=1,
+    )
+    heading_turns = [action for action in env.calls if action[3:5] == [12, 15]]
+    assert len(heading_turns) == 8

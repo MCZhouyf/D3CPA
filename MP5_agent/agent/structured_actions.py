@@ -2315,7 +2315,26 @@ def action_craft(env, item, memory,use_crafting_table,use_furnace,craft_num):
 
     return name, num
 
-def go_up(env, y_level, equipment = ""):
+def go_up(
+    env,
+    y_level,
+    equipment="",
+    allow_directional_recovery=True,
+    max_direction_attempts=8,
+    max_vertical_attempts=20,
+    stalled_limit=3,
+):
+    """Mine upward, then try eight bounded escape headings if the shaft stalls.
+
+    The directional phase rotates by 45 degrees, clears body/head/diagonal
+    space, attempts one lateral move, and retries a short vertical climb.  It
+    returns ``True`` only after gaining the requested elevation.
+    """
+    if max_direction_attempts < 0 or max_direction_attempts > 8:
+        raise ValueError("max_direction_attempts must be between 0 and 8")
+    if max_vertical_attempts <= 0 or stalled_limit <= 0:
+        raise ValueError("vertical attempt limits must be positive")
+
     events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
     if equipment:
         inventory = events['inventory']['name'].tolist()
@@ -2327,45 +2346,97 @@ def go_up(env, y_level, equipment = ""):
         if equipment_index != -1:
             events,_,_,_ = env.step([0,0,0,12,12,5,0,equipment_index]); save_rgb_for_video(events)
             print(f"found equipment {equipment} for go_up")
-    '''
-    cb_inventory_index = events['inventory']['name'].tolist().index('dirt')  #################for debug, could be changed
-    events,_,_,_ = env.step([0,0,0,12,12,5,0,cb_inventory_index]); save_rgb_for_video(events) #equip cobblestone
-    '''
-    for i in range(6):
-        turn_up(env,1)
-    curlevel = events['location_stats']['pos'][1]
-    stalled_steps = 0
-    for go_up_try_idx in range(20):
-        if curlevel >= y_level:
-            break
-        print(curlevel)
-        pre_level = curlevel
-        for i in range(10):
-                events,_,_,_ = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events) #attack 5 times
-        '''
-        if  events['inventory']['name'].tolist()[0]!='dirt':
-            cb_inventory_index = events['inventory']['name'].tolist().index('dirt')  #################for debug, could be changed
-            events,_,_,_ = env.step([0,0,0,12,12,5,0,cb_inventory_index]); save_rgb_for_video(events) #equip cobblestone
-        '''
-        for i in range(12):
-            turn_down(env,1)
-        events,_,_,_ = env.step([0,0,1,12,12,0,0,0]); save_rgb_for_video(events)
-        for i in range(4):
-            if  events['inventory']['name'].tolist()[0]=='dirt':
-                events,_,_,_ = env.step([0,0,0,12,12,6,0,0]); save_rgb_for_video(events)
-        for i in range(12):
-            turn_up(env,1)
-        curlevel = events['location_stats']['pos'][1]
-        if curlevel <= pre_level + 0.05:
-            stalled_steps += 1
-            if stalled_steps >= 3:
-                print(f"go_up stalled at {curlevel} while targeting {y_level}; returning to caller.")
-                break
-        else:
-            stalled_steps = 0
 
-    for i in range(6):
-        turn_down(env,1)
+    def vertical_climb(attempt_limit, local_stalled_limit):
+        nonlocal events
+        for _ in range(6):
+            events = turn_up(env, 1)
+        curlevel = float(events['location_stats']['pos'][1])
+        stalled_steps = 0
+        for _ in range(attempt_limit):
+            if curlevel >= y_level:
+                break
+            print(curlevel)
+            pre_level = curlevel
+            for _ in range(10):
+                events,_,_,_ = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+            for _ in range(12):
+                events = turn_down(env, 1)
+            events,_,_,_ = env.step([0,0,1,12,12,0,0,0]); save_rgb_for_video(events)
+            inventory_names = events['inventory']['name'].tolist()
+            for _ in range(4):
+                if inventory_names and inventory_names[0] == 'dirt':
+                    events,_,_,_ = env.step([0,0,0,12,12,6,0,0]); save_rgb_for_video(events)
+            for _ in range(12):
+                events = turn_up(env, 1)
+            curlevel = float(events['location_stats']['pos'][1])
+            if curlevel <= pre_level + 0.05:
+                stalled_steps += 1
+                if stalled_steps >= local_stalled_limit:
+                    break
+            else:
+                stalled_steps = 0
+        for _ in range(6):
+            events = turn_down(env, 1)
+        return curlevel >= y_level
+
+    if vertical_climb(max_vertical_attempts, stalled_limit):
+        return True
+    stalled_level = float(events['location_stats']['pos'][1])
+    if not allow_directional_recovery or max_direction_attempts == 0:
+        print(f"go_up stalled at {stalled_level} while targeting {y_level}; returning to caller.")
+        return False
+
+    print(
+        f"go_up stalled at {stalled_level}; trying up to "
+        f"{max_direction_attempts} escape headings."
+    )
+    for direction_idx in range(max_direction_attempts):
+        # One +45-degree yaw step gives eight evenly spaced horizontal headings.
+        events,_,_,_ = env.step([0,0,0,12,15,0,0,0]); save_rgb_for_video(events)
+
+        # Clear body, head, and diagonal-up space in the selected heading.
+        for _ in range(6):
+            events,_,_,_ = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+        events,_,_,_ = env.step([0,0,0,10,12,0,0,0]); save_rgb_for_video(events)
+        for _ in range(6):
+            events,_,_,_ = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+        events,_,_,_ = env.step([0,0,0,8,12,0,0,0]); save_rgb_for_video(events)
+        for _ in range(6):
+            events,_,_,_ = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+        events,_,_,_ = env.step([0,0,0,18,12,0,0,0]); save_rgb_for_video(events)
+
+        start_pos = np.array(events['location_stats']['pos'], dtype=float)
+        for _ in range(4):
+            events,_,_,_ = env.step([1,0,1,12,12,0,0,0]); save_rgb_for_video(events)
+        end_pos = np.array(events['location_stats']['pos'], dtype=float)
+        horizontal_delta = float(np.linalg.norm((end_pos - start_pos)[[0, 2]]))
+        print(
+            f"go_up escape heading {direction_idx + 1}/{max_direction_attempts}: "
+            f"horizontal_delta={horizontal_delta:.3f}, Y={end_pos[1]:.2f}."
+        )
+        if horizontal_delta <= 0.20:
+            continue
+
+        if go_up(
+            env,
+            y_level,
+            equipment="",
+            allow_directional_recovery=False,
+            max_direction_attempts=0,
+            max_vertical_attempts=3,
+            stalled_limit=2,
+        ):
+            print(f"go_up escaped through heading {direction_idx + 1}.")
+            return True
+        events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
+
+    final_level = float(events['location_stats']['pos'][1])
+    print(
+        f"go_up exhausted {max_direction_attempts} escape headings at Y={final_level} "
+        f"while targeting {y_level}."
+    )
+    return final_level >= y_level
 
 # Helper function.
 def turn_up(env, angle):
