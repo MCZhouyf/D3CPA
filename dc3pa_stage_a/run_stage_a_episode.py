@@ -27,6 +27,32 @@ from dc3pa_stage_a.inventory_write_logger import InventoryWriteLogger
 from dc3pa_stage_a.paper_config import PaperRunConfig, load
 
 
+class EnvironmentStepBudgetExceeded(RuntimeError):
+    """Raised before a task attempts its (max_steps + 1)-th environment step."""
+
+
+class StepBudgetEnv:
+    """Transparent MineDojo proxy that enforces a whole-episode step budget."""
+
+    def __init__(self, env: Any, max_steps: int) -> None:
+        if max_steps <= 0:
+            raise ValueError("max_steps must be positive")
+        self._env = env
+        self.max_steps = int(max_steps)
+        self.step_count = 0
+
+    def step(self, *args: Any, **kwargs: Any) -> Any:
+        if self.step_count >= self.max_steps:
+            raise EnvironmentStepBudgetExceeded(
+                f"environment_step_budget_exhausted: {self.max_steps} steps"
+            )
+        self.step_count += 1
+        return self._env.step(*args, **kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._env, name)
+
+
 def _json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -54,7 +80,9 @@ def _assert_formal_task(task_path: Path, taskset_manifest: Path) -> Mapping[str,
     raise ValueError(f"task is not in the frozen formal task manifest: {task_path}")
 
 
-def _stage6_payload(config: PaperRunConfig, snapshot_manifest: Path | None) -> Mapping[str, Any]:
+def _stage6_payload(
+    config: PaperRunConfig, snapshot_manifest: Path | None, max_env_steps: int | None = None
+) -> Mapping[str, Any]:
     if snapshot_manifest is not None and not snapshot_manifest.is_file():
         raise FileNotFoundError(snapshot_manifest)
     payload = {
@@ -63,7 +91,9 @@ def _stage6_payload(config: PaperRunConfig, snapshot_manifest: Path | None) -> M
             "max_execution_attempts": config.max_execution_attempts,
             "unresolved_plan_policy": "block",
             "planner_failure_policy": "reasoning_only",
-            "controller_exception_policy": "return_failure",
+            "controller_exception_policy": (
+                "raise" if max_env_steps is not None else "return_failure"
+            ),
             "goal_check_exception_policy": "return_failure",
             "memory_failure_policy": "trace",
             "require_goal_check": True,
@@ -170,6 +200,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--memory-root", type=Path)
     parser.add_argument("--development-encoders", action="store_true")
     parser.add_argument("--record-inventory-writes", action="store_true")
+    parser.add_argument(
+        "--max-env-steps",
+        type=int,
+        help="Whole-episode MineDojo env.step budget; no wall-clock limit is applied.",
+    )
     parser.add_argument("--dry-run", action="store_true")
     return parser
 
@@ -200,9 +235,13 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("snapshot manifests are only accepted for evaluate_readonly execution")
     if not args.openai_key or not args.gpt_model_name:
         raise ValueError("openai key and model name are required for execution")
+    if args.max_env_steps is not None and args.max_env_steps <= 0:
+        raise ValueError("--max-env-steps must be positive")
 
     stage6_config = run_root / "stage6_runtime_config.json"
-    stage6_config.write_text(json.dumps(_stage6_payload(config, args.snapshot_manifest), indent=2) + "\n", encoding="utf-8")
+    stage6_config.write_text(json.dumps(
+        _stage6_payload(config, args.snapshot_manifest, args.max_env_steps), indent=2
+    ) + "\n", encoding="utf-8")
     os.environ["DC3PA_WORLD_SEED"] = str(args.seed)
     os.environ["DC3PA_SIM_SEED"] = str(args.seed)
 
@@ -216,6 +255,7 @@ def main(argv: list[str] | None = None) -> int:
     trace = run_root / "stage6_trace.jsonl"
     memory_root = args.memory_root or (run_root / "memory")
     logger: InventoryWriteLogger | None = None
+    step_budget_env: StepBudgetEnv | None = None
     original_make = minedojo.make
     original_run_task = Stage6ClosedLoopRunner.run_task
     original_execute = LegacyControllerAdapter.execute
@@ -234,11 +274,10 @@ def main(argv: list[str] | None = None) -> int:
         return result
 
     def traced_make(*make_args: Any, **make_kwargs: Any):
-        nonlocal logger
+        nonlocal logger, step_budget_env
         env = original_make(*make_args, **make_kwargs)
-        if not args.record_inventory_writes:
-            return env
-        logger = InventoryWriteLogger(
+        if args.record_inventory_writes:
+            logger = InventoryWriteLogger(
             writes,
             context={
                 "run_id": args.run_id, "task": task_name, "tier": args.tier,
@@ -248,8 +287,11 @@ def main(argv: list[str] | None = None) -> int:
                 "legacy_task_hacks": os.environ["DC3PA_LEGACY_TASK_HACKS"],
                 "bounded_resource_fallback": os.environ["DC3PA_CONTROLLER_BOUNDED_RESOURCE_FALLBACK"],
             },
-        )
-        logger.install(env)
+            )
+            logger.install(env)
+        if args.max_env_steps is not None:
+            step_budget_env = StepBudgetEnv(env, args.max_env_steps)
+            return step_budget_env
         return env
 
     minedojo.make = traced_make
@@ -286,6 +328,13 @@ def main(argv: list[str] | None = None) -> int:
             "success": return_code == 0, "exit_code": return_code,
             "config_hash": config.config_hash(), "error": error,
             "wall_clock_seconds": time.monotonic() - started,
+            "environment_step_count": step_budget_env.step_count if step_budget_env else None,
+            "environment_step_budget": args.max_env_steps,
+            "termination_reason": (
+                "environment_step_budget_exhausted"
+                if "environment_step_budget_exhausted" in error
+                else "completed_or_other_error"
+            ),
             "attempt_count": len(attempts),
             "max_attempts_reached": bool(result is not None and not getattr(result, "success", False) and len(attempts) >= config.max_execution_attempts),
             "llm": _trace_metrics(trace),

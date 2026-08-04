@@ -280,3 +280,28 @@ def test_bootstrap_writes_are_counted_regardless_of_function_name():
     assert symmetry["per_mode"]["dc3pa"]["substitute_calls"] == 2
 
     assert attribute_write({"caller_chain": []}) == "unattributed"
+
+
+class _StepEnv:
+    def __init__(self):
+        self.calls = 0
+
+    def step(self, action):
+        self.calls += 1
+        return action
+
+
+def test_step_budget_env_allows_exact_budget_then_raises():
+    from dc3pa_stage_a.run_stage_a_episode import (
+        EnvironmentStepBudgetExceeded,
+        StepBudgetEnv,
+    )
+
+    base = _StepEnv()
+    env = StepBudgetEnv(base, 2)
+    assert env.step("first") == "first"
+    assert env.step("second") == "second"
+    assert env.step_count == 2
+    with pytest.raises(EnvironmentStepBudgetExceeded, match="12000|2 steps"):
+        env.step("third")
+    assert base.calls == 2
