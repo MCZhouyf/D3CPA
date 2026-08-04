@@ -1,0 +1,172 @@
+{
+  "schema_version": 1,
+  "purpose": "Stage A disabled-memory diagnostic plan; not a paper configuration",
+  "frozen_config_manifest": "configs/stage_a_diagnostic_manifest.json",
+  "formal_taskset_manifest": "configs/stage_a_formal_taskset_manifest.json",
+  "groups": {
+    "G1_scope_and_bootstrap": {
+      "description": "Static deep-mining candidates plus conservative wooden-pick/cobblestone bootstrap-chain candidates.",
+      "tasks": [
+        {
+          "task": "craft wooden pickaxe",
+          "tier": "easy"
+        },
+        {
+          "task": "mine cobblestone",
+          "tier": "medium"
+        },
+        {
+          "task": "mine coal ore",
+          "tier": "medium"
+        },
+        {
+          "task": "craft furnace",
+          "tier": "medium"
+        },
+        {
+          "task": "craft stone pickaxe",
+          "tier": "medium"
+        },
+        {
+          "task": "mine iron ore",
+          "tier": "medium"
+        },
+        {
+          "task": "smelt iron ingot",
+          "tier": "hard"
+        },
+        {
+          "task": "craft iron pickaxe",
+          "tier": "hard"
+        },
+        {
+          "task": "obtain diamond",
+          "tier": "complex"
+        },
+        {
+          "task": "mine redstone",
+          "tier": "complex"
+        }
+      ],
+      "runtime_modes": [
+        "mp5_legacy",
+        "reasoning_only",
+        "dc3pa"
+      ],
+      "seeds": [
+        31001,
+        31002,
+        31003,
+        31004,
+        31005,
+        31006
+      ],
+      "episodes": 180
+    },
+    "G2_breadth": {
+      "description": "Two non-G1 tasks in each of five tiers.",
+      "tasks": [
+        {
+          "task": "mine log",
+          "tier": "basic"
+        },
+        {
+          "task": "craft stick",
+          "tier": "basic"
+        },
+        {
+          "task": "craft chest",
+          "tier": "easy"
+        },
+        {
+          "task": "craft boat",
+          "tier": "easy"
+        },
+        {
+          "task": "craft lever",
+          "tier": "medium"
+        },
+        {
+          "task": "craft stone axe",
+          "tier": "medium"
+        },
+        {
+          "task": "smelt glass",
+          "tier": "hard"
+        },
+        {
+          "task": "craft iron bars",
+          "tier": "hard"
+        },
+        {
+          "task": "craft dropper",
+          "tier": "complex"
+        },
+        {
+          "task": "craft compass",
+          "tier": "complex"
+        }
+      ],
+      "runtime_modes": [
+        "mp5_legacy",
+        "reasoning_only",
+        "dc3pa"
+      ],
+      "seeds": [
+        31001,
+        31002
+      ],
+      "episodes": 60
+    },
+    "G3_logger_ab": {
+      "description": "Logger on/off paired diagnostic; dc3pa only, no performance claim.",
+      "tasks": [
+        {
+          "task": "mine log",
+          "tier": "basic"
+        },
+        {
+          "task": "craft chest",
+          "tier": "easy"
+        }
+      ],
+      "runtime_modes": [
+        "dc3pa"
+      ],
+      "seeds": [
+        31001,
+        31002,
+        31003
+      ],
+      "logger_states": [
+        "on",
+        "off"
+      ],
+      "episodes": 12
+    }
+  },
+  "pilot": {
+    "tasks": [
+      {
+        "task": "mine log",
+        "tier": "basic"
+      },
+      {
+        "task": "obtain diamond",
+        "tier": "complex"
+      }
+    ],
+    "runtime_modes": [
+      "mp5_legacy",
+      "reasoning_only",
+      "dc3pa"
+    ],
+    "seeds": [
+      31001
+    ],
+    "logger": "on",
+    "episodes": 6
+  },
+  "total_full_diagnostic_episodes": 252,
+  "execution_rule": "Run pilot first. If extrapolated wall-clock exceeds 8 hours, mark threshold crossed and request a scale decision; do not scale unilaterally."
+}

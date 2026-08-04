@@ -73,6 +73,20 @@ class PaperRunConfig:
         if isinstance(self.max_execution_attempts, bool) or self.max_execution_attempts <= 0:
             raise ValueError("max_execution_attempts must be a positive integer")
 
+        # Diagnostic runs may use memory_mode="disabled": it needs no frozen
+        # snapshot, writes nothing, and is identical across runtime modes, so it
+        # is a legitimate symmetric baseline for substitute-scope and symmetry
+        # measurement. It must never be used for reported paper results.
+        if self.memory_mode == "disabled":
+            if self.record_legacy_workflow_memory or self.record_multimodal_memory:
+                raise ValueError(
+                    "memory_mode='disabled' forbids long-term memory recording"
+                )
+            if not self.notes.strip():
+                raise ValueError(
+                    "memory_mode='disabled' is diagnostic only; record why in notes"
+                )
+
         # Evaluation runs must not write long-term memory.
         if self.memory_mode == "evaluate_readonly":
             if self.record_legacy_workflow_memory or self.record_multimodal_memory:

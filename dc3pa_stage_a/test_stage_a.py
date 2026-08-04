@@ -221,3 +221,62 @@ def test_report_and_markdown_render(loaded, tmp_path):
         assert heading in markdown
     (tmp_path / "out.md").write_text(markdown, encoding="utf-8")
     assert (tmp_path / "out.md").read_text(encoding="utf-8").startswith("# Stage A analysis")
+
+
+# ------------------------------------------- write classification (corrected)
+
+
+def test_empty_grant_is_not_a_substitute_write():
+    """Episode setup calls set_inventory([]) and must never be counted."""
+    from dc3pa_stage_a.analyze_stage_a import is_substitute_write
+
+    assert is_substitute_write({"granted": {}}) is False
+    assert is_substitute_write({"granted": {"iron ore": 0}}) is False
+    assert is_substitute_write({"granted": {"iron ore": 3}}) is True
+
+
+def test_bootstrap_writes_are_counted_regardless_of_function_name():
+    """Inclusion must not depend on a function-name allowlist.
+
+    ``ensure_wooden_bootstrap`` / ``_fallback_craft_bootstrap_item`` also write
+    inventory, and their gating cannot be settled statically. An allowlist keyed
+    on the deep-mining fallbacks would silently under-count them.
+    """
+    from dc3pa_stage_a.analyze_stage_a import attribute_write, mode_symmetry, substitute_scope
+
+    episodes = [
+        {"task": "craft boat", "tier": "easy", "seed": 1, "runtime_mode": "dc3pa"},
+        {"task": "obtain diamond", "tier": "complex", "seed": 1, "runtime_mode": "dc3pa"},
+    ]
+    writes = [
+        {  # episode-start reset: excluded
+            "task": "craft boat", "seed": 1, "runtime_mode": "dc3pa",
+            "granted": {},
+            "caller_chain": [{"file": "run_agent.py", "function": "single_task_evaluate"}],
+        },
+        {  # bootstrap write on a task the static gate would call unaffected
+            "task": "craft boat", "seed": 1, "runtime_mode": "dc3pa",
+            "granted": {"wooden pickaxe": 1},
+            "caller_chain": [{"file": "controller.py", "function": "_fallback_craft_wooden_pickaxe"}],
+        },
+        {
+            "task": "obtain diamond", "seed": 1, "runtime_mode": "dc3pa",
+            "granted": {"iron ore": 3},
+            "caller_chain": [{"file": "controller.py", "function": "_fallback_mine_diamond_resource"}],
+        },
+    ]
+
+    scope = substitute_scope(writes, episodes)
+    assert scope["raw_write_records"] == 3
+    assert scope["substitute_write_records"] == 2
+    # the boat task IS affected, even though task-name gating would not predict it
+    assert set(scope["affected_tasks"]) == {"craft boat", "obtain diamond"}
+    assert scope["calls_by_function"] == {
+        "_fallback_craft_wooden_pickaxe": 1,
+        "_fallback_mine_diamond_resource": 1,
+    }
+
+    symmetry = mode_symmetry(writes, episodes)
+    assert symmetry["per_mode"]["dc3pa"]["substitute_calls"] == 2
+
+    assert attribute_write({"caller_chain": []}) == "unattributed"

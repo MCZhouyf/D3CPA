@@ -13,6 +13,7 @@ import hashlib
 import json
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -53,10 +54,10 @@ def _assert_formal_task(task_path: Path, taskset_manifest: Path) -> Mapping[str,
     raise ValueError(f"task is not in the frozen formal task manifest: {task_path}")
 
 
-def _stage6_payload(config: PaperRunConfig, snapshot_manifest: Path) -> Mapping[str, Any]:
-    if not snapshot_manifest.is_file():
+def _stage6_payload(config: PaperRunConfig, snapshot_manifest: Path | None) -> Mapping[str, Any]:
+    if snapshot_manifest is not None and not snapshot_manifest.is_file():
         raise FileNotFoundError(snapshot_manifest)
-    return {
+    payload = {
         "runtime": {
             "mode": config.runtime_mode,
             "max_execution_attempts": config.max_execution_attempts,
@@ -72,7 +73,6 @@ def _stage6_payload(config: PaperRunConfig, snapshot_manifest: Path) -> Mapping[
             "capture_final_scene": True,
             "memory_mode": config.memory_mode,
             "telemetry_enabled": True,
-            "memory_snapshot_manifest": str(snapshot_manifest.resolve()),
         },
         "hybrid_probability": {
             "visual_similarity_weight": 0.7,
@@ -99,11 +99,59 @@ def _stage6_payload(config: PaperRunConfig, snapshot_manifest: Path) -> Mapping[
     }
 
 
+    if snapshot_manifest is not None:
+        payload["runtime"]["memory_snapshot_manifest"] = str(snapshot_manifest.resolve())
+    return payload
+
 def _append_jsonl(path: Path, record: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(dict(record), sort_keys=True, ensure_ascii=False) + "\n")
 
+
+
+def _trace_metrics(path: Path) -> dict[str, Any]:
+    completed = failed = 0
+    token_usage = []
+    if path.is_file():
+        for raw in path.read_text(encoding="utf-8").splitlines():
+            try:
+                record = json.loads(raw)
+            except json.JSONDecodeError:
+                continue
+            event_type = record.get("event_type")
+            if event_type == "llm_call_completed":
+                completed += 1
+            elif event_type == "llm_call_failed":
+                failed += 1
+            payload = record.get("payload") or {}
+            usage = payload.get("usage")
+            if isinstance(usage, Mapping):
+                token_usage.append(dict(usage))
+    return {
+        "llm_calls_completed": completed,
+        "llm_calls_failed": failed,
+        "token_usage": token_usage or None,
+        "token_usage_status": "provider_not_exposed_in_stage6_trace" if not token_usage else "captured",
+    }
+
+
+def _action_sequence(controller_results: list[Any]) -> list[dict[str, Any]]:
+    sequence: list[dict[str, Any]] = []
+    for result in controller_results:
+        for event in getattr(result, "telemetry", ()):
+            if getattr(event, "event_type", "") != "action_started":
+                continue
+            payload = getattr(event, "payload", {}) or {}
+            sequence.append({
+                "plan_id": str(getattr(event, "plan_id", "")),
+                "plan_version": int(getattr(event, "plan_version", 0)),
+                "step_id": str(getattr(event, "step_id", "")),
+                "step_index": int(getattr(event, "step_index", -1)),
+                "action_index": int(getattr(event, "action_index", -1)),
+                "action": dict(payload.get("action") or {}),
+            })
+    return sequence
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run one frozen Stage A episode")
@@ -121,6 +169,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--gpt-model-name", default=os.environ.get("GPT_MODEL_NAME", ""))
     parser.add_argument("--memory-root", type=Path)
     parser.add_argument("--development-encoders", action="store_true")
+    parser.add_argument("--record-inventory-writes", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     return parser
 
@@ -145,8 +194,10 @@ def main(argv: list[str] | None = None) -> int:
             "task_json_sha256": _sha256(args.task),
         }, sort_keys=True))
         return 0
-    if args.snapshot_manifest is None:
+    if config.memory_mode == "evaluate_readonly" and args.snapshot_manifest is None:
         raise ValueError("--snapshot-manifest is required for evaluate_readonly execution")
+    if config.memory_mode != "evaluate_readonly" and args.snapshot_manifest is not None:
+        raise ValueError("snapshot manifests are only accepted for evaluate_readonly execution")
     if not args.openai_key or not args.gpt_model_name:
         raise ValueError("openai key and model name are required for execution")
 
@@ -156,6 +207,8 @@ def main(argv: list[str] | None = None) -> int:
     os.environ["DC3PA_SIM_SEED"] = str(args.seed)
 
     import minedojo
+    from dc3pa.integration.controller import LegacyControllerAdapter
+    from dc3pa.integration.runtime import Stage6ClosedLoopRunner
     from scripts_dc3pa import stage6_run_minecraft
 
     writes = run_root / "inventory_writes.jsonl"
@@ -164,10 +217,27 @@ def main(argv: list[str] | None = None) -> int:
     memory_root = args.memory_root or (run_root / "memory")
     logger: InventoryWriteLogger | None = None
     original_make = minedojo.make
+    original_run_task = Stage6ClosedLoopRunner.run_task
+    original_execute = LegacyControllerAdapter.execute
+    task_results: list[Any] = []
+    controller_results: list[Any] = []
+    started = time.monotonic()
+
+    def observed_run_task(self: Any, *run_args: Any, **run_kwargs: Any):
+        result = original_run_task(self, *run_args, **run_kwargs)
+        task_results.append(result)
+        return result
+
+    def observed_execute(self: Any, *execute_args: Any, **execute_kwargs: Any):
+        result = original_execute(self, *execute_args, **execute_kwargs)
+        controller_results.append(result)
+        return result
 
     def traced_make(*make_args: Any, **make_kwargs: Any):
         nonlocal logger
         env = original_make(*make_args, **make_kwargs)
+        if not args.record_inventory_writes:
+            return env
         logger = InventoryWriteLogger(
             writes,
             context={
@@ -183,6 +253,8 @@ def main(argv: list[str] | None = None) -> int:
         return env
 
     minedojo.make = traced_make
+    Stage6ClosedLoopRunner.run_task = observed_run_task
+    LegacyControllerAdapter.execute = observed_execute
     return_code = 1
     error = ""
     try:
@@ -201,14 +273,24 @@ def main(argv: list[str] | None = None) -> int:
         raise
     finally:
         minedojo.make = original_make
+        Stage6ClosedLoopRunner.run_task = original_run_task
+        LegacyControllerAdapter.execute = original_execute
         if logger is not None:
             logger.uninstall()
+        result = task_results[-1] if task_results else None
+        attempts = tuple(getattr(result, "attempts", ()) or ())
         _append_jsonl(episodes, {
             "run_id": args.run_id, "task": task_name, "tier": args.tier,
             "seed": args.seed, "runtime_mode": config.runtime_mode,
             "memory_mode": config.memory_mode, "traversal": args.traversal,
             "success": return_code == 0, "exit_code": return_code,
             "config_hash": config.config_hash(), "error": error,
+            "wall_clock_seconds": time.monotonic() - started,
+            "attempt_count": len(attempts),
+            "max_attempts_reached": bool(result is not None and not getattr(result, "success", False) and len(attempts) >= config.max_execution_attempts),
+            "llm": _trace_metrics(trace),
+            "action_sequence": _action_sequence(controller_results),
+            "stage6_result": result.to_dict() if result is not None else None,
         })
     return return_code
 

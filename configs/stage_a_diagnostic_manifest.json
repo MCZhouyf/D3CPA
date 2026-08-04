@@ -1,0 +1,31 @@
+{
+  "purpose": "Stage A diagnostic only; no paper claims",
+  "memory_mode": "disabled",
+  "notes": "Stage A diagnostic run: memory disabled so substitute scope and per-mode symmetry are measured without memory as a confound; not a paper configuration.",
+  "runtime_mode_hashes": {
+    "mp5_legacy": "afc885655ea7f83c42a526d766b01715802850601a6b7645e8cd5cbd59f745fa",
+    "reasoning_only": "5d3330dcb4e269aef00715bb4ff6bb78e56fc5d6ecfefca55d17abb1aaa88073",
+    "dc3pa": "f4ac040286b343c57a8b45296bf2a053bcbbe8565877980665119c14a5209002"
+  },
+  "shared_non_mode_hash": "39db0a3a61a6a96a4fde346c9cd544ef9831faf666d1b31cea49f993c0df89e7",
+  "mode_invariance_assertion": "All three serialized dicts are identical after removing runtime_mode.",
+  "option_b": {
+    "DC3PA_LEGACY_TASK_HACKS": "0",
+    "DC3PA_CONTROLLER_BOUNDED_RESOURCE_FALLBACK": "1"
+  },
+  "pilot": {
+    "tasks": [
+      "mine log",
+      "obtain diamond"
+    ],
+    "tiers": [
+      "basic",
+      "complex"
+    ],
+    "seeds": [
+      31001
+    ],
+    "episodes": 6,
+    "logger": "on"
+  }
+}

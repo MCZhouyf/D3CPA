@@ -40,39 +40,6 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 # --------------------------------------------------------------------------- IO
 
 
-_SUBSTITUTE_CALLERS = {
-    "_fallback_mine_diamond_resource",
-    "_fallback_craft_diamond_item",
-    "_fallback_craft_wooden_pickaxe",
-    "_fallback_craft_bootstrap_item",
-    "_fallback_craft_stone_pickaxe",
-    "ensure_wooden_bootstrap",
-    "_gather_logs",
-}
-
-
-def is_substitute_write(record: Mapping[str, Any]) -> bool:
-    """Return True only for a positive controller-level substitute write.
-
-    The logger deliberately records every inventory write, including the normal
-    empty-inventory reset at episode start. Scope and symmetry tables must not
-    count that reset as a low-level substitute invocation.
-    """
-    if not (record.get("granted") or {}):
-        return False
-    caller_chain = record.get("caller_chain")
-    if not caller_chain:
-        # Legacy/truncated evidence lacks a stack; preserve the package's
-        # historical convention that positive grants in such evidence are
-        # substitute records. Newly collected Stage A evidence always has one.
-        return True
-    return any(
-        frame.get("function") in _SUBSTITUTE_CALLERS
-        for frame in caller_chain
-        if isinstance(frame, Mapping)
-    )
-
-
 def read_jsonl(path: str | Path) -> List[Dict[str, Any]]:
     records: List[Dict[str, Any]] = []
     with Path(path).open("r", encoding="utf-8") as handle:
@@ -96,6 +63,44 @@ def _episode_key(record: Mapping[str, Any]) -> Tuple[Any, Any, Any, Any]:
     )
 
 
+# ------------------------------------------------------- write classification
+
+#: Episode setup performs ``env.set_inventory([])`` to clear the inventory.
+#: That call grants nothing and must never be counted as a substitute event.
+#:
+#: The inclusion rule is deliberately **not** a function-name allowlist. Static
+#: inspection of ``agent/controller.py`` shows inventory-writing helpers
+#: (``ensure_wooden_bootstrap``, ``_fallback_craft_bootstrap_item``,
+#: ``_fallback_craft_stone_pickaxe`` …) reachable from call sites whose gating
+#: cannot be settled statically, so any allowlist risks silently under-counting
+#: the very thing Stage A must bound. The caller chain is therefore used for
+#: *attribution only*.
+
+
+def is_substitute_write(record: Mapping[str, Any]) -> bool:
+    """True when this ``set_inventory`` call actually granted something.
+
+    A write counts when at least one item's quantity increased relative to the
+    previous whole-inventory snapshot. Empty grants (episode-start resets,
+    re-writes of an unchanged inventory) are excluded.
+    """
+    granted = record.get("granted") or {}
+    return any(int(quantity) > 0 for quantity in granted.values())
+
+
+def attribute_write(record: Mapping[str, Any]) -> str:
+    """Name the repository function responsible for a write, for reporting."""
+    for frame in record.get("caller_chain") or []:
+        function = frame.get("function")
+        if function and not str(function).startswith("<"):
+            return str(function)
+    return "unattributed"
+
+
+def substitute_writes(records: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
+    return [dict(record) for record in records if is_substitute_write(record)]
+
+
 # ----------------------------------------------------------------- A. scope
 
 
@@ -112,7 +117,9 @@ def substitute_scope(
 
     granted_by_task: Dict[Any, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
     calls_by_task: Dict[Any, int] = defaultdict(int)
-    for write in filter(is_substitute_write, writes):
+    calls_by_function: Dict[str, int] = defaultdict(int)
+    for write in substitute_writes(writes):
+        calls_by_function[attribute_write(write)] += 1
         task = write.get("task")
         calls_by_task[task] += 1
         for item, quantity in (write.get("granted") or {}).items():
@@ -143,6 +150,9 @@ def substitute_scope(
             str(task): dict(sorted(items.items()))
             for task, items in sorted(granted_by_task.items(), key=lambda kv: str(kv[0]))
         },
+        "calls_by_function": dict(sorted(calls_by_function.items())),
+        "raw_write_records": len(writes),
+        "substitute_write_records": sum(1 for w in writes if is_substitute_write(w)),
     }
 
 
@@ -167,7 +177,7 @@ def mode_symmetry(
     calls_by_mode: Dict[Any, int] = defaultdict(int)
     items_by_mode: Dict[Any, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
     episodes_with_substitute: Dict[Any, set] = defaultdict(set)
-    for write in filter(is_substitute_write, writes):
+    for write in substitute_writes(writes):
         mode = write.get("runtime_mode")
         calls_by_mode[mode] += 1
         episodes_with_substitute[mode].add((write.get("task"), write.get("seed")))
