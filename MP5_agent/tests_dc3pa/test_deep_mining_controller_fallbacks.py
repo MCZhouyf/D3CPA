@@ -336,3 +336,26 @@ def test_dig_down_normalizes_legacy_wooden_pickaxe_target(monkeypatch):
     assert underground
     assert called == [(env, 50, "wooden pickaxe")]
     assert workflow["workflow"][0]["actions"][0]["args"]["y_level"] == 50
+
+
+def test_downstream_craft_materials_cap_cobblestone_collection():
+    workflow = [
+        {"times": "20", "actions": [{"name": "mine", "args": {"obj": "cobblestone"}}]},
+        {"times": "1", "actions": [{"name": "craft", "args": {"obj": {"furnace": 1}, "materials": {"cobblestone": 8}}}]},
+        {"times": "1", "actions": [{"name": "craft", "args": {"obj": {"stone pickaxe": 1}, "materials": {"cobblestone": 3, "stick": 2}}}]},
+    ]
+
+    assert Controller._workflow_material_requirement(workflow, 0, "cobblestone", 20) == 11
+
+
+def test_downstream_material_requirement_drives_cobblestone_skip(monkeypatch):
+    controller = _controller({"cobblestone": 11})
+    monkeypatch.setattr("controller.legacy_task_hacks_enabled", lambda: False)
+    monkeypatch.setenv("DC3PA_CONTROLLER_BOUNDED_RESOURCE_FALLBACK", "1")
+
+    assert controller._should_skip_diamond_action(
+        {"name": "mine", "args": {"obj": "cobblestone", "tool": "wooden pickaxe"}},
+        20,
+        {"task": "diamond"},
+        required_quantity=11,
+    )

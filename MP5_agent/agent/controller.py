@@ -254,6 +254,25 @@ class Controller:
             required_quantity = max(required_quantity, 3)
         return required_quantity
 
+    @staticmethod
+    def _workflow_material_requirement(workflow, after_step_index, inventory_obj, fallback_quantity):
+        """Infer a mined resource's required total from downstream craft inputs.
+
+        This intentionally derives demand from the LLM workflow itself rather
+        than keeping a resource/recipe registry in the controller.
+        """
+        inventory_obj = normalize_inventory_name(inventory_obj)
+        required_quantity = 0
+        for step in workflow[after_step_index + 1:]:
+            repetitions = max(1, int(step.get("times", 1)))
+            for action in step.get("actions", []):
+                if action.get("name") != "craft":
+                    continue
+                for material, quantity in action.get("args", {}).get("materials", {}).items():
+                    if normalize_inventory_name(material) == inventory_obj:
+                        required_quantity += repetitions * int(quantity)
+        return max(1, required_quantity or int(fallback_quantity))
+
     def _fallback_craft_diamond_item(self, env, crafted_obj, target_quantity):
         crafted_obj = normalize_inventory_name(crafted_obj)
         inventory = self.memory.inventory
@@ -354,8 +373,9 @@ class Controller:
                     self.ensure_wooden_bootstrap(env, underground=False)
                 self._fallback_craft_bootstrap_item(env, "stick", 2)
 
-    def _ensure_diamond_resource_before_action(self, env, action, step_times):
+    def _ensure_diamond_resource_before_action(self, env, action, step_times, required_quantity=None):
         name = action["name"]
+        action_requirement = int(required_quantity or step_times)
         if name not in {"find", "move_to", "mine"}:
             return False
 
@@ -364,7 +384,7 @@ class Controller:
             return self._fallback_mine_diamond_resource(
                 env,
                 "coal",
-                self._deep_mining_required_quantity("coal", step_times),
+                self._deep_mining_required_quantity("coal", action_requirement),
             )
         if target == "iron ore":
             if self.memory.inventory.get("stone pickaxe", 0) < 1 and self._has_stone_pickaxe_materials():
@@ -372,7 +392,7 @@ class Controller:
             return self._fallback_mine_diamond_resource(
                 env,
                 "iron ore",
-                self._deep_mining_required_quantity("iron ore", step_times),
+                self._deep_mining_required_quantity("iron ore", action_requirement),
             )
         if target == "furnace":
             return self.memory.inventory.get("furnace", 0) >= 1
@@ -380,7 +400,7 @@ class Controller:
             return self._fallback_mine_diamond_resource(
                 env,
                 target,
-                self._deep_mining_required_quantity(target, step_times),
+                self._deep_mining_required_quantity(target, action_requirement),
             )
 
         return False
@@ -397,7 +417,7 @@ class Controller:
 
         return None
 
-    def _should_skip_diamond_action(self, action, step_times, task_information):
+    def _should_skip_diamond_action(self, action, step_times, task_information, required_quantity=None):
         if not self._is_deep_mining_task(task_information):
             return False
 
@@ -422,7 +442,7 @@ class Controller:
         if name == "equip" and target == "wooden pickaxe" and inventory.get("wooden pickaxe", 0) >= 1:
             return True
 
-        if target == "cobblestone" and inventory.get("cobblestone", 0) >= max(3, int(step_times)):
+        if target == "cobblestone" and inventory.get("cobblestone", 0) >= int(required_quantity or max(3, int(step_times))):
             return True
 
         if target == "coal" and inventory.get("coal", 0) >= self._deep_mining_required_quantity("coal", step_times):
@@ -776,11 +796,17 @@ class Controller:
                     '''
                     print(f"action is {action['name']},and  args is {action['args']}")
                     name, args = action['name'], action['args']
+                    action_target = self._diamond_action_target(action)
+                    action_required_quantity = self._workflow_material_requirement(
+                        workflow, step_index, action_target, times
+                    ) if action_target else times
                     emit_action_started(step, step_index, action_index, action, events)
 
                     if (
                         self._is_deep_mining_task(task_information)
-                        and self._ensure_diamond_resource_before_action(env, action, times)
+                        and self._ensure_diamond_resource_before_action(
+                            env, action, times, action_required_quantity
+                        )
                     ):
                         print(
                             f"Skipping deep mining resource action before env sync: {action}; "
@@ -790,7 +816,9 @@ class Controller:
                             mine_finish = True
                         emit_action_finished(step, step_index, action_index, action, "skipped_satisfied")
                         continue
-                    if self._should_skip_diamond_action(action, times, task_information):
+                    if self._should_skip_diamond_action(
+                        action, times, task_information, action_required_quantity
+                    ):
                         print(
                             f"Skipping deep mining action before env sync: {action}; "
                             f"inventory={self.memory.inventory}"
@@ -812,7 +840,9 @@ class Controller:
 
                     if (
                         self._is_deep_mining_task(task_information)
-                        and self._ensure_diamond_resource_before_action(env, action, times)
+                        and self._ensure_diamond_resource_before_action(
+                            env, action, times, action_required_quantity
+                        )
                     ):
                         print(
                             f"Skipping deep mining resource action after bounded resource fallback: {action}; "
@@ -821,7 +851,9 @@ class Controller:
                         emit_action_finished(step, step_index, action_index, action, "skipped_satisfied")
                         continue
 
-                    if self._should_skip_diamond_action(action, times, task_information):
+                    if self._should_skip_diamond_action(
+                        action, times, task_information, action_required_quantity
+                    ):
                         print(
                             f"Skipping deep mining action already covered by inventory: {action}; "
                             f"inventory={self.memory.inventory}"
@@ -891,7 +923,9 @@ class Controller:
                                 and self._fallback_mine_diamond_resource(
                                     env,
                                     inventory_obj,
-                                    self._deep_mining_required_quantity(inventory_obj, times),
+                                    self._deep_mining_required_quantity(
+                                        inventory_obj, action_required_quantity
+                                    ),
                                 )
                             ):
                                 print(
@@ -1015,7 +1049,7 @@ class Controller:
 
                         self.memory.update_inventory(count_inventory(inventory_name_list, inventory_num_list))
                         new_quantity = self.memory.inventory.get(inventory_obj, 0)
-                        if new_quantity <= old_quantity and new_quantity < times:
+                        if new_quantity <= old_quantity and new_quantity < action_required_quantity:
                             if attempt_idx < execution_attempts - 1:
                                 print(
                                     f"Mine attempt {attempt_idx + 1}/{execution_attempts} did not add {inventory_obj}; "
@@ -1034,7 +1068,9 @@ class Controller:
                                 break
                             if (
                                 self._is_deep_mining_task(task_information)
-                                and self._fallback_mine_diamond_resource(env, inventory_obj, times)
+                                and self._fallback_mine_diamond_resource(
+                                    env, inventory_obj, action_required_quantity
+                                )
                             ):
                                 new_quantity = self.memory.inventory.get(inventory_obj, 0)
                                 mine_finish = True
@@ -1057,7 +1093,10 @@ class Controller:
                             }
                             return finish_failure(step, step_index, action_index, action, check_result, underground)
                         #print(f"mine----update_inventory is{self.memory.inventory}")
-                        if inventory_obj in self.memory.inventory.keys() and int(self.memory.inventory[inventory_obj]) >= times:
+                        if (
+                            inventory_obj in self.memory.inventory
+                            and int(self.memory.inventory[inventory_obj]) >= action_required_quantity
+                        ):
                             mine_finish = True
                         emit_action_finished(step, step_index, action_index, action, "success", check_result)
 
