@@ -116,6 +116,32 @@ def test_gather_logs_falls_back_after_bounded_failed_attempts(monkeypatch):
     assert env.set_inventory_calls
 
 
+class StepCountingFakeEnv(FakeEnv):
+    def __init__(self, memory):
+        super().__init__(memory)
+        self.step_count = 0
+
+    def step(self, action):
+        self.step_count += 1
+        return super().step(action)
+
+
+def test_gather_logs_defers_callback_until_100_environment_steps(monkeypatch):
+    controller = _controller()
+    env = StepCountingFakeEnv(controller.memory)
+
+    monkeypatch.setattr("controller.check_find", lambda *args, **kwargs: False)
+    monkeypatch.setattr("controller.approach", lambda *args, **kwargs: False)
+    monkeypatch.setattr(
+        "controller.explore_above_ground_none", lambda *args, **kwargs: None
+    )
+
+    assert controller._gather_logs(env, underground=False, target_logs=2)
+    assert env.step_count >= 100
+    assert controller.memory.inventory["log"] == 2.0
+    assert env.set_inventory_calls
+
+
 def test_wooden_bootstrap_uses_deterministic_craft_fallbacks(monkeypatch):
     controller = _controller()
     env = FakeEnv(controller.memory)

@@ -515,12 +515,59 @@ class Controller:
 
         return has_inventory_goal and all_satisfied
 
+    _LOG_CALLBACK_DELAY_STEPS = 100
+
+    def _begin_log_callback_window(self, env, target_logs):
+        """Start one real-environment-step window for a missing log request."""
+        step_count = getattr(env, "step_count", None)
+        if not isinstance(step_count, int):
+            return None
+        state = getattr(self, "_log_callback_window", None)
+        current_logs = self.memory.inventory.get("log", 0)
+        if (
+            not isinstance(state, dict)
+            or current_logs >= int(state.get("target_logs", 0))
+        ):
+            state = {"start_step": step_count, "target_logs": int(target_logs)}
+            self._log_callback_window = state
+            print(
+                "Log callback window started: "
+                f"target={target_logs}, delay={self._LOG_CALLBACK_DELAY_STEPS} environment steps."
+            )
+        else:
+            state["target_logs"] = max(int(state["target_logs"]), int(target_logs))
+        return state
+
+    def _log_callback_due(self, env, target_logs):
+        state = self._begin_log_callback_window(env, target_logs)
+        if state is None:
+            # Unit-test and non-budgeted legacy environments do not expose a
+            # trusted global step counter, so retain their bounded behavior.
+            return True
+        return getattr(env, "step_count") - state["start_step"] >= self._LOG_CALLBACK_DELAY_STEPS
+
+    def _complete_log_callback_window(self):
+        self._log_callback_window = None
+
     def _gather_logs(self, env, underground, target_logs, max_attempts=2):
-        for attempt_idx in range(max_attempts):
+        """Attempt normal gathering until 100 real steps, then callback exactly once."""
+        self._begin_log_callback_window(env, target_logs)
+        attempt_idx = 0
+        has_step_counter = isinstance(getattr(env, "step_count", None), int)
+        while True:
             self._sync_memory(env)
             if self.memory.inventory.get("log", 0) >= target_logs:
+                self._complete_log_callback_window()
                 return True
-            print(f"Bootstrap log gather attempt {attempt_idx + 1}/{max_attempts}")
+            if has_step_counter and self._log_callback_due(env, target_logs):
+                break
+            if not has_step_counter and attempt_idx >= max_attempts:
+                break
+            attempt_idx += 1
+            print(
+                f"Bootstrap log gather attempt {attempt_idx} "
+                f"before {self._LOG_CALLBACK_DELAY_STEPS}-step callback."
+            )
             check_find(env, self.memory, "log", underground)
             if not approach(env=env, memory=self.memory, object="log", underground=underground):
                 explore_above_ground_none(env, self.memory, "nothing", underground, 3)
@@ -535,12 +582,16 @@ class Controller:
             )
             self.memory.update_inventory(count_inventory(inventory_name_list, inventory_num_list))
             if self.memory.inventory.get("log", 0) >= target_logs:
+                self._complete_log_callback_window()
                 return True
             if self.memory.inventory.get("log", 0) > old_quantity:
                 for extra_mine_idx in range(3):
                     self._sync_memory(env)
                     if self.memory.inventory.get("log", 0) >= target_logs:
+                        self._complete_log_callback_window()
                         return True
+                    if has_step_counter and self._log_callback_due(env, target_logs):
+                        break
                     chained_old_quantity = self.memory.inventory.get("log", 0)
                     print(f"Bootstrap chained log mine {extra_mine_idx + 1}/3")
                     inventory_name_list, inventory_num_list = mine(
@@ -554,14 +605,18 @@ class Controller:
                     if self.memory.inventory.get("log", 0) <= chained_old_quantity:
                         break
                 if self.memory.inventory.get("log", 0) >= target_logs:
+                    self._complete_log_callback_window()
                     return True
         if not underground and self.memory.inventory.get("log", 0) < target_logs:
             print(
-                "Fallback adding logs after bounded MineDojo log-gather attempts: "
-                f"{self.memory.inventory.get('log', 0)} -> {target_logs}"
+                "Log callback fired after 100 environment steps; adding only the "
+                f"requested logs: {self.memory.inventory.get('log', 0)} -> {target_logs}"
             )
             self._set_inventory_from_memory(env, {"log": target_logs})
-        return self.memory.inventory.get("log", 0) >= target_logs
+        if self.memory.inventory.get("log", 0) >= target_logs:
+            self._complete_log_callback_window()
+            return True
+        return False
 
     def _craft_bootstrap_item(self, env, craft_name, use_crafting_table, craft_num=1):
         inventory_name_list, inventory_num_list = action_craft(
@@ -814,6 +869,11 @@ class Controller:
                             "item": action_target,
                             "quantity": action_required_quantity,
                         }
+                        if action_target == "log":
+                            self._begin_log_callback_window(
+                                env,
+                                self.memory.inventory.get("log", 0) + max(1, times),
+                            )
                     else:
                         self.memory._dc3pa_active_resource_goal = None
                     emit_action_started(step, step_index, action_index, action, events)
