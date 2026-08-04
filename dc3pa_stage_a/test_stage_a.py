@@ -305,3 +305,15 @@ def test_step_budget_env_allows_exact_budget_then_raises():
     with pytest.raises(EnvironmentStepBudgetExceeded, match="12000|2 steps"):
         env.step("third")
     assert base.calls == 2
+
+
+def test_diagnostic_payload_pauses_after_first_failure():
+    from dc3pa_stage_a.run_stage_a_episode import _stage6_payload
+
+    config_path = Path(__file__).resolve().parents[1] / "configs" / "stage_a_diagnostic_mp5_legacy.json"
+    config = load(config_path)
+    payload = _stage6_payload(config, None, max_env_steps=12000)
+
+    assert config.max_execution_attempts == 1
+    assert payload["runtime"]["max_execution_attempts"] == 1
+    assert payload["runtime"]["reset_environment_between_attempts"] is False

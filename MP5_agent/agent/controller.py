@@ -373,6 +373,87 @@ class Controller:
                     self.ensure_wooden_bootstrap(env, underground=False)
                 self._fallback_craft_bootstrap_item(env, "stick", 2)
 
+    def _available_pickaxe(self):
+        """Return an available pickaxe without maintaining a tool registry."""
+        for item_name, quantity in self.memory.inventory.items():
+            normalized_name = normalize_inventory_name(item_name)
+            if quantity > 0 and normalized_name.endswith("pickaxe"):
+                return normalized_name
+        return ""
+
+    def _surface_for_material_recovery(self, env, underground):
+        """Physically leave the mine before gathering surface-only materials."""
+        if not underground:
+            return True, False
+
+        tool = self._available_pickaxe()
+        for recovery_idx in range(4):
+            events = self._sync_memory(env)
+            location = events.get("location_stats", {})
+            start_level = float(location.get("pos", [0, 0, 0])[1])
+            if start_level >= 60 or bool(location.get("can_see_sky", False)):
+                return True, False
+            target_level = min(60, int(start_level) + 10)
+            print(
+                f"Material recovery dig_up {recovery_idx + 1}/4: "
+                f"Y={start_level:.1f} -> {target_level} using {tool or 'available hand'}."
+            )
+            go_up(env, target_level, equipment=tool)
+            events = self._sync_memory(env)
+            end_location = events.get("location_stats", {})
+            end_level = float(end_location.get("pos", [0, start_level, 0])[1])
+            if end_level <= start_level + 0.05:
+                print("Material recovery could not gain elevation; leaving failure visible.")
+                return False, True
+            if end_level >= 60 or bool(end_location.get("can_see_sky", False)):
+                return True, False
+        return False, True
+
+    def _recover_missing_craft_materials(self, env, args, underground):
+        """Recover missing wood-derived craft inputs in the same execution attempt."""
+        materials = {
+            normalize_inventory_name(item_name): int(quantity)
+            for item_name, quantity in args.get("materials", {}).items()
+        }
+        missing = {
+            item_name: quantity
+            for item_name, quantity in materials.items()
+            if self.memory.inventory.get(item_name, 0) < quantity
+        }
+        if not missing:
+            return True, underground
+        if any(item_name not in {"log", "planks", "stick"} for item_name in missing):
+            return False, underground
+
+        surfaced, underground = self._surface_for_material_recovery(env, underground)
+        if not surfaced:
+            return False, underground
+
+        current_sticks = self.memory.inventory.get("stick", 0)
+        required_sticks = materials.get("stick", 0)
+        stick_crafts = max(0, math.ceil((required_sticks - current_sticks) / 4))
+        required_planks = materials.get("planks", 0) + stick_crafts * 2
+        current_planks = self.memory.inventory.get("planks", 0)
+        plank_crafts = max(0, math.ceil((required_planks - current_planks) / 4))
+        if plank_crafts:
+            current_logs = self.memory.inventory.get("log", 0)
+            target_logs = max(current_logs, plank_crafts)
+            if not self._gather_logs(env, False, target_logs):
+                return False, underground
+            if not self._fallback_craft_bootstrap_item(env, "planks", required_planks):
+                return False, underground
+        if required_sticks and not self._fallback_craft_bootstrap_item(
+            env, "stick", required_sticks
+        ):
+            return False, underground
+
+        self._sync_memory(env)
+        recovered = all(
+            self.memory.inventory.get(item_name, 0) >= quantity
+            for item_name, quantity in materials.items()
+        )
+        return recovered, underground
+
     def _ensure_diamond_resource_before_action(self, env, action, step_times, required_quantity=None):
         name = action["name"]
         action_requirement = int(required_quantity or step_times)
@@ -1029,6 +1110,7 @@ class Controller:
                             self._is_deep_mining_task(task_information)
                             and crafted_obj in {"planks", "stick", "crafting table", "wooden pickaxe"}
                             and self.ensure_wooden_bootstrap(env, underground)
+                            and self._inventory_has(crafted_obj, craft_num)
                         ):
                             print(
                                 "Completed bounded wooden bootstrap before planned craft; "
@@ -1042,6 +1124,15 @@ class Controller:
                             self._prepare_deep_mining_craft_dependencies(env, crafted_obj)
                      
                         check_result = self.check_action_preparation(env,"craft", args,task_information,events)
+                        if not check_result["success"] and self._is_deep_mining_task(task_information):
+                            recovered, underground = self._recover_missing_craft_materials(
+                                env, args, underground
+                            )
+                            if recovered:
+                                events = self._sync_memory(env)
+                                check_result = self.check_action_preparation(
+                                    env, "craft", args, task_information, events
+                                )
                         if not check_result["success"]:
                             return finish_failure(step, step_index, action_index, action, check_result, underground)
                         

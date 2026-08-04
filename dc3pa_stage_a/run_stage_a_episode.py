@@ -143,7 +143,7 @@ def _stage6_payload(
             "record_multimodal_memory": config.record_multimodal_memory,
             "capture_initial_scene": True,
             "capture_final_scene": True,
-            "reset_environment_between_attempts": True,
+            "reset_environment_between_attempts": False,
             "memory_mode": config.memory_mode,
             "telemetry_enabled": True,
         },

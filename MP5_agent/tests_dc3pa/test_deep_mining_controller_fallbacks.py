@@ -259,11 +259,12 @@ def test_deep_mining_bootstrap_precedes_first_bootstrap_craft(monkeypatch):
 
     monkeypatch.setattr("controller.share_memory", lambda *args, **kwargs: None)
     monkeypatch.setattr(Controller, "_is_deep_mining_task", lambda *args, **kwargs: True)
-    monkeypatch.setattr(
-        Controller,
-        "ensure_wooden_bootstrap",
-        lambda self, env, underground: called.append((env, underground)) or True,
-    )
+    def fake_bootstrap(self, target_env, underground):
+        called.append((target_env, underground))
+        self.memory.inventory["planks"] = 4.0
+        return True
+
+    monkeypatch.setattr(Controller, "ensure_wooden_bootstrap", fake_bootstrap)
 
     result, underground = controller.check_and_execute_workflow(
         env,
@@ -385,3 +386,108 @@ def test_downstream_material_requirement_drives_cobblestone_skip(monkeypatch):
         {"task": "diamond"},
         required_quantity=11,
     )
+
+
+def test_unsatisfied_stick_craft_is_not_skipped_by_existing_wooden_pickaxe(monkeypatch):
+    controller = _controller({"wooden pickaxe": 1, "planks": 2})
+    env = FakeEnv(controller.memory)
+    craft_calls = []
+
+    monkeypatch.setattr("controller.share_memory", lambda *args, **kwargs: None)
+    monkeypatch.setattr(Controller, "_is_deep_mining_task", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        Controller, "ensure_wooden_bootstrap", lambda *args, **kwargs: True
+    )
+    monkeypatch.setattr(
+        Controller, "_prepare_deep_mining_craft_dependencies", lambda *args: None
+    )
+    monkeypatch.setattr(
+        Controller,
+        "_execute_craft_with_retries",
+        lambda self, *args, **kwargs: craft_calls.append(args) or True,
+    )
+
+    result, underground = controller.check_and_execute_workflow(
+        env,
+        {
+            "workflow": [
+                {
+                    "times": "1",
+                    "actions": [
+                        {
+                            "name": "craft",
+                            "args": {
+                                "obj": {"stick": 4},
+                                "materials": {"planks": 2},
+                                "platform": None,
+                            },
+                        }
+                    ],
+                }
+            ]
+        },
+        {"task": "diamond"},
+        underground=False,
+    )
+
+    assert result["success"]
+    assert not underground
+    assert craft_calls
+
+
+def test_missing_sticks_are_recovered_from_logs_in_same_attempt(monkeypatch):
+    controller = _controller(
+        {"iron ingot": 3, "planks": 1, "stone pickaxe": 1}
+    )
+    env = FakeEnv(controller.memory)
+
+    monkeypatch.setattr(
+        Controller,
+        "_surface_for_material_recovery",
+        lambda self, target_env, underground: (True, False),
+    )
+
+    def fake_gather(self, target_env, underground, target_logs, max_attempts=2):
+        self._set_inventory_from_memory(target_env, {"log": target_logs})
+        return True
+
+    monkeypatch.setattr(Controller, "_gather_logs", fake_gather)
+
+    recovered, underground = controller._recover_missing_craft_materials(
+        env,
+        {
+            "materials": {"iron ingot": 3, "stick": 2},
+            "obj": {"iron pickaxe": 1},
+            "platform": "crafting table",
+        },
+        underground=True,
+    )
+
+    assert recovered
+    assert not underground
+    assert controller.memory.inventory["stick"] >= 2
+    assert controller.memory.inventory["iron ingot"] == 3
+
+
+def test_missing_wood_material_recovery_physically_digs_up(monkeypatch):
+    controller = _controller({"stone pickaxe": 1})
+    env = _UpwardEnv(controller.memory, y_level=40.0)
+    called = []
+
+    monkeypatch.setattr("controller.share_memory", lambda *args, **kwargs: None)
+
+    def fake_go_up(target_env, target_y, equipment=""):
+        called.append((target_env, target_y, equipment))
+        target_env.y_level = float(target_y)
+        target_env.can_see_sky = target_y >= 60
+
+    monkeypatch.setattr("controller.go_up", fake_go_up)
+
+    surfaced, underground = controller._surface_for_material_recovery(env, True)
+
+    assert surfaced
+    assert not underground
+    assert called == [
+        (env, 50, "stone pickaxe"),
+        (env, 60, "stone pickaxe"),
+    ]
