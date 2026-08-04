@@ -43,8 +43,9 @@ def test_mine_ahead_returns_false_after_finite_attack_budget(monkeypatch):
     monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda _events: None)
 
     assert not structured_actions.mine_ahead(env, _Memory(), max_hits=2)
-    # Initial sync + 2 head hits + look + 2 body hits + restore look.
-    assert len(env.calls) == 7
+    # max_hits is shared across head and body instead of allowing 2 + 2 hits.
+    attack_actions = [action for action in env.calls if action[5] == 3]
+    assert len(attack_actions) == 2
 
 
 def test_mine_ahead_returns_true_without_attacking_when_path_is_clear(monkeypatch):
@@ -56,6 +57,69 @@ def test_mine_ahead_returns_true_without_attacking_when_path_is_clear(monkeypatc
 
     assert structured_actions.mine_ahead(env, _Memory(), max_hits=2)
     assert len(env.calls) == 1
+
+
+class _BreakingPickaxeEnv(_StoneAheadEnv):
+    def __init__(self):
+        super().__init__()
+        self.events["inventory"] = {
+            "name": np.array(["stone pickaxe"], dtype=object),
+            "quantity": np.array([1.0]),
+        }
+
+    def step(self, action):
+        self.calls.append(list(action))
+        if action[5] == 3:
+            self.events["inventory"] = {
+                "name": np.array(["air"], dtype=object),
+                "quantity": np.array([0.0]),
+            }
+        return self.events, 0.0, False, {}
+
+
+def test_mine_ahead_stops_as_soon_as_pickaxe_breaks(monkeypatch):
+    env = _BreakingPickaxeEnv()
+    monkeypatch.setattr(structured_actions, "share_memory", lambda *args: None)
+    monkeypatch.setattr(structured_actions, "sleep", lambda _env: env.events)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda _events: None)
+
+    assert not structured_actions.mine_ahead(env, _Memory(), max_hits=12)
+    attack_actions = [action for action in env.calls if action[5] == 3]
+    assert len(attack_actions) == 1
+
+
+class _BlockedFurnacePlacementEnv(_StoneAheadEnv):
+    def __init__(self):
+        super().__init__()
+        self.events["location_stats"]["pos"] = np.array([0.0, 40.0, 0.0])
+        self.events["inventory"] = {
+            "name": np.array(["furnace", "coal", "stone pickaxe"], dtype=object),
+            "quantity": np.array([1.0, 1.0, 1.0]),
+        }
+
+
+def test_underground_furnace_placement_is_bounded_without_tunnel_clearing(monkeypatch):
+    env = _BlockedFurnacePlacementEnv()
+    memory = _Memory()
+    monkeypatch.setattr(structured_actions, "share_memory", lambda *args: None)
+    monkeypatch.setattr(structured_actions, "sleep", lambda _env: env.events)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda _events: None)
+    monkeypatch.setattr(
+        structured_actions,
+        "mine_ahead",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("underground furnace placement must not clear a tunnel")
+        ),
+    )
+
+    names, quantities = structured_actions.action_craft(
+        env, "iron_ingot", memory, False, True, craft_num=1
+    )
+
+    assert names == ["furnace", "coal", "stone pickaxe"]
+    assert quantities == [1.0, 1.0, 1.0]
+    assert len([action for action in env.calls if action[5] == 6]) == 8
+    assert all(action[5] != 4 for action in env.calls)
 
 
 class _CraftMemory:

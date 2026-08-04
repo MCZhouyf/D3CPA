@@ -890,6 +890,19 @@ def mine_ahead(env, memory, direction=0, max_hits=12):
     print("trying to mine")
     print(f"mine_ahead:{memory.inventory}")
 
+    def pickaxe_count(current_events):
+        names = current_events["inventory"]["name"].tolist()
+        amounts = current_events["inventory"]["quantity"].tolist()
+        return sum(
+            amount
+            for name, amount in zip(names, amounts)
+            if str(name).replace("_", " ").endswith("pickaxe")
+        )
+
+    initial_pickaxe_count = pickaxe_count(events)
+    hits_used = 0
+    tool_exhausted = False
+
     def active_resource_goal_satisfied(current_events):
         """Stop tunnel clearing once the controller's current resource goal is met."""
         goal = getattr(memory, "_dc3pa_active_resource_goal", None)
@@ -916,19 +929,27 @@ def mine_ahead(env, memory, direction=0, max_hits=12):
         return False
 
     def bounded_attack_until(clear_check, look_action=None):
-        nonlocal events
-        if active_resource_goal_satisfied(events):
+        nonlocal events, hits_used, tool_exhausted
+        if active_resource_goal_satisfied(events) or tool_exhausted:
             return False
         if look_action is not None:
             events, _, _, _ = env.step(look_action)
             save_rgb_for_video(events)
             share_memory(memory, events)
-        for _ in range(max_hits):
+        while hits_used < max_hits:
             if clear_check(events) or active_resource_goal_satisfied(events):
                 return clear_check(events)
             events, _, _, _ = env.step([0, 0, 0, 12, 12, 3, 0, 0])
+            hits_used += 1
             save_rgb_for_video(events)
             share_memory(memory, events)
+            if initial_pickaxe_count > 0 and pickaxe_count(events) < initial_pickaxe_count:
+                tool_exhausted = True
+                print(
+                    "mine_ahead stopped because the active pickaxe was consumed; "
+                    "returning control for tool recovery."
+                )
+                return False
             if active_resource_goal_satisfied(events):
                 return False
         return clear_check(events)
@@ -971,7 +992,10 @@ def mine_ahead(env, memory, direction=0, max_hits=12):
     save_rgb_for_video(events)
     cleared = head_cleared and body_cleared
     if not cleared:
-        print(f"mine_ahead exhausted {max_hits} hits without clearing direction {direction}")
+        print(
+            f"mine_ahead stopped after {hits_used}/{max_hits} total hits "
+            f"without clearing direction {direction}"
+        )
     return cleared
 
 
@@ -2133,10 +2157,8 @@ def action_craft(env, item, memory,use_crafting_table,use_furnace,craft_num):
         if use_furnace:
             if (events['location_stats']['pos'][1]<=56):
                 events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-                #events = sleep(env)
-        
                 share_memory(memory,events)
-                mine_ahead(env,memory)
+                print("underground furnace use: skip tunnel clearing and try bounded placement")
             else:
                 move_to_middle(env)
                 events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
@@ -2180,21 +2202,66 @@ def action_craft(env, item, memory,use_crafting_table,use_furnace,craft_num):
             events = sleep(env)
             events,_,_,_ = env.step([0,0,0,12,12,5,0,cb_inventory_index]); save_rgb_for_video(events) #equip furnace
             events = sleep(env)
-            while events['inventory']['name'].tolist()[0]=='furnace':
-                events,_,_,_ = env.step([0,0,0,12,12,6,0,0]); save_rgb_for_video(events) #backward until place furnace
-                events,_,_,_ = env.step([2,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-            
-            cb_inventory_index = events['inventory']['name'].tolist().index('coal') #equip coal
+
+            def inventory_item_count(current_events, target):
+                names = current_events['inventory']['name'].tolist()
+                amounts = current_events['inventory']['quantity'].tolist()
+                return sum(
+                    amount for name, amount in zip(names, amounts)
+                    if str(name).replace('_', ' ') == target
+                )
+
+            furnace_count_before = inventory_item_count(events, 'furnace')
+            furnace_placed = False
+            for placement_attempt in range(8):
+                events,_,_,_ = env.step([0,0,0,12,12,6,0,0]); save_rgb_for_video(events)
+                events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
+                if inventory_item_count(events, 'furnace') < furnace_count_before:
+                    furnace_placed = True
+                    break
+                if placement_attempt < 7:
+                    events,_,_,_ = env.step([0,0,0,12,15,0,0,0]); save_rgb_for_video(events)
+
+            if not furnace_placed:
+                print("furnace placement failed after 8 headings; returning without smelting")
+                return (
+                    events['inventory']['name'].tolist(),
+                    events['inventory']['quantity'].tolist(),
+                )
+
             events,_,_,_ = env.step([0,0,0,12,12,1,0,0]); save_rgb_for_video(events) #use furnace
             for i in range(craft_num):
                 events,_,_,_ = env.step([0,0,0,12,12,4,item_recipy_index,0]); save_rgb_for_video(events) #craft item by craft_num
             events = sleep(env)
 
-            cb_inventory_index = events['inventory']['name'].tolist().index('stone pickaxe')  #################for debug, could be changed
-            events,_,_,_ = env.step([0,0,0,12,12,5,0,cb_inventory_index]); save_rgb_for_video(events) #equip stone pickaxe
+            inventory_names = events['inventory']['name'].tolist()
+            inventory_amounts = events['inventory']['quantity'].tolist()
+            pickaxe_index = next(
+                (
+                    index for index, (name, amount) in enumerate(zip(inventory_names, inventory_amounts))
+                    if amount > 0 and str(name).replace('_', ' ').endswith('pickaxe')
+                ),
+                -1,
+            )
+            if pickaxe_index == -1:
+                print("no pickaxe remains after smelting; leave the furnace placed and return for recovery")
+                return inventory_names, inventory_amounts
 
-            for i in range(10):# may have to modify
-                events,_,_,_ = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events) #attack 8 times to get furnace
+            selected_pickaxe = str(inventory_names[pickaxe_index]).replace('_', ' ')
+            events,_,_,_ = env.step([0,0,0,12,12,5,0,pickaxe_index]); save_rgb_for_video(events)
+
+            for i in range(10):
+                events,_,_,_ = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+                if selected_pickaxe not in {
+                    str(name).replace('_', ' ')
+                    for name, amount in zip(
+                        events['inventory']['name'].tolist(),
+                        events['inventory']['quantity'].tolist(),
+                    )
+                    if amount > 0
+                }:
+                    print("pickaxe was consumed while recovering furnace; stop attacking")
+                    break
             events,_,_,_ = env.step([0,0,0,8,12,0,0,0]); save_rgb_for_video(events) #look forward 
             events = sleep(env)
             print(events['inventory']['name'].tolist())
