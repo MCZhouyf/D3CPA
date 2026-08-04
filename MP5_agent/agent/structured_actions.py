@@ -2347,11 +2347,39 @@ def action_craft(env, item, memory,use_crafting_table,use_furnace,craft_num):
         events,_,_,_ = env.step([0,0,0,16,12,0,0,0]); save_rgb_for_video(events)
         events = sleep(env)
         events,_,_,_ = env.step([0,0,0,12,12,5,0,cb_inventory_index]); save_rgb_for_video(events) #equip crafting tabsle
-        # sleep(env)
-        # while events['inventory']['name'].tolist()[0]=='crafting table':
-        #     events,_,_,_ = env.step([0,0,0,12,12,6,0,0]); save_rgb_for_video(events) #place crafting table
-        #     events,_,_,_ = env.step([2,0,0,12,12,0,0,0]); save_rgb_for_video(events) 
         events = sleep(env)
+
+        def inventory_item_count(current_events, target):
+            names = current_events['inventory']['name'].tolist()
+            amounts = current_events['inventory']['quantity'].tolist()
+            return sum(
+                amount for name, amount in zip(names, amounts)
+                if str(name).replace('_', ' ') == target
+            )
+
+        # A crafting recipe that requires a table is only valid after a real
+        # table has been placed.  The legacy implementation equipped the table
+        # and immediately sent "use", which merely interacted with empty space
+        # in an underground shaft.  Try every heading once and verify placement
+        # from the inventory decrease before opening the crafting interface.
+        table_count_before = inventory_item_count(events, 'crafting table')
+        table_placed = False
+        for placement_attempt in range(8):
+            events,_,_,_ = env.step([0,0,0,12,12,6,0,0]); save_rgb_for_video(events)
+            events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
+            if inventory_item_count(events, 'crafting table') < table_count_before:
+                table_placed = True
+                break
+            if placement_attempt < 7:
+                events,_,_,_ = env.step([0,0,0,12,15,0,0,0]); save_rgb_for_video(events)
+
+        if not table_placed:
+            print("crafting-table placement failed after 8 headings; returning without crafting")
+            return (
+                events['inventory']['name'].tolist(),
+                events['inventory']['quantity'].tolist(),
+            )
+
         events,_,_,_ = env.step([0,0,0,12,12,1,0,0]); save_rgb_for_video(events) #use
         print(f"crafting .....")
         for i in range(craft_num):

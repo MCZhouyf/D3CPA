@@ -163,6 +163,40 @@ def test_crafting_table_prep_aborts_in_solid_tunnel(monkeypatch):
     assert all(action[5] not in {1, 4} for action in env.calls)
 
 
+class _UndergroundTablePlacementEnv(_StoneAheadEnv):
+    def __init__(self):
+        super().__init__()
+        self.events["location_stats"]["pos"] = np.array([0.0, 50.0, 0.0])
+        self.events["inventory"] = {
+            "name": np.array(["crafting table", "cobblestone"], dtype=object),
+            "quantity": np.array([1.0, 8.0]),
+        }
+
+    def step(self, action):
+        self.calls.append(list(action))
+        if action[5] == 6:
+            # Physical placement removes the selected table from inventory.
+            self.events["inventory"]["quantity"][0] = 0.0
+        return self.events, 0.0, False, {}
+
+
+def test_underground_crafting_places_table_before_use_and_recipe(monkeypatch):
+    env = _UndergroundTablePlacementEnv()
+    memory = _CraftMemory()
+    monkeypatch.setattr(structured_actions, "share_memory", lambda *args: None)
+    monkeypatch.setattr(structured_actions, "sleep", lambda _env: env.events)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda _events: None)
+
+    structured_actions.action_craft(
+        env, "furnace", memory, True, False, craft_num=1
+    )
+
+    operation_codes = [action[5] for action in env.calls]
+    placement_index = operation_codes.index(6)
+    assert operation_codes.index(1) > placement_index
+    assert operation_codes.index(4) > placement_index
+
+
 def test_underground_mine_caps_static_target_attacks(monkeypatch):
     env = _StoneAheadEnv()
     memory = _Memory()
