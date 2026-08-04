@@ -429,6 +429,14 @@ class Controller:
         if not surfaced:
             return False, underground
 
+        required_logs = materials.get("log", 0)
+        if (
+            required_logs
+            and self.memory.inventory.get("log", 0) < required_logs
+            and not self._gather_logs(env, False, required_logs)
+        ):
+            return False, underground
+
         current_sticks = self.memory.inventory.get("stick", 0)
         required_sticks = materials.get("stick", 0)
         stick_crafts = max(0, math.ceil((required_sticks - current_sticks) / 4))
@@ -1108,7 +1116,7 @@ class Controller:
                         crafted_obj = normalize_inventory_name(list(args["obj"].keys())[0])
                         if (
                             self._is_deep_mining_task(task_information)
-                            and crafted_obj in {"planks", "stick", "crafting table", "wooden pickaxe"}
+                            and crafted_obj == "wooden pickaxe"
                             and self.ensure_wooden_bootstrap(env, underground)
                             and self._inventory_has(crafted_obj, craft_num)
                         ):

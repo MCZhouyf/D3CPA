@@ -252,19 +252,25 @@ class _UpwardEnv(FakeEnv):
         )
 
 
-def test_deep_mining_bootstrap_precedes_first_bootstrap_craft(monkeypatch):
-    controller = _controller()
+def test_planned_planks_craft_does_not_consume_logs_in_bootstrap(monkeypatch):
+    controller = _controller({"log": 1})
     env = FakeEnv(controller.memory)
-    called = []
+    craft_calls = []
 
     monkeypatch.setattr("controller.share_memory", lambda *args, **kwargs: None)
     monkeypatch.setattr(Controller, "_is_deep_mining_task", lambda *args, **kwargs: True)
-    def fake_bootstrap(self, target_env, underground):
-        called.append((target_env, underground))
-        self.memory.inventory["planks"] = 4.0
-        return True
-
-    monkeypatch.setattr(Controller, "ensure_wooden_bootstrap", fake_bootstrap)
+    monkeypatch.setattr(
+        Controller,
+        "ensure_wooden_bootstrap",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("planned plank crafting must not run wooden bootstrap")
+        ),
+    )
+    monkeypatch.setattr(
+        Controller,
+        "_execute_craft_with_retries",
+        lambda self, *args, **kwargs: craft_calls.append(args) or True,
+    )
 
     result, underground = controller.check_and_execute_workflow(
         env,
@@ -278,7 +284,7 @@ def test_deep_mining_bootstrap_precedes_first_bootstrap_craft(monkeypatch):
                             "args": {
                                 "obj": {"planks": 4},
                                 "materials": {"log": 1},
-                                "platform": "",
+                                "platform": None,
                             },
                         }
                     ],
@@ -291,7 +297,8 @@ def test_deep_mining_bootstrap_precedes_first_bootstrap_craft(monkeypatch):
 
     assert result["success"]
     assert not underground
-    assert called == [(env, False)]
+    assert controller.memory.inventory["log"] == 1
+    assert craft_calls
 
 
 def test_dig_up_invokes_physical_go_up_and_checks_elevation(monkeypatch):
@@ -491,3 +498,37 @@ def test_missing_wood_material_recovery_physically_digs_up(monkeypatch):
         (env, 50, "stone pickaxe"),
         (env, 60, "stone pickaxe"),
     ]
+
+
+def test_missing_direct_logs_are_gathered_in_same_attempt(monkeypatch):
+    controller = _controller({"wooden pickaxe": 1})
+    env = FakeEnv(controller.memory)
+    gathered = []
+
+    monkeypatch.setattr(
+        Controller,
+        "_surface_for_material_recovery",
+        lambda self, target_env, underground: (True, False),
+    )
+
+    def fake_gather(self, target_env, underground, target_logs, max_attempts=2):
+        gathered.append(target_logs)
+        self._set_inventory_from_memory(target_env, {"log": target_logs})
+        return True
+
+    monkeypatch.setattr(Controller, "_gather_logs", fake_gather)
+
+    recovered, underground = controller._recover_missing_craft_materials(
+        env,
+        {
+            "materials": {"log": 3},
+            "obj": {"planks": 12},
+            "platform": None,
+        },
+        underground=False,
+    )
+
+    assert recovered
+    assert not underground
+    assert gathered == [3]
+    assert controller.memory.inventory["log"] == 3
