@@ -1,51 +1,78 @@
 # Stage A report (Option B)
 
-## Status: runtime evidence pending — do not use as a completed experiment report
+## Status: diagnostic infrastructure complete; external pilot pending authorization
 
-The Stage A additive tooling, static audit, formal 50-task binding, and frozen Option-B configuration are complete. Formal execution tables remain pending because readonly Stage6 runs require an approved frozen memory snapshot manifest that is absent from this checkout. No synthetic snapshot, surrogate task set, prompt edit, or base-code edit was used.
+Base code and prompts remain untouched. The Stage A v2 toolbox passed its
+required offline suite (16 passed). The supplied v2 policy counts all positive
+inventory grants, not a function allowlist. Six diagnostic episodes are planned
+but not launched because their new task state would be transmitted to an
+external relay and the explicit relay authorization currently on record is
+limited to craft diamond.
 
-## Completed
+| Guardrail | Status |
+| --- | --- |
+| `git diff --stat -- MP5_agent/agent MP5_agent/dc3pa` | Empty |
+| Prompt modifications | None |
+| Option B | `LEGACY_TASK_HACKS=0`; `BOUNDED_RESOURCE_FALLBACK=1` |
+| Diagnostic memory | `disabled`; no long-term writes; required note frozen |
+| Formal task source | External 50-task catalog, hash-bound manifest |
+| Tool test | `python -m pytest dc3pa_stage_a/test_stage_a.py -q` → 16 passed |
 
-| Item | Result | Evidence |
-| --- | --- | --- |
-| Base code immutability | Pass | `git diff --stat -- MP5_agent/agent MP5_agent/dc3pa` is empty. |
-| Prompt templates | Unchanged | No prompt file was edited. |
-| Tool tests | Pass | `python -m pytest dc3pa_stage_a/test_stage_a.py -q`: 14 passed. |
-| A0 static audit | Complete | `docs/STAGE_A_CODE_AUDIT.md`. |
-| A1 frozen Option-B config | Complete | `configs/paper_run_config.json`, hash `81a3708d…7aa2`; mode-invariant non-mode hash `79209385…a510`. |
-| Formal task binding | Complete | `/external/dc3pa/task_assets_schema/final_task_catalog.csv`, 50 tasks/5×10 tiers, frozen in `configs/stage_a_formal_taskset_manifest.json`. |
-| A2 attachment path | Complete, not yet environment-executed | `dc3pa_stage_a/run_stage_a_episode.py` wraps `minedojo.make`, installs `InventoryWriteLogger`, asserts config before launch, and dry-run validates a formal JSON. |
-| Offline analysis pipeline | Pass | Fixture-only analysis at `docs/evidence/stage_a/fixtures_analysis.json`; it is not formal evidence. |
+## Planned diagnostic design
 
-## Table A — substitute scope
+`configs/stage_a_diagnostic_batch_plan.json` defines:
 
-| Measure | Formal empirical value | Static preflight |
-| --- | --- | --- |
-| Formal tasks | pending episodes | 50 |
-| Static gate-matched tasks | pending episodes | 2/50 (4%): `obtain diamond`, `mine redstone` |
-| Per-task calls and grants | pending inventory-write log | not inferable statically |
+| Group | Purpose | Episodes |
+| --- | --- | ---: |
+| Pilot | mine log + obtain diamond × three modes × one seed | 6 |
+| G1 | static candidates plus conservative wooden-pick/cobblestone bootstrap chain × 3 modes × 6 seeds | 180 |
+| G2 | two non-G1 tasks per tier × 3 modes × 2 seeds | 60 |
+| G3 | logger on/off paired diagnostic: two G2 tasks × dc3pa × 3 seeds | 12 |
+| Full diagnostic total | G1 + G2 + G3 | 252 |
 
-See `docs/STAGE_A_STATIC_SCOPE.md`.
+The pilot will measure wall-clock time, success/attempt ceiling, trace-derived
+LLM call counts, and any provider-exposed token usage. If the extrapolated full
+diagnostic time exceeds eight hours, execution stops at that observation and a
+human scale decision is requested; it is never scaled unilaterally.
 
-## Table B — per-mode symmetry
+## Table A — actual substitute scope
 
-No formal episode has been run. The code-level precondition holds: all three modes use the single `ControllerAdapter` stored at `runtime.py:121` and invoked at `runtime.py:741-743`. The empirical calls-per-episode relative range, touched-episode fraction, grant composition, and ≤10% decision are **pending**.
+| Measure | Current value |
+| --- | --- |
+| `raw_write_records` | pending pilot |
+| `substitute_write_records` | pending pilot |
+| Actual affected tasks / static hypothesis | pending / 2 of 50 (static only) |
+| Grants by task/tier | pending pilot |
+| `calls_by_function` attribution | pending pilot |
+
+Any actual affected count above two will be conspicuous in the report.
+
+## Table B — empirical mode symmetry
+
+Pending pilot. The prespecified metric is calls per episode. Relative spread
+≤10% is symmetric; >10% is asymmetric and requires escalation. Disabled-memory
+symmetry does not replace a later frozen-readonly rerun.
 
 ## Table C — order invariance
 
-No formal order experiment has been run. The code audit confirms the risk: `work_memory.py:144` reads historical workflow memory and `run_agent.py:303` writes it after success. The required acquire/evaluate_readonly forward/reverse comparison, plus same-order control if needed, is **pending**.
+Pending approved frozen snapshot. If a forward/reverse pair disagrees, run three
+pairs and an off/off control before any interpretation.
 
-## Table D — dual-population success
+## Table D — dual population
 
-No formal success-rate run has been performed. Full-population and substitute-free-subset rates are **pending**; no comparison claim may use them yet.
+Pending actual logger data. It will show both all-task success and the subset
+never touched by a positive substitute write.
 
-## Failures and unexpected findings
+## Acquisition schedule decision
 
-1. The supplied test command initially failed because `test_stage_a.py` used local-module imports while being invoked as a package. The additive test imports were corrected to package imports; the mandated command now passes 14 tests.
-2. The supplied analyzer counted every inventory write. Because the real launcher resets inventory with `set_inventory([])`, that would have inflated substitute calls. The additive analyzer now filters real records to positive grants with a controller fallback in the caller chain, while retaining a conservative compatibility rule for historical stackless records. All 14 tests pass after the change.
-3. The initial repository search did not expose the formal 50-task catalog. The user supplied the authoritative external path; it is now hash-bound. A different 100-entry acquisition schedule was deliberately not used.
-4. No approved frozen Stage6 memory snapshot manifest was found. This is recorded in `docs/OPEN_DECISIONS.md`; execution is refused rather than silently using mutable or empty memory.
+The previous 100-entry schedule was inspected but not adopted. It is a separate
+acquisition campaign with 25 distinct tasks, only 22 overlapping the formal 50,
+and 100 seeds disjoint from this plan. See
+`docs/STAGE_A_ACQUISITION_SCHEDULE.md`. It requires explicit human snapshot
+approval.
 
-## Needed human decision
+## Required human decision
 
-Provide/approve the frozen memory snapshot manifest and root that correspond to the 50-task acquisition data. Then run the additive launcher for: (i) logging-on/off A/B pairs, (ii) 10-task × 3-mode × 3-seed A3/A4 sample, and (iii) A5 forward/reverse memory protocol.
+Authorize transmission of the six specified disabled-memory pilot task states to
+the configured external relay. Separately, approve an exact current-registry
+acquisition snapshot before any readonly memory evaluation.
