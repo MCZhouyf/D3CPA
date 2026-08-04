@@ -2336,6 +2336,7 @@ def go_up(
         raise ValueError("vertical attempt limits must be positive")
 
     events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
+    entry_level = float(events['location_stats']['pos'][1])
     if equipment:
         inventory = events['inventory']['name'].tolist()
         try:
@@ -2383,6 +2384,12 @@ def go_up(
     if vertical_climb(max_vertical_attempts, stalled_limit):
         return True
     stalled_level = float(events['location_stats']['pos'][1])
+    if stalled_level > entry_level + 0.05:
+        print(
+            f"go_up retained partial elevation: {entry_level:.2f} -> "
+            f"{stalled_level:.2f}; returning control to the workflow."
+        )
+        return True
     if not allow_directional_recovery or max_direction_attempts == 0:
         print(f"go_up stalled at {stalled_level} while targeting {y_level}; returning to caller.")
         return False
@@ -2417,6 +2424,18 @@ def go_up(
         )
         if horizontal_delta <= 0.20:
             continue
+
+        # A lateral jump can already form the first stair step.  Confirm the
+        # elevation survives one neutral observation, then stop searching so
+        # later headings do not destroy durability or discard real progress.
+        events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
+        stable_level = float(events['location_stats']['pos'][1])
+        if stable_level > stalled_level + 0.05:
+            print(
+                f"go_up escaped through heading {direction_idx + 1} with stable "
+                f"elevation {stalled_level:.2f} -> {stable_level:.2f}."
+            )
+            return True
 
         if go_up(
             env,

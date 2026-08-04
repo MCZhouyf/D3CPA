@@ -177,8 +177,9 @@ def test_mine_ahead_does_not_clear_tunnel_after_active_resource_goal_is_met(monk
 
 
 class _DirectionalGoUpEnv:
-    def __init__(self, successful_heading=None):
+    def __init__(self, successful_heading=None, lateral_elevation_heading=None):
         self.successful_heading = successful_heading
+        self.lateral_elevation_heading = lateral_elevation_heading
         self.heading = 0
         self.y_level = 50.0
         self.x_level = 0.0
@@ -203,6 +204,8 @@ class _DirectionalGoUpEnv:
             self.heading += 1
         if action[0] == 1 and action[2] == 1:
             self.x_level += 0.15
+            if self.heading == self.lateral_elevation_heading:
+                self.y_level = 51.0
         if (
             action[0] == 0
             and action[2] == 1
@@ -240,3 +243,18 @@ def test_go_up_exhausts_exactly_eight_headings_when_all_are_blocked(monkeypatch)
     )
     heading_turns = [action for action in env.calls if action[3:5] == [12, 15]]
     assert len(heading_turns) == 8
+
+
+def test_go_up_stops_after_first_heading_retains_partial_elevation(monkeypatch):
+    env = _DirectionalGoUpEnv(lateral_elevation_heading=1)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda _events: None)
+
+    assert structured_actions.go_up(
+        env,
+        60,
+        max_vertical_attempts=2,
+        stalled_limit=1,
+    )
+    heading_turns = [action for action in env.calls if action[3:5] == [12, 15]]
+    assert len(heading_turns) == 1
+    assert env.y_level == 51.0
