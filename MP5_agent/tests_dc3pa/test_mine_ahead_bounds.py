@@ -158,3 +158,19 @@ def test_underground_mine_returns_after_first_collected_target(monkeypatch):
     assert names == ["wooden pickaxe", "cobblestone"]
     assert quantities == [1.0, 1.0]
     assert env._attacks == 1
+
+
+def test_mine_ahead_does_not_clear_tunnel_after_active_resource_goal_is_met(monkeypatch):
+    env = _StoneAheadEnv()
+    memory = _Memory()
+    memory._dc3pa_active_resource_goal = {"item": "cobblestone", "quantity": 11}
+    env.events["inventory"] = {
+        "name": np.array(["wooden pickaxe", "cobblestone"]),
+        "quantity": np.array([1.0, 11.0]),
+    }
+    monkeypatch.setattr(structured_actions, "share_memory", lambda *args: None)
+    monkeypatch.setattr(structured_actions, "sleep", lambda _env: env.events)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda _events: None)
+
+    assert not structured_actions.mine_ahead(env, memory, max_hits=2)
+    assert all(action[5] != 3 for action in env.calls)

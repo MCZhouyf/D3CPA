@@ -890,16 +890,47 @@ def mine_ahead(env, memory, direction=0, max_hits=12):
     print("trying to mine")
     print(f"mine_ahead:{memory.inventory}")
 
+    def active_resource_goal_satisfied(current_events):
+        """Stop tunnel clearing once the controller's current resource goal is met."""
+        goal = getattr(memory, "_dc3pa_active_resource_goal", None)
+        if not isinstance(goal, dict):
+            return False
+        item = goal.get("item")
+        quantity = goal.get("quantity")
+        if not item or not isinstance(quantity, (int, float)):
+            return False
+        normalized_item = str(item).replace("_", " ")
+        names = current_events["inventory"]["name"].tolist()
+        amounts = current_events["inventory"]["quantity"].tolist()
+        held = sum(
+            amount
+            for name, amount in zip(names, amounts)
+            if str(name).replace("_", " ") == normalized_item
+        )
+        if held >= quantity:
+            print(
+                f"mine_ahead stops tunnel clearing: {normalized_item} "
+                f"already satisfies {held}/{quantity}."
+            )
+            return True
+        return False
+
     def bounded_attack_until(clear_check, look_action=None):
         nonlocal events
+        if active_resource_goal_satisfied(events):
+            return False
         if look_action is not None:
             events, _, _, _ = env.step(look_action)
             save_rgb_for_video(events)
+            share_memory(memory, events)
         for _ in range(max_hits):
-            if clear_check(events):
-                return True
+            if clear_check(events) or active_resource_goal_satisfied(events):
+                return clear_check(events)
             events, _, _, _ = env.step([0, 0, 0, 12, 12, 3, 0, 0])
             save_rgb_for_video(events)
+            share_memory(memory, events)
+            if active_resource_goal_satisfied(events):
+                return False
         return clear_check(events)
 
     if events["location_stats"]["pos"][1] < 20:

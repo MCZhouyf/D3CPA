@@ -800,6 +800,22 @@ class Controller:
                     action_required_quantity = self._workflow_material_requirement(
                         workflow, step_index, action_target, times
                     ) if action_target else times
+                    # ``approach`` may clear an underground tunnel by calling
+                    # ``mine_ahead`` several times before this high-level action
+                    # returns.  Expose the workflow-derived resource demand to
+                    # that low-level operation so it stops clearing as soon as
+                    # the actual collection requirement has been met.
+                    if (
+                        self._is_deep_mining_task(task_information)
+                        and name in {"find", "move_to", "mine"}
+                        and action_target
+                    ):
+                        self.memory._dc3pa_active_resource_goal = {
+                            "item": action_target,
+                            "quantity": action_required_quantity,
+                        }
+                    else:
+                        self.memory._dc3pa_active_resource_goal = None
                     emit_action_started(step, step_index, action_index, action, events)
 
                     if (
