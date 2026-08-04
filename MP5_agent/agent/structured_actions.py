@@ -2232,8 +2232,18 @@ def action_craft(env, item, memory,use_crafting_table,use_furnace,craft_num):
 
     return name, num
 
-def go_up(env, y_level):
-    events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events) 
+def go_up(env, y_level, equipment = ""):
+    events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
+    if equipment:
+        inventory = events['inventory']['name'].tolist()
+        try:
+            equipment_index = inventory.index(equipment)
+        except ValueError:
+            equipment_index = -1
+            print(f"no equipment {equipment} found for go_up")
+        if equipment_index != -1:
+            events,_,_,_ = env.step([0,0,0,12,12,5,0,equipment_index]); save_rgb_for_video(events)
+            print(f"found equipment {equipment} for go_up")
     '''
     cb_inventory_index = events['inventory']['name'].tolist().index('dirt')  #################for debug, could be changed
     events,_,_,_ = env.step([0,0,0,12,12,5,0,cb_inventory_index]); save_rgb_for_video(events) #equip cobblestone

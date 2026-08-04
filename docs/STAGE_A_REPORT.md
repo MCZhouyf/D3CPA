@@ -11,7 +11,8 @@ limited to craft diamond.
 
 | Guardrail | Status |
 | --- | --- |
-| `git diff --stat -- MP5_agent/agent MP5_agent/dc3pa` | Empty |
+| Pilot configuration core diff | Empty at the time of the recorded pilot artifacts |
+| Current core diff | `MP5_agent/agent/controller.py` changed only by the subsequently authorized execution-layer repair; it is not part of the pilot evidence |
 | Prompt modifications | None |
 | Option B | `LEGACY_TASK_HACKS=0`; `BOUNDED_RESOURCE_FALLBACK=1` |
 | Diagnostic memory | `disabled`; no long-term writes; required note frozen |
@@ -35,6 +36,17 @@ LLM call counts, and any provider-exposed token usage. If the extrapolated full
 diagnostic time exceeds eight hours, execution stops at that observation and a
 human scale decision is requested; it is never scaled unilaterally.
 
+
+## Post-pilot execution repair (not part of Stage A evidence)
+
+After the censored diamond rerun, the user authorized an execution-layer repair.
+`controller.py` now invokes the pre-existing physical `go_up` routine for
+`dig_up` (rather than only changing an internal flag), verifies that elevation
+actually increased, and performs the bounded wooden bootstrap before its first
+planned bootstrap craft. This prevents a one-log plan from consuming the wood
+needed for its wooden pickaxe. No prompt or `MP5_agent/dc3pa` source changed.
+The repair is covered by local controller tests, but it changes the executable
+system and is consequently kept separate from the recorded pre-repair pilot.
 
 ## Pilot throughput result — partial and censored
 

@@ -200,3 +200,103 @@ def test_move_to_resource_fallback_after_bounded_attempts(monkeypatch):
     assert result["success"]
     assert not underground
     assert controller.memory.inventory["cobblestone"] == 3.0
+
+
+class _UpwardEnv(FakeEnv):
+    def __init__(self, memory, y_level=40.0):
+        super().__init__(memory)
+        self.y_level = float(y_level)
+        self.can_see_sky = False
+
+    def step(self, action):
+        return (
+            {
+                "inventory": {
+                    "name": np.array(list(self.memory.inventory)),
+                    "quantity": np.array(list(self.memory.inventory.values())),
+                },
+                "location_stats": {
+                    "pos": np.array([0.0, self.y_level, 0.0]),
+                    "can_see_sky": self.can_see_sky,
+                },
+            },
+            0,
+            False,
+            {},
+        )
+
+
+def test_deep_mining_bootstrap_precedes_first_bootstrap_craft(monkeypatch):
+    controller = _controller()
+    env = FakeEnv(controller.memory)
+    called = []
+
+    monkeypatch.setattr("controller.share_memory", lambda *args, **kwargs: None)
+    monkeypatch.setattr(Controller, "_is_deep_mining_task", lambda *args, **kwargs: True)
+    monkeypatch.setattr(
+        Controller,
+        "ensure_wooden_bootstrap",
+        lambda self, env, underground: called.append((env, underground)) or True,
+    )
+
+    result, underground = controller.check_and_execute_workflow(
+        env,
+        {
+            "workflow": [
+                {
+                    "times": "1",
+                    "actions": [
+                        {
+                            "name": "craft",
+                            "args": {
+                                "obj": {"planks": 4},
+                                "materials": {"log": 1},
+                                "platform": "",
+                            },
+                        }
+                    ],
+                }
+            ]
+        },
+        {"task": "diamond"},
+        underground=False,
+    )
+
+    assert result["success"]
+    assert not underground
+    assert called == [(env, False)]
+
+
+def test_dig_up_invokes_physical_go_up_and_checks_elevation(monkeypatch):
+    controller = _controller({"wooden pickaxe": 1})
+    env = _UpwardEnv(controller.memory, y_level=40.0)
+    called = []
+
+    monkeypatch.setattr("controller.share_memory", lambda *args, **kwargs: None)
+
+    def fake_go_up(target_env, target_y, equipment=""):
+        called.append((target_env, target_y, equipment))
+        target_env.y_level = float(target_y)
+        target_env.can_see_sky = True
+
+    monkeypatch.setattr("controller.go_up", fake_go_up)
+
+    result, underground = controller.check_and_execute_workflow(
+        env,
+        {
+            "workflow": [
+                {
+                    "times": "1",
+                    "actions": [
+                        {"name": "dig_up", "args": {"tool": "wooden pickaxe"}}
+                    ],
+                }
+            ]
+        },
+        {"task": "diamond"},
+        underground=True,
+    )
+
+    assert result["success"]
+    assert called == [(env, 50, "wooden pickaxe")]
+    assert not underground

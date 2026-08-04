@@ -915,6 +915,19 @@ class Controller:
                         craft_name = list(args["obj"].keys())[0].replace(" ", "_")
                         craft_num = int(list(args["obj"].values())[0])
                         crafted_obj = normalize_inventory_name(list(args["obj"].keys())[0])
+                        if (
+                            self._is_deep_mining_task(task_information)
+                            and crafted_obj in {"planks", "stick", "crafting table", "wooden pickaxe"}
+                            and self.ensure_wooden_bootstrap(env, underground)
+                        ):
+                            print(
+                                "Completed bounded wooden bootstrap before planned craft; "
+                                f"skipping now-satisfied action for {crafted_obj}."
+                            )
+                            emit_action_finished(
+                                step, step_index, action_index, action, "skipped_satisfied"
+                            )
+                            continue
                         if self._is_deep_mining_task(task_information):
                             self._prepare_deep_mining_craft_dependencies(env, crafted_obj)
                      
@@ -1095,7 +1108,31 @@ class Controller:
                         if not check_result["success"]:
                             return finish_failure(step, step_index, action_index, action, check_result, underground)
 
-                        underground = False
+                        location = events.get("location_stats", {})
+                        start_level = float(location.get("pos", [0, 0, 0])[1])
+                        tool = "" if args["tool"] is None else args["tool"]
+                        # ``dig_up`` used to merely flip the underground flag.  Invoke
+                        # the existing physical mine-up/jump routine before changing
+                        # navigation mode so an underground agent can actually leave
+                        # the shaft it dug with ``dig_down``.
+                        go_up(env, int(start_level) + 10, equipment=tool)
+                        events = self._sync_memory(env)
+                        end_location = events.get("location_stats", {})
+                        end_level = float(end_location.get("pos", [0, start_level, 0])[1])
+                        if end_level <= start_level + 0.05:
+                            check_result = {
+                                "feedback": "The 'dig_up' action did not gain elevation.",
+                                "success": False,
+                                "suggestion": "Clear the block above and retry dig_up with the equipped tool.",
+                            }
+                            return finish_failure(step, step_index, action_index, action, check_result, underground)
+
+                        underground = not bool(end_location.get("can_see_sky", False))
+                        check_result = {
+                            "feedback": f"dig_up raised Y from {start_level:.1f} to {end_level:.1f} with {tool or 'no tool'}.",
+                            "success": True,
+                            "suggestion": "",
+                        }
                         emit_action_finished(step, step_index, action_index, action, "success", check_result)
                     
                     elif name == "apply":
