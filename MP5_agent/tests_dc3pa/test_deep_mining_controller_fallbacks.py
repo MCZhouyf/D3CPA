@@ -300,3 +300,39 @@ def test_dig_up_invokes_physical_go_up_and_checks_elevation(monkeypatch):
     assert result["success"]
     assert called == [(env, 50, "wooden pickaxe")]
     assert not underground
+
+
+def test_dig_down_normalizes_legacy_wooden_pickaxe_target(monkeypatch):
+    controller = _controller({"wooden pickaxe": 1})
+    env = _UpwardEnv(controller.memory, y_level=70.0)
+    called = []
+
+    monkeypatch.setattr("controller.share_memory", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "controller.go_down_to_y_level",
+        lambda target_env, target_y, equipment="": called.append(
+            (target_env, target_y, equipment)
+        ),
+    )
+    workflow = {
+        "workflow": [
+            {
+                "times": "1",
+                "actions": [
+                    {
+                        "name": "dig_down",
+                        "args": {"y_level": 60, "tool": "wooden pickaxe"},
+                    }
+                ],
+            }
+        ]
+    }
+
+    result, underground = controller.check_and_execute_workflow(
+        env, workflow, {"task": "diamond"}, underground=False
+    )
+
+    assert result["success"]
+    assert underground
+    assert called == [(env, 50, "wooden pickaxe")]
+    assert workflow["workflow"][0]["actions"][0]["args"]["y_level"] == 50

@@ -1089,6 +1089,15 @@ class Controller:
 
 
                     elif name == "dig_down":
+                        # The legacy wooden-pickaxe descent target was Y=60.  Keep
+                        # execution and telemetry aligned with the revised Y=50
+                        # target even if a retrieved legacy workflow still says 60.
+                        if (
+                            args.get("tool") == "wooden pickaxe"
+                            and int(args.get("y_level", 0)) == 60
+                        ):
+                            args["y_level"] = 50
+                            print("Normalized wooden-pickaxe dig_down target from Y=60 to Y=50")
                         events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); 
                         share_memory(self.memory,events)
                         check_result = self.check_action_preparation(env,"dig_down",  args,task_information,events)

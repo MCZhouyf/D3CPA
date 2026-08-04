@@ -133,7 +133,7 @@ class Evaluator:
                 {"times": "1", "actions": [{"name": "craft", "args": {"obj": {"stick": 4}, "materials": {"planks": 2}, "platform": None}}]},
                 {"times": "1", "actions": [{"name": "craft", "args": {"obj": {"wooden pickaxe": 1}, "materials": {"planks": 3, "stick": 2}, "platform": "crafting table"}}]},
                 {"times": "1", "actions": [{"name": "equip", "args": {"obj": "wooden pickaxe"}}]},
-                {"times": "1", "actions": [{"name": "dig_down", "args": {"y_level": 60, "tool": "wooden pickaxe"}}]},
+                {"times": "1", "actions": [{"name": "dig_down", "args": {"y_level": 50, "tool": "wooden pickaxe"}}]},
                 {"times": "11", "actions": [
                     {"name": "find", "args": {"obj": "cobblestone"}},
                     {"name": "move_to", "args": {"obj": "cobblestone"}},
