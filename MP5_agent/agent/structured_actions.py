@@ -498,6 +498,18 @@ def mine(target,equipment,underground,env,memory):
     inventory_target_name = update_inventory_obj_name(old_target)
     initial_target_quantity = inventory_quantity(events, inventory_target_name)
 
+    def bounded_attack_until_voxel_changes(current_events, still_target, direction_label, max_hits=12):
+        """Mine one adjacent underground voxel without an unbounded attack loop."""
+        for _ in range(max_hits):
+            if not still_target(current_events):
+                return current_events, True
+            current_events, _, _, _ = env.step([0,0,0,12,12,3,0,0])
+            save_rgb_for_video(current_events)
+        cleared = not still_target(current_events)
+        if not cleared:
+            print(f"underground mining exhausted {max_hits} hits at {direction_label}")
+        return current_events, cleared
+
     def mine_adjacent_target(events, block_name):
         # Prefer deterministic close-range mining before relying on ray casts.
         adjacent_offsets = [
@@ -713,58 +725,66 @@ def mine(target,equipment,underground,env,memory):
         if (events['voxels']['block_name'][vradius][vradius][vradius+1]==target):
             events,_,_,_ = env.step([0,0,0,12,18,0,0,0]); save_rgb_for_video(events)
             events,_,_,_ = env.step([0,0,0,15,12,0,0,0]); save_rgb_for_video(events)
-            while (events['voxels']['block_name'][vradius][vradius][vradius+1]==target):
-                events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+            events, _ = bounded_attack_until_voxel_changes(
+                events, lambda current: current['voxels']['block_name'][vradius][vradius][vradius+1] == target, "right-down"
+            )
             events,_,_,_ = env.step([0,0,0,9,12,0,0,0]); save_rgb_for_video(events)
             events,_,_,_ = env.step([0,0,0,12,6,0,0,0]); save_rgb_for_video(events)
             sleep(env)
         # right top
         if (events['voxels']['block_name'][vradius][vradius+1][vradius+1]==target):
             events,_,_,_ = env.step([0,0,0,12,18,0,0,0]); save_rgb_for_video(events)
-            while (events['voxels']['block_name'][vradius][vradius+1][vradius+1]==target):
-                events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+            events, _ = bounded_attack_until_voxel_changes(
+                events, lambda current: current['voxels']['block_name'][vradius][vradius+1][vradius+1] == target, "right-top"
+            )
             events,_,_,_ = env.step([0,0,0,12,6,0,0,0]); save_rgb_for_video(events)
             sleep(env)
         # forward down
         if (events['voxels']['block_name'][vradius+1][vradius][vradius]==target):
             events,_,_,_ = env.step([0,0,0,15,12,0,0,0]); save_rgb_for_video(events)
-            while (events['voxels']['block_name'][vradius+1][vradius][vradius]==target):
-                events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+            events, _ = bounded_attack_until_voxel_changes(
+                events, lambda current: current['voxels']['block_name'][vradius+1][vradius][vradius] == target, "forward-down"
+            )
             events,_,_,_ = env.step([0,0,0,9,12,0,0,0]); save_rgb_for_video(events)
             sleep(env)
         # forward top
         if (events['voxels']['block_name'][vradius+1][vradius+1][vradius]==target):
-            while (events['voxels']['block_name'][vradius+1][vradius+1][vradius]==target):
-                events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+            events, _ = bounded_attack_until_voxel_changes(
+                events, lambda current: current['voxels']['block_name'][vradius+1][vradius+1][vradius] == target, "forward-top"
+            )
             sleep(env)
         # left down
         if (events['voxels']['block_name'][vradius][vradius][vradius-1]==target):
             events,_,_,_ = env.step([0,0,0,12,6,0,0,0]); save_rgb_for_video(events)
             events,_,_,_ = env.step([0,0,0,15,12,0,0,0]); save_rgb_for_video(events)
-            while (events['voxels']['block_name'][vradius][vradius][vradius-1]==target):
-                events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+            events, _ = bounded_attack_until_voxel_changes(
+                events, lambda current: current['voxels']['block_name'][vradius][vradius][vradius-1] == target, "left-down"
+            )
             events,_,_,_ = env.step([0,0,0,9,12,0,0,0]); save_rgb_for_video(events)
             events,_,_,_ = env.step([0,0,0,12,18,0,0,0]); save_rgb_for_video(events)
             sleep(env)
         # left top
         if (events['voxels']['block_name'][vradius][vradius+1][vradius-1]==target):
             events,_,_,_ = env.step([0,0,0,12,6,0,0,0]); save_rgb_for_video(events)
-            while (events['voxels']['block_name'][vradius][vradius+1][vradius-1]==target):
-                events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+            events, _ = bounded_attack_until_voxel_changes(
+                events, lambda current: current['voxels']['block_name'][vradius][vradius+1][vradius-1] == target, "left-top"
+            )
             events,_,_,_ = env.step([0,0,0,12,18,0,0,0]); save_rgb_for_video(events)
             sleep(env)
         # top
         if (events['voxels']['block_name'][vradius][vradius+2][vradius]==target):
             events,_,_,_ = env.step([0,0,0,6,12,0,0,0]); save_rgb_for_video(events)
-            while (events['voxels']['block_name'][vradius][vradius+2][vradius]==target):
-                events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+            events, _ = bounded_attack_until_voxel_changes(
+                events, lambda current: current['voxels']['block_name'][vradius][vradius+2][vradius] == target, "top"
+            )
             events,_,_,_ = env.step([0,0,0,18,12,0,0,0]); save_rgb_for_video(events)
             sleep(env)
         # down
         if (events['voxels']['block_name'][vradius][vradius-1][vradius]==target):
             events,_,_,_ = env.step([0,0,0,18,12,0,0,0]); save_rgb_for_video(events)
-            while (events['voxels']['block_name'][vradius][vradius-1][vradius]==target):
-                events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+            events, _ = bounded_attack_until_voxel_changes(
+                events, lambda current: current['voxels']['block_name'][vradius][vradius-1][vradius] == target, "down"
+            )
             events,_,_,_ = env.step([0,0,0,6,12,0,0,0]); save_rgb_for_video(events)
             sleep(env)
 

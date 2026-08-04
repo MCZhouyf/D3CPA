@@ -97,3 +97,25 @@ def test_crafting_table_prep_aborts_in_solid_tunnel(monkeypatch):
     assert quantities == [1.0, 6.0, 4.0]
     # No table-use (1) nor item-craft (4) action is sent after failed prep.
     assert all(action[5] not in {1, 4} for action in env.calls)
+
+
+def test_underground_mine_caps_static_target_attacks(monkeypatch):
+    env = _StoneAheadEnv()
+    memory = _Memory()
+    size = structured_actions.vradius * 2 + 3
+    env.events["voxels"]["block_name"] = np.full((size, size, size), "air", dtype=object)
+    env.events["voxels"]["block_name"][
+        structured_actions.vradius + 1, structured_actions.vradius + 1, structured_actions.vradius
+    ] = "stone"
+    env.events["inventory"] = {
+        "name": np.array(["wooden pickaxe"]),
+        "quantity": np.array([1.0]),
+    }
+    monkeypatch.setattr(structured_actions, "share_memory", lambda *args: None)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda _events: None)
+    monkeypatch.setattr(structured_actions, "mine_ahead", lambda *args, **kwargs: False)
+
+    structured_actions.mine("cobblestone", "wooden pickaxe", True, env, memory)
+
+    attack_actions = [action for action in env.calls if action[5] == 3]
+    assert len(attack_actions) == 12
