@@ -2170,7 +2170,13 @@ def action_craft(env, item, memory,use_crafting_table,use_furnace,craft_num):
             print(f"action_craft: front floor{events['voxels']['block_name'][vradius+1][vradius-1][vradius]}\n block in front of body is {events['voxels']['block_name'][vradius+1][vradius][vradius]} \n and block in front of head is {events['voxels']['block_name'][vradius+1][vradius+1][vradius]}\n begin crafting {item}")
             print(f"7777777777")
             if not ready_for_table:
-                print("proceeding to use crafting table despite imperfect placement area")
+                # A table cannot be placed/used inside a solid tunnel. Continuing
+                # here made the bootstrap loop retry UI crafting, then drift farther
+                # underground without a usable pickaxe.
+                print("crafting-table prep failed; aborting this craft without placement")
+                name = events['inventory']['name'].tolist()
+                num = events['inventory']['quantity'].tolist()
+                return name, num
             else:
                 mine_ahead(env,memory)
             move_to_middle(env)

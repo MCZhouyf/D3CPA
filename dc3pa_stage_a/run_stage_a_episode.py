@@ -53,6 +53,48 @@ class StepBudgetEnv:
         return getattr(self._env, name)
 
 
+class TransportTimeoutEnv:
+    """Set a finite timeout on MineDojo's per-step Malmo sockets.
+
+    This is a transport liveness guard, not an episode timeout: it does not
+    change the whole-task step budget or impose a wall-clock task limit.
+    """
+
+    def __init__(self, env: Any, socket_timeout_seconds: float = 45.0) -> None:
+        if socket_timeout_seconds <= 0:
+            raise ValueError("socket_timeout_seconds must be positive")
+        self._env = env
+        self.socket_timeout_seconds = float(socket_timeout_seconds)
+
+    def _configure_bridge_sockets(self) -> None:
+        pending = [self._env]
+        visited: set[int] = set()
+        while pending:
+            candidate = pending.pop()
+            identity = id(candidate)
+            if identity in visited:
+                continue
+            visited.add(identity)
+            for instance in getattr(candidate, "_instances", ()) or ():
+                sock = getattr(instance, "client_socket", None)
+                if sock is not None:
+                    sock.settimeout(self.socket_timeout_seconds)
+            for attr in ("_env", "env", "unwrapped", "_sim", "sim", "_bridge_env", "bridge_env"):
+                try:
+                    nested = getattr(candidate, attr)
+                except (AttributeError, RuntimeError):
+                    continue
+                if nested is not None and nested is not candidate:
+                    pending.append(nested)
+
+    def step(self, *args: Any, **kwargs: Any) -> Any:
+        self._configure_bridge_sockets()
+        return self._env.step(*args, **kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._env, name)
+
+
 def _json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -290,6 +332,9 @@ def main(argv: list[str] | None = None) -> int:
             },
             )
             logger.install(env)
+        # Convert a dead local Malmo bridge into a recoverable controller error.
+        # This is per transport call only; it does not alter the episode step budget.
+        env = TransportTimeoutEnv(env)
         if args.max_env_steps is not None:
             step_budget_env = StepBudgetEnv(env, args.max_env_steps)
             return step_budget_env
