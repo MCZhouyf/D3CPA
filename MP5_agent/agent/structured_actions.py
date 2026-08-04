@@ -498,17 +498,28 @@ def mine(target,equipment,underground,env,memory):
     inventory_target_name = update_inventory_obj_name(old_target)
     initial_target_quantity = inventory_quantity(events, inventory_target_name)
 
+    def target_collected(current_events):
+        delta_inventory = current_events.get("delta_inv", {})
+        return (
+            np.isin(old_target, delta_inventory.get("inc_name_by_other", []))
+            or inventory_quantity(current_events, inventory_target_name) > initial_target_quantity
+        )
+
     def bounded_attack_until_voxel_changes(current_events, still_target, direction_label, max_hits=12):
         """Mine one adjacent underground voxel without an unbounded attack loop."""
         for _ in range(max_hits):
-            if not still_target(current_events):
+            if target_collected(current_events) or not still_target(current_events):
                 return current_events, True
             current_events, _, _, _ = env.step([0,0,0,12,12,3,0,0])
             save_rgb_for_video(current_events)
-        cleared = not still_target(current_events)
-        if not cleared:
+            # MineDojo can retain a stale voxel frame after a successful break;
+            # inventory/delta evidence is authoritative for this one-target action.
+            if target_collected(current_events):
+                return current_events, True
+        completed = target_collected(current_events) or not still_target(current_events)
+        if not completed:
             print(f"underground mining exhausted {max_hits} hits at {direction_label}")
-        return current_events, cleared
+        return current_events, completed
 
     def mine_adjacent_target(events, block_name):
         # Prefer deterministic close-range mining before relying on ray casts.
@@ -728,6 +739,8 @@ def mine(target,equipment,underground,env,memory):
             events, _ = bounded_attack_until_voxel_changes(
                 events, lambda current: current['voxels']['block_name'][vradius][vradius][vradius+1] == target, "right-down"
             )
+            if target_collected(events):
+                return events['inventory']['name'].tolist(), events['inventory']['quantity'].tolist()
             events,_,_,_ = env.step([0,0,0,9,12,0,0,0]); save_rgb_for_video(events)
             events,_,_,_ = env.step([0,0,0,12,6,0,0,0]); save_rgb_for_video(events)
             sleep(env)
@@ -737,6 +750,8 @@ def mine(target,equipment,underground,env,memory):
             events, _ = bounded_attack_until_voxel_changes(
                 events, lambda current: current['voxels']['block_name'][vradius][vradius+1][vradius+1] == target, "right-top"
             )
+            if target_collected(events):
+                return events['inventory']['name'].tolist(), events['inventory']['quantity'].tolist()
             events,_,_,_ = env.step([0,0,0,12,6,0,0,0]); save_rgb_for_video(events)
             sleep(env)
         # forward down
@@ -745,6 +760,8 @@ def mine(target,equipment,underground,env,memory):
             events, _ = bounded_attack_until_voxel_changes(
                 events, lambda current: current['voxels']['block_name'][vradius+1][vradius][vradius] == target, "forward-down"
             )
+            if target_collected(events):
+                return events['inventory']['name'].tolist(), events['inventory']['quantity'].tolist()
             events,_,_,_ = env.step([0,0,0,9,12,0,0,0]); save_rgb_for_video(events)
             sleep(env)
         # forward top
@@ -752,6 +769,8 @@ def mine(target,equipment,underground,env,memory):
             events, _ = bounded_attack_until_voxel_changes(
                 events, lambda current: current['voxels']['block_name'][vradius+1][vradius+1][vradius] == target, "forward-top"
             )
+            if target_collected(events):
+                return events['inventory']['name'].tolist(), events['inventory']['quantity'].tolist()
             sleep(env)
         # left down
         if (events['voxels']['block_name'][vradius][vradius][vradius-1]==target):
@@ -760,6 +779,8 @@ def mine(target,equipment,underground,env,memory):
             events, _ = bounded_attack_until_voxel_changes(
                 events, lambda current: current['voxels']['block_name'][vradius][vradius][vradius-1] == target, "left-down"
             )
+            if target_collected(events):
+                return events['inventory']['name'].tolist(), events['inventory']['quantity'].tolist()
             events,_,_,_ = env.step([0,0,0,9,12,0,0,0]); save_rgb_for_video(events)
             events,_,_,_ = env.step([0,0,0,12,18,0,0,0]); save_rgb_for_video(events)
             sleep(env)
@@ -769,6 +790,8 @@ def mine(target,equipment,underground,env,memory):
             events, _ = bounded_attack_until_voxel_changes(
                 events, lambda current: current['voxels']['block_name'][vradius][vradius+1][vradius-1] == target, "left-top"
             )
+            if target_collected(events):
+                return events['inventory']['name'].tolist(), events['inventory']['quantity'].tolist()
             events,_,_,_ = env.step([0,0,0,12,18,0,0,0]); save_rgb_for_video(events)
             sleep(env)
         # top
@@ -777,6 +800,8 @@ def mine(target,equipment,underground,env,memory):
             events, _ = bounded_attack_until_voxel_changes(
                 events, lambda current: current['voxels']['block_name'][vradius][vradius+2][vradius] == target, "top"
             )
+            if target_collected(events):
+                return events['inventory']['name'].tolist(), events['inventory']['quantity'].tolist()
             events,_,_,_ = env.step([0,0,0,18,12,0,0,0]); save_rgb_for_video(events)
             sleep(env)
         # down
@@ -785,10 +810,16 @@ def mine(target,equipment,underground,env,memory):
             events, _ = bounded_attack_until_voxel_changes(
                 events, lambda current: current['voxels']['block_name'][vradius][vradius-1][vradius] == target, "down"
             )
+            if target_collected(events):
+                return events['inventory']['name'].tolist(), events['inventory']['quantity'].tolist()
             events,_,_,_ = env.step([0,0,0,6,12,0,0,0]); save_rgb_for_video(events)
             sleep(env)
 
-    mine_ahead(env,memory)   
+    # Underground resource actions are one-target operations.  Do not clear a
+    # tunnel after a failed/finished target scan: that wastes pickaxe durability
+    # and can prevent the following dig_up/crafting steps.
+    if not underground:
+        mine_ahead(env,memory)
     events = sleep(env)
 
      # equipe dirt 

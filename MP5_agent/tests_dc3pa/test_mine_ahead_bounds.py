@@ -119,3 +119,42 @@ def test_underground_mine_caps_static_target_attacks(monkeypatch):
 
     attack_actions = [action for action in env.calls if action[5] == 3]
     assert len(attack_actions) == 12
+
+
+class _CollectingCobblestoneEnv(_StoneAheadEnv):
+    def __init__(self):
+        super().__init__()
+        size = structured_actions.vradius * 2 + 3
+        self.events["voxels"]["block_name"] = np.full((size, size, size), "air", dtype=object)
+        self.events["voxels"]["block_name"][
+            structured_actions.vradius + 1, structured_actions.vradius + 1, structured_actions.vradius
+        ] = "stone"
+        self.events["inventory"] = {
+            "name": np.array(["wooden pickaxe", "cobblestone"]),
+            "quantity": np.array([1.0, 0.0]),
+        }
+        self._attacks = 0
+
+    def step(self, action):
+        self.calls.append(list(action))
+        if action[5] == 3:
+            self._attacks += 1
+            self.events["inventory"]["quantity"][1] = 1.0
+            self.events["voxels"]["block_name"][
+                structured_actions.vradius + 1, structured_actions.vradius + 1, structured_actions.vradius
+            ] = "air"
+        return self.events, 0.0, False, {}
+
+
+def test_underground_mine_returns_after_first_collected_target(monkeypatch):
+    env = _CollectingCobblestoneEnv()
+    memory = _Memory()
+    monkeypatch.setattr(structured_actions, "share_memory", lambda *args: None)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda _events: None)
+    monkeypatch.setattr(structured_actions, "mine_ahead", lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("must not clear tunnel after collection")))
+
+    names, quantities = structured_actions.mine("cobblestone", "wooden pickaxe", True, env, memory)
+
+    assert names == ["wooden pickaxe", "cobblestone"]
+    assert quantities == [1.0, 1.0]
+    assert env._attacks == 1
