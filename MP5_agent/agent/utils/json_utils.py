@@ -146,6 +146,10 @@ def fix_and_parse_json(
     json_str: str, try_to_fix_with_gpt: bool = True
 ) -> Union[str, Dict[Any, Any]]:
     """Fix and parse JSON string"""
+    json_str = json_str.strip()
+    fenced = re.fullmatch(r"\`\`\`(?:json)?\s*(\{.*\})\s*\`\`\`", json_str, re.DOTALL)
+    if fenced is not None:
+        json_str = fenced.group(1)
     try:
         json_str = json_str.replace("\t", "")
         # print('-----', json_str)

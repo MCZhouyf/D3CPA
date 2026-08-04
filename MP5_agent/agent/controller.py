@@ -409,29 +409,12 @@ class Controller:
         if inventory.get(task_target, 0) >= 1:
             return True
 
-        if target == "log" and (
-            inventory.get("wooden pickaxe", 0) >= 1
-            or self._has_wooden_pickaxe_materials()
-        ):
+        if target == "log" and inventory.get("log", 0) >= int(step_times):
             return True
 
-        if name == "craft" and target == "planks" and (
-            inventory.get("wooden pickaxe", 0) >= 1
-            or self._has_wooden_pickaxe_materials()
-        ):
-            return True
-
-        if name == "craft" and target == "stick" and (
-            inventory.get("wooden pickaxe", 0) >= 1
-            or self._has_wooden_pickaxe_materials()
-        ) and inventory.get("stick", 0) >= 2:
-            return True
-
-        if name == "craft" and target == "crafting table" and (
-            inventory.get("wooden pickaxe", 0) >= 1
-            or self._has_wooden_pickaxe_materials()
-        ):
-            return True
+        if name == "craft" and target in {"planks", "stick", "crafting table"}:
+            requested_quantity = int(list(action["args"]["obj"].values())[0])
+            return inventory.get(target, 0) >= requested_quantity
 
         if name == "craft" and target == "wooden pickaxe" and inventory.get("wooden pickaxe", 0) >= 1:
             return True
@@ -759,34 +742,9 @@ class Controller:
             step_count=len(workflow),
         )
 
-        if self._is_deep_mining_task(task_information) and not underground:
-            self._sync_memory(env)
-            if not self._diamond_bootstrap_ready():
-                print(f"Running {task_information.get('task')} bootstrap before workflow execution")
-                self.ensure_wooden_bootstrap(env, underground)
-       
         for step_index, step in enumerate(workflow):
             events = self._sync_memory(env)
             emit_step_started(step, step_index)
-            if (
-                self._is_deep_mining_task(task_information)
-                and not underground
-                and self._diamond_bootstrap_ready()
-                and self._is_diamond_bootstrap_step(step)
-            ):
-                if any(
-                    action["name"] == "craft"
-                    and normalize_inventory_name(list(action["args"]["obj"].keys())[0]) == "stick"
-                    and self.memory.inventory.get("stick", 0) < 2
-                    for action in step["actions"]
-                ):
-                    print(
-                        f"Not skipping stick craft because later mining tools still need sticks: {step}"
-                    )
-                else:
-                    print(f"Skipping bootstrap step because wooden bootstrap is already ready: {step}")
-                    emit_step_finished(step, step_index, "skipped_satisfied")
-                    continue
             if (
                 self._is_deep_mining_task(task_information)
                 and self._diamond_step_already_satisfied(step)
@@ -957,15 +915,6 @@ class Controller:
                         craft_name = list(args["obj"].keys())[0].replace(" ", "_")
                         craft_num = int(list(args["obj"].values())[0])
                         crafted_obj = normalize_inventory_name(list(args["obj"].keys())[0])
-                        if (
-                            self._is_deep_mining_task(task_information)
-                            and not underground
-                            and (
-                                craft_name in {"stick", "crafting_table", "wooden_pickaxe"}
-                                or args["platform"] == "crafting table"
-                            )
-                        ):
-                            self.ensure_wooden_bootstrap(env, underground)
                         if self._is_deep_mining_task(task_information):
                             self._prepare_deep_mining_craft_dependencies(env, crafted_obj)
                      
