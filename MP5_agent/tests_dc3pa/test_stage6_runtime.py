@@ -20,6 +20,15 @@ from tests_dc3pa.helpers_stage6 import (
 )
 
 
+class ResettableEnv:
+    def __init__(self):
+        self.reset_calls = 0
+
+    def reset(self):
+        self.reset_calls += 1
+        return {"reset": self.reset_calls}
+
+
 def build_runtime(
     *,
     mode="reasoning_only",
@@ -32,6 +41,7 @@ def build_runtime(
     multimodal_memory=None,
     state_provider=None,
     reflexion=None,
+    env=None,
 ):
     plan = simple_plan()
     reasoning = reasoning or StaticPlanSource(plan)
@@ -41,7 +51,7 @@ def build_runtime(
         **(config_overrides or {}),
     )
     return Stage6ClosedLoopRunner(
-        env=object(),
+        env=env or ResettableEnv(),
         config=config,
         reasoning_chain=reasoning,
         legacy_plan_source=reasoning if mode == "mp5_legacy" else None,
@@ -279,3 +289,38 @@ def test_mismatched_plan_task_is_blocked_before_controller():
     assert not result.success
     assert result.controller_execution_count == 0
     assert result.failure_reason == "unhandled_planning_failure"
+
+def test_reactive_replan_resets_environment_and_clears_underground_state():
+    env = ResettableEnv()
+    runtime = build_runtime(
+        controller_results=(False, True),
+        goal_values=(True,),
+        env=env,
+    )
+
+    result = runtime.run_task({"task": "log"}, underground=True)
+
+    assert result.success
+    assert env.reset_calls == 1
+    assert runtime.controller.calls[0][3] is True
+    assert runtime.controller.calls[1][3] is False
+    reset_events = [
+        event for event in result.events if event.event_type == "environment_reset_completed"
+    ]
+    assert len(reset_events) == 1
+    assert reset_events[0].attempt == 2
+
+
+def test_retry_stops_when_environment_cannot_be_reset():
+    runtime = build_runtime(
+        controller_results=(False, True),
+        goal_values=(True,),
+        env=object(),
+    )
+
+    result = runtime.run_task({"task": "log"})
+
+    assert not result.success
+    assert result.failure_reason == "environment_reset_unavailable"
+    assert result.controller_execution_count == 1
+    assert any(event.event_type == "environment_reset_failed" for event in result.events)

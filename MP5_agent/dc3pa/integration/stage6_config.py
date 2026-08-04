@@ -49,6 +49,9 @@ class Stage6RuntimeConfig:
     record_multimodal_memory: bool = True
     capture_initial_scene: bool = True
     capture_final_scene: bool = True
+    # A new execution attempt must start from a fresh Minecraft world state.
+    # Reflection is retained, but position, inventory, and underground status are not.
+    reset_environment_between_attempts: bool = True
 
     # Round-1 lifecycle controls. ``acquire`` preserves the legacy write path.
     memory_mode: str = MemoryMode.ACQUIRE.value
@@ -89,6 +92,7 @@ class Stage6RuntimeConfig:
             "record_multimodal_memory",
             "capture_initial_scene",
             "capture_final_scene",
+            "reset_environment_between_attempts",
             "telemetry_enabled",
         ):
             _strict_bool(getattr(self, label), label)

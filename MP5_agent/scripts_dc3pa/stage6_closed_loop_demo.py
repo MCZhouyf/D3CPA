@@ -64,6 +64,15 @@ class DemoStateProvider:
         )
 
 
+class DemoEnv:
+    def __init__(self):
+        self.reset_calls = 0
+
+    def reset(self):
+        self.reset_calls += 1
+        return {"reset": self.reset_calls}
+
+
 class DemoController:
     def __init__(self):
         self.calls = 0
@@ -119,7 +128,7 @@ def main() -> None:
     controller = DemoController()
     multimodal_memory = DemoMemory()
     runtime = Stage6ClosedLoopRunner(
-        env=object(),
+        env=DemoEnv(),
         config=Stage6RuntimeConfig(mode="dc3pa", max_execution_attempts=2),
         reasoning_chain=StaticReasoning(plan),
         cognitive_planner=DemoCognitivePlanner(plan),

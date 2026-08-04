@@ -636,6 +636,59 @@ class Stage6ClosedLoopRunner:
         failure_reason = "attempt_limit_reached"
 
         for attempt_index in range(1, self.config.max_execution_attempts + 1):
+            if attempt_index > 1 and self.config.reset_environment_between_attempts:
+                reset = getattr(self.env, "reset", None)
+                if not callable(reset):
+                    failure_reason = "environment_reset_unavailable"
+                    self._emit(
+                        events,
+                        "environment_reset_failed",
+                        attempt_index,
+                        {"reason": failure_reason},
+                    )
+                    attempts.append(
+                        AttemptRecord(
+                            attempt=attempt_index,
+                            plan_id=None,
+                            plan_version=None,
+                            controller_executed=False,
+                            controller_success=False,
+                            goal_success=False,
+                            duration_seconds=0.0,
+                            blocked_reason=failure_reason,
+                        )
+                    )
+                    break
+                try:
+                    reset()
+                except Exception as exc:
+                    failure_reason = f"environment_reset_failed:{type(exc).__name__}"
+                    self._emit(
+                        events,
+                        "environment_reset_failed",
+                        attempt_index,
+                        {"reason": failure_reason, "error": str(exc)},
+                    )
+                    attempts.append(
+                        AttemptRecord(
+                            attempt=attempt_index,
+                            plan_id=None,
+                            plan_version=None,
+                            controller_executed=False,
+                            controller_success=False,
+                            goal_success=False,
+                            duration_seconds=0.0,
+                            blocked_reason=failure_reason,
+                        )
+                    )
+                    break
+                underground = False
+                self._emit(
+                    events,
+                    "environment_reset_completed",
+                    attempt_index,
+                    {"underground": underground},
+                )
             started = time.monotonic()
             initial_snapshot = self.state_provider.snapshot(task_information, underground)
             if initial_snapshot.state.task != task:
