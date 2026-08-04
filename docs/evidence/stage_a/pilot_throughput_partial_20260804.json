@@ -1,0 +1,52 @@
+{
+  "status": "partial_censored_pilot",
+  "run_root": "runs/stage_a_v2_diagnostic_pilot_20260804",
+  "planned_episodes": 6,
+  "completed_episodes": 1,
+  "interrupted_episodes": 1,
+  "unstarted_episodes": 4,
+  "completed_episode": {
+    "mode": "mp5_legacy",
+    "task": "mine log",
+    "tier": "basic",
+    "seed": 31001,
+    "success": true,
+    "wall_clock_seconds": 80.11342889908701,
+    "attempt_count": 1,
+    "llm_calls_completed": 1,
+    "llm_calls_failed": 0,
+    "token_usage_status": "provider_not_exposed_in_stage6_trace",
+    "raw_write_records": 2,
+    "substitute_write_records": 1,
+    "calls_by_function": {
+      "_set_inventory_from_memory": 1
+    },
+    "granted_by_task": {
+      "log": {
+        "dirt": 4,
+        "log": 1,
+        "sapling": 1
+      }
+    }
+  },
+  "interrupted_episode": {
+    "mode": "mp5_legacy",
+    "task": "obtain diamond",
+    "tier": "complex",
+    "seed": 31001,
+    "status": "censored_by_15_minute_orchestrator_timeout",
+    "observed_llm_calls_completed": 3,
+    "observed_llm_calls_failed": 1,
+    "last_trace_timestamp": "2026-08-04T11:46:44.471879+00:00",
+    "first_controller_failure": "missing wooden pickaxe",
+    "relay_failure": "read timeout"
+  },
+  "throughput_decision": {
+    "full_batch_episodes": 252,
+    "censored_two_episode_wall_clock_lower_bound_seconds": 900,
+    "lower_bound_seconds_per_episode": 450,
+    "lower_bound_full_batch_hours": 31.5,
+    "eight_hour_threshold_crossed": true,
+    "decision": "Do not scale or launch more episodes without a human choice."
+  }
+}

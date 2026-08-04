@@ -35,15 +35,41 @@ LLM call counts, and any provider-exposed token usage. If the extrapolated full
 diagnostic time exceeds eight hours, execution stops at that observation and a
 human scale decision is requested; it is never scaled unilaterally.
 
+
+## Pilot throughput result — partial and censored
+
+The authorized six-episode pilot was launched serially on 2026-08-04. One
+episode completed; the second was censored when the orchestration hard limit of
+15 minutes terminated the batch. The remaining four were deliberately not
+started. This is **not** a completed pilot, a success-rate result, a parity
+result, or a paper result.
+
+| Episode | Result | Wall time / calls | Scope observation |
+| --- | --- | --- | --- |
+| `mp5_legacy`, mine log, seed 31001 | success, 1 attempt | 80.1 s; 1 completed LLM call; token usage unavailable in the Stage6 trace | 2 raw writes; 1 positive grant, attributed to `_set_inventory_from_memory`: dirt×4, log×1, sapling×1 |
+| `mp5_legacy`, obtain diamond, seed 31001 | censored before completion | exceeded the remaining 15-minute batch allowance; 3 completed and 1 timed-out LLM call | first controller attempt failed for missing wooden pickaxe; no terminal outcome |
+
+The second record establishes that the full pilot did not complete within the
+orchestrator window. Counting the two scheduled slots against the 900-second
+window gives a conservative censored lower bound of 450 seconds/episode; the
+252-episode plan is therefore at least **31.5 hours** under that bound, above
+the eight-hour threshold. This is a throughput flag, not a performance claim.
+No G1/G2/G3 expansion will be started without a human scale decision.
+
+Table A's positive mine-log write is specifically evidence that the static 2/50
+deep-mining hypothesis cannot be treated as empirical scope: a non-deep-mining
+task already exercised a positive inventory write. It does not establish the
+actual 50-task affected count.
+
 ## Table A — actual substitute scope
 
 | Measure | Current value |
 | --- | --- |
-| `raw_write_records` | pending pilot |
-| `substitute_write_records` | pending pilot |
-| Actual affected tasks / static hypothesis | pending / 2 of 50 (static only) |
-| Grants by task/tier | pending pilot |
-| `calls_by_function` attribution | pending pilot |
+| `raw_write_records` | partial: 2 in the one completed mine-log episode |
+| `substitute_write_records` | partial: 1 in the one completed mine-log episode |
+| Actual affected tasks / static hypothesis | partial: 1 of 1 observed / 2 of 50 (static only) |
+| Grants by task/tier | partial: basic mine log → dirt×4, log×1, sapling×1 |
+| `calls_by_function` attribution | partial: `_set_inventory_from_memory`: 1 |
 
 Any actual affected count above two will be conspicuous in the report.
 
