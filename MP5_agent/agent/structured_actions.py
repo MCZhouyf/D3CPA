@@ -822,83 +822,76 @@ def mine_ahead_aboveground(env):
 # Agent facing north -> direction = 0; Agent facing west -> direction = 1; 
 # Agent facing east -> direction = 2; Agent facing south -> direction = 3; 
 ######## only refine direction=0, other to be done
-def mine_ahead(env,memory,direction = 0):
-    events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); 
-    share_memory(memory,events)
+def mine_ahead(env, memory, direction=0, max_hits=12):
+    """Clear the body/head blocks in one direction with a finite attack budget.
+
+    Returns ``True`` only when both target blocks are clear.  Callers can therefore
+    choose recovery rather than assuming that a failed clearance opened a passage.
+    """
+    if isinstance(max_hits, bool) or not isinstance(max_hits, int) or max_hits <= 0:
+        raise ValueError("max_hits must be a positive integer")
+    if direction not in {0, 1, 2, 3}:
+        raise ValueError("direction must be one of 0, 1, 2, or 3")
+
+    events, _, _, _ = env.step([0, 0, 0, 12, 12, 0, 0, 0])
+    share_memory(memory, events)
     events = sleep(env)
-    print('trying to mine')
-    # move_to_middle(env)
-    # equipe iron pickaxe in deep 
+    print("trying to mine")
     print(f"mine_ahead:{memory.inventory}")
 
-    def bounded_attack_until(clear_check, look_action=None, max_hits=12):
+    def bounded_attack_until(clear_check, look_action=None):
         nonlocal events
         if look_action is not None:
-            events,reward,ended,addinfo = env.step(look_action); save_rgb_for_video(events)
-        for hit_idx in range(max_hits):
+            events, _, _, _ = env.step(look_action)
+            save_rgb_for_video(events)
+        for _ in range(max_hits):
             if clear_check(events):
                 return True
-            events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+            events, _, _, _ = env.step([0, 0, 0, 12, 12, 3, 0, 0])
+            save_rgb_for_video(events)
         return clear_check(events)
-        
-    
-    if (events['location_stats']['pos'][1]<20):
-        inventory = events['inventory']['name'].tolist()
-        
+
+    if events["location_stats"]["pos"][1] < 20:
+        inventory = events["inventory"]["name"].tolist()
         try:
-            cb_inventory_index = inventory.index('iron pickaxe')
+            pickaxe_index = inventory.index("iron pickaxe")
         except ValueError:
-            cb_inventory_index = -1 
-            print(f"no equipment iron pickaxe found")
-        if (cb_inventory_index != -1):
+            pickaxe_index = -1
+            print("no equipment iron pickaxe found")
+        if pickaxe_index != -1:
             events = sleep(env)
-            events,_,_,_ = env.step([0,0,0,12,12,5,0,cb_inventory_index]); save_rgb_for_video(events) #equip tool
-    
-    if (direction == 0):
-        if (events['voxels']['block_name'][vradius+1][vradius+1][vradius] not in ["air", "water"]) or (events['voxels']['block_name'][vradius+1][vradius][vradius] not in ["air", "water"]):
-            bounded_attack_until(
-                lambda e: e['voxels']['block_name'][vradius+1][vradius+1][vradius] in ["air", "water"],
-                max_hits=12,
-            )
-            bounded_attack_until(
-                lambda e: e['voxels']['block_name'][vradius+1][vradius][vradius] in ["air", "water"],
-                look_action=[0,0,0,15,12,0,0,0],
-                max_hits=12,
-            )
-            events,reward,ended,addinfo = env.step([0,0,0,9,12,0,0,0]); save_rgb_for_video(events)
-    elif (direction == 1):
-        bounded_attack_until(
-            lambda e: e['voxels']['block_name'][vradius][vradius][vradius-1] in ["air", "water"],
-            max_hits=12,
-        )
-        bounded_attack_until(
-            lambda e: e['voxels']['block_name'][vradius][vradius+1][vradius-1] in ["air", "water"],
-            look_action=[0,0,0,10,12,0,0,0],
-            max_hits=12,
-        )
-        events,reward,ended,addinfo = env.step([0,0,0,14,12,0,0,0]); save_rgb_for_video(events)
-    elif (direction == 2):
-        bounded_attack_until(
-            lambda e: e['voxels']['block_name'][vradius][vradius][vradius+1] in ["air", "water"],
-            max_hits=12,
-        )
-        bounded_attack_until(
-            lambda e: e['voxels']['block_name'][vradius][vradius+1][vradius+1] in ["air", "water"],
-            look_action=[0,0,0,10,12,0,0,0],
-            max_hits=12,
-        )
-        events,reward,ended,addinfo = env.step([0,0,0,14,12,0,0,0]); save_rgb_for_video(events)
+            events, _, _, _ = env.step([0, 0, 0, 12, 12, 5, 0, pickaxe_index])
+            save_rgb_for_video(events)
+
+    if direction == 0:
+        head_clear = lambda e: e["voxels"]["block_name"][vradius + 1][vradius + 1][vradius] in ("air", "water")
+        body_clear = lambda e: e["voxels"]["block_name"][vradius + 1][vradius][vradius] in ("air", "water")
+        body_look, restore_look = [0, 0, 0, 15, 12, 0, 0, 0], [0, 0, 0, 9, 12, 0, 0, 0]
+    elif direction == 1:
+        head_clear = lambda e: e["voxels"]["block_name"][vradius][vradius + 1][vradius - 1] in ("air", "water")
+        body_clear = lambda e: e["voxels"]["block_name"][vradius][vradius][vradius - 1] in ("air", "water")
+        body_look, restore_look = [0, 0, 0, 10, 12, 0, 0, 0], [0, 0, 0, 14, 12, 0, 0, 0]
+    elif direction == 2:
+        head_clear = lambda e: e["voxels"]["block_name"][vradius][vradius + 1][vradius + 1] in ("air", "water")
+        body_clear = lambda e: e["voxels"]["block_name"][vradius][vradius][vradius + 1] in ("air", "water")
+        body_look, restore_look = [0, 0, 0, 10, 12, 0, 0, 0], [0, 0, 0, 14, 12, 0, 0, 0]
     else:
-        bounded_attack_until(
-            lambda e: e['voxels']['block_name'][vradius-1][vradius][vradius] in ["air", "water"],
-            max_hits=12,
-        )
-        bounded_attack_until(
-            lambda e: e['voxels']['block_name'][vradius-1][vradius+1][vradius] in ["air", "water"],
-            look_action=[0,0,0,10,12,0,0,0],
-            max_hits=12,
-        )
-        events,reward,ended,addinfo = env.step([0,0,0,14,12,0,0,0]); save_rgb_for_video(events)
+        head_clear = lambda e: e["voxels"]["block_name"][vradius - 1][vradius + 1][vradius] in ("air", "water")
+        body_clear = lambda e: e["voxels"]["block_name"][vradius - 1][vradius][vradius] in ("air", "water")
+        body_look, restore_look = [0, 0, 0, 10, 12, 0, 0, 0], [0, 0, 0, 14, 12, 0, 0, 0]
+
+    if head_clear(events) and body_clear(events):
+        return True
+
+    head_cleared = bounded_attack_until(head_clear)
+    body_cleared = bounded_attack_until(body_clear, look_action=body_look)
+    events, _, _, _ = env.step(restore_look)
+    save_rgb_for_video(events)
+    cleared = head_cleared and body_cleared
+    if not cleared:
+        print(f"mine_ahead exhausted {max_hits} hits without clearing direction {direction}")
+    return cleared
+
 
 # Function enabling the agent to move one block. Underground specifies if agent is underground or not.
 # The direction parameter should fall within [0,3], 0: ahead along the positive direction of the x axis, 1: left, 2: right, 3: backward
@@ -2159,7 +2152,9 @@ def action_craft(env, item, memory,use_crafting_table,use_furnace,craft_num):
                 # Keep table-placement preparation bounded; getting stuck here blocks all later tool upgrades.
                 for prep_try in range(3):
                     print(f"crafting-table prep try {prep_try + 1}/3")
-                    mine_ahead(env,memory)
+                    cleared = mine_ahead(env, memory, max_hits=6)
+                    if not cleared:
+                        print("crafting-table prep clearance failed; continuing to bounded placement recovery")
                     move_to_middle(env)
                     events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
                     ready_for_table = (

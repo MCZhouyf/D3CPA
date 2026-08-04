@@ -1,0 +1,58 @@
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import numpy as np
+
+
+ROOT = Path(__file__).resolve().parents[1]
+AGENT_DIR = ROOT / "agent"
+if str(AGENT_DIR) not in sys.path:
+    sys.path.insert(0, str(AGENT_DIR))
+
+import structured_actions  # noqa: E402
+
+
+class _Memory:
+    inventory = {}
+
+
+class _StoneAheadEnv:
+    def __init__(self):
+        self.calls = []
+        size = structured_actions.vradius * 2 + 3
+        self.events = {
+            "location_stats": {"pos": np.array([0.0, 64.0, 0.0])},
+            "inventory": {
+                "name": np.array(["air"]),
+                "quantity": np.array([0.0]),
+            },
+            "voxels": {"block_name": np.full((size, size, size), "stone")},
+        }
+
+    def step(self, action):
+        self.calls.append(list(action))
+        return self.events, 0.0, False, {}
+
+
+def test_mine_ahead_returns_false_after_finite_attack_budget(monkeypatch):
+    env = _StoneAheadEnv()
+    monkeypatch.setattr(structured_actions, "share_memory", lambda *args: None)
+    monkeypatch.setattr(structured_actions, "sleep", lambda _env: env.events)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda _events: None)
+
+    assert not structured_actions.mine_ahead(env, _Memory(), max_hits=2)
+    # Initial sync + 2 head hits + look + 2 body hits + restore look.
+    assert len(env.calls) == 7
+
+
+def test_mine_ahead_returns_true_without_attacking_when_path_is_clear(monkeypatch):
+    env = _StoneAheadEnv()
+    env.events["voxels"]["block_name"].fill("air")
+    monkeypatch.setattr(structured_actions, "share_memory", lambda *args: None)
+    monkeypatch.setattr(structured_actions, "sleep", lambda _env: env.events)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda _events: None)
+
+    assert structured_actions.mine_ahead(env, _Memory(), max_hits=2)
+    assert len(env.calls) == 1
