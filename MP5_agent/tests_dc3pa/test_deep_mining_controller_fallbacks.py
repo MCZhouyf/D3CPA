@@ -92,13 +92,25 @@ def test_gold_uses_mining_target_aliases_and_recovery_flag(monkeypatch):
     assert result["success"]
 
 
-def test_gold_fallback_uses_valid_minedojo_item_name():
+def test_non_log_resource_fallback_is_disabled():
     controller = _controller({"iron pickaxe": 1})
     env = FakeEnv(controller.memory)
 
-    assert controller._fallback_mine_diamond_resource(env, "gold", 1)
-    assert env.set_inventory_calls[-1][-1].name == "gold_ore"
-    assert controller.memory.inventory["gold"] == 1.0
+    assert not controller._fallback_mine_diamond_resource(env, "gold", 1)
+    assert not env.set_inventory_calls
+
+
+def test_inventory_mutation_rejects_non_log_items():
+    controller = _controller({"planks": 2})
+    env = FakeEnv(controller.memory)
+
+    try:
+        controller._set_inventory_from_memory(env, {"diamond": 1})
+    except RuntimeError as exc:
+        assert "restricted to the log callback" in str(exc)
+    else:
+        raise AssertionError("non-log inventory mutation must be rejected")
+    assert not env.set_inventory_calls
 
 
 def test_gather_logs_falls_back_after_bounded_failed_attempts(monkeypatch):
@@ -142,20 +154,22 @@ def test_gather_logs_defers_callback_until_100_environment_steps(monkeypatch):
     assert env.set_inventory_calls
 
 
-def test_wooden_bootstrap_uses_deterministic_craft_fallbacks(monkeypatch):
+def test_wooden_bootstrap_does_not_synthesize_failed_crafts(monkeypatch):
     controller = _controller()
     env = FakeEnv(controller.memory)
 
     def fake_gather_logs(self, env, underground, target_logs):
-        self._set_inventory_from_memory(env, {"log": target_logs})
+        self._set_inventory_from_memory(
+            env, {"log": target_logs}, callback_kind="log_callback"
+        )
         return True
 
     monkeypatch.setattr(Controller, "_gather_logs", fake_gather_logs)
     monkeypatch.setattr(Controller, "_craft_bootstrap_item", lambda *args, **kwargs: None)
 
-    assert controller.ensure_wooden_bootstrap(env, underground=False)
-    assert controller.memory.inventory["wooden pickaxe"] == 1.0
-    assert controller.memory.inventory.get("crafting table", 0) >= 1.0
+    assert not controller.ensure_wooden_bootstrap(env, underground=False)
+    assert controller.memory.inventory.get("wooden pickaxe", 0) == 0
+    assert set(controller.memory.inventory) == {"log"}
 
 
 def test_cobblestone_step_requires_stone_pickaxe_minimum():
@@ -176,24 +190,21 @@ def test_cobblestone_step_requires_stone_pickaxe_minimum():
     assert controller._diamond_step_already_satisfied(step)
 
 
-def test_stone_pickaxe_dependency_preparation_fills_cobblestone():
+def test_dependency_preparation_does_not_synthesize_cobblestone_or_sticks():
     controller = _controller({"wooden pickaxe": 1, "cobblestone": 2})
     env = FakeEnv(controller.memory)
 
     controller._prepare_deep_mining_craft_dependencies(env, "stone pickaxe")
+    assert controller.memory.inventory["cobblestone"] == 2.0
 
-    assert controller.memory.inventory["cobblestone"] == 3.0
-
-
-def test_iron_pickaxe_dependency_preparation_fills_sticks():
     controller = _controller(
         {"crafting table": 1, "iron ingot": 3, "planks": 2, "wooden pickaxe": 1}
     )
     env = FakeEnv(controller.memory)
-
     controller._prepare_deep_mining_craft_dependencies(env, "iron pickaxe")
 
-    assert controller.memory.inventory["stick"] >= 2.0
+    assert controller.memory.inventory.get("stick", 0) == 0
+    assert not env.set_inventory_calls
 
 
 def test_move_to_resource_fallback_after_bounded_attempts(monkeypatch):
@@ -223,9 +234,10 @@ def test_move_to_resource_fallback_after_bounded_attempts(monkeypatch):
         env, workflow, {"task": "diamond"}, underground=False
     )
 
-    assert result["success"]
+    assert not result["success"]
     assert not underground
-    assert controller.memory.inventory["cobblestone"] == 3.0
+    assert controller.memory.inventory.get("cobblestone", 0) == 0
+    assert not env.set_inventory_calls
 
 
 class _UpwardEnv(FakeEnv):
@@ -455,10 +467,22 @@ def test_missing_sticks_are_recovered_from_logs_in_same_attempt(monkeypatch):
     )
 
     def fake_gather(self, target_env, underground, target_logs, max_attempts=2):
-        self._set_inventory_from_memory(target_env, {"log": target_logs})
+        self._set_inventory_from_memory(
+            target_env, {"log": target_logs}, callback_kind="log_callback"
+        )
         return True
 
     monkeypatch.setattr(Controller, "_gather_logs", fake_gather)
+
+    def fake_physical_craft(self, target_env, craft_name, use_crafting_table, craft_num=1):
+        if craft_name == "planks":
+            self.memory.inventory["log"] -= craft_num
+            self.memory.inventory["planks"] = self.memory.inventory.get("planks", 0) + 4 * craft_num
+        elif craft_name == "stick":
+            self.memory.inventory["planks"] -= 2 * craft_num
+            self.memory.inventory["stick"] = self.memory.inventory.get("stick", 0) + 4 * craft_num
+
+    monkeypatch.setattr(Controller, "_craft_bootstrap_item", fake_physical_craft)
 
     recovered, underground = controller._recover_missing_craft_materials(
         env,
@@ -513,7 +537,9 @@ def test_missing_direct_logs_are_gathered_in_same_attempt(monkeypatch):
 
     def fake_gather(self, target_env, underground, target_logs, max_attempts=2):
         gathered.append(target_logs)
-        self._set_inventory_from_memory(target_env, {"log": target_logs})
+        self._set_inventory_from_memory(
+            target_env, {"log": target_logs}, callback_kind="log_callback"
+        )
         return True
 
     monkeypatch.setattr(Controller, "_gather_logs", fake_gather)

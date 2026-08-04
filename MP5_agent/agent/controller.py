@@ -94,20 +94,43 @@ class Controller:
             and inventory.get("stick", 0) >= 2
         )
 
-    def _set_inventory_from_memory(self, env, overrides=None):
-        overrides = overrides or {}
-        merged_inventory = dict(self.memory.inventory)
-        for item_name, quantity in overrides.items():
-            normalized_name = normalize_inventory_name(item_name)
-            if quantity <= 0:
-                merged_inventory.pop(normalized_name, None)
-            else:
-                merged_inventory[normalized_name] = quantity
+    def _set_inventory_from_memory(self, env, overrides=None, *, callback_kind=""):
+        """Apply the sole permitted inventory mutation: a delayed log callback.
+
+        All non-log resources and all crafted items must be obtained through
+        Minecraft actions.  This guard makes accidental inventory fallback a
+        hard failure instead of silently turning an execution failure into a
+        successful episode.
+        """
+        normalized_overrides = {
+            normalize_inventory_name(item_name): float(quantity)
+            for item_name, quantity in (overrides or {}).items()
+        }
+        current_inventory = {
+            normalize_inventory_name(item_name): float(quantity)
+            for item_name, quantity in self.memory.inventory.items()
+            if item_name != "air" and quantity > 0
+        }
+        if callback_kind != "log_callback" or set(normalized_overrides) != {"log"}:
+            raise RuntimeError("inventory mutation is restricted to the log callback")
+        requested_logs = normalized_overrides["log"]
+        if requested_logs < current_inventory.get("log", 0):
+            raise RuntimeError("log callback may only add missing logs")
+
+        merged_inventory = dict(current_inventory)
+        merged_inventory["log"] = requested_logs
+        changed_non_logs = {
+            item_name
+            for item_name in set(current_inventory) | set(merged_inventory)
+            if item_name != "log"
+            and current_inventory.get(item_name, 0) != merged_inventory.get(item_name, 0)
+        }
+        if changed_non_logs:
+            raise RuntimeError(f"log callback attempted to change non-log items: {changed_non_logs}")
 
         inventory_items = []
-        slot_idx = 0
-        for item_name, quantity in merged_inventory.items():
-            if item_name == "air" or quantity <= 0:
+        for slot_idx, (item_name, quantity) in enumerate(merged_inventory.items()):
+            if quantity <= 0:
                 continue
             minedojo_item_name = "gold_ore" if item_name == "gold" else item_name.replace(" ", "_")
             inventory_items.append(
@@ -118,85 +141,20 @@ class Controller:
                     quantity=int(quantity),
                 )
             )
-            slot_idx += 1
 
         env.set_inventory(inventory_items)
         self._sync_memory(env)
-        # MineDojo can report one stale inventory frame immediately after set_inventory.
-        # Keep deterministic deep-mining fallbacks stable for the current controller turn.
-        self.memory.inventory = {
-            item_name: float(quantity)
-            for item_name, quantity in merged_inventory.items()
-            if item_name != "air" and quantity > 0
-        }
-
+        # MineDojo can report one stale frame immediately after set_inventory.
+        self.memory.inventory = merged_inventory
     def _fallback_craft_wooden_pickaxe(self, env):
-        if not self._has_wooden_pickaxe_materials():
-            return False
-
-        inventory = self.memory.inventory
-        print("Fallback crafting wooden pickaxe after bounded UI craft attempts.")
-        self._set_inventory_from_memory(
-            env,
-            {
-                "planks": inventory.get("planks", 0) - 3,
-                "stick": inventory.get("stick", 0) - 2,
-                "wooden pickaxe": inventory.get("wooden pickaxe", 0) + 1,
-            },
-        )
-        return self.memory.inventory.get("wooden pickaxe", 0) >= 1
-
+        print("Wooden-pickaxe inventory fallback is disabled; require physical crafting.")
+        return False
     def _fallback_craft_bootstrap_item(self, env, crafted_obj, target_quantity=1):
         crafted_obj = normalize_inventory_name(crafted_obj)
-        inventory = dict(self.memory.inventory)
-        current_quantity = inventory.get(crafted_obj, 0)
-        if current_quantity >= target_quantity:
+        if self.memory.inventory.get(crafted_obj, 0) >= target_quantity:
             return True
-
-        if crafted_obj == "planks":
-            crafts_needed = max(0, math.ceil((target_quantity - current_quantity) / 4))
-            if inventory.get("log", 0) < crafts_needed:
-                return False
-            print("Fallback crafting planks after bounded UI craft attempts.")
-            self._set_inventory_from_memory(
-                env,
-                {
-                    "log": inventory.get("log", 0) - crafts_needed,
-                    "planks": current_quantity + crafts_needed * 4,
-                },
-            )
-            return self.memory.inventory.get("planks", 0) >= target_quantity
-
-        if crafted_obj == "crafting table":
-            if inventory.get("planks", 0) < 4:
-                return False
-            print("Fallback crafting crafting table after bounded UI craft attempts.")
-            self._set_inventory_from_memory(
-                env,
-                {
-                    "planks": inventory.get("planks", 0) - 4,
-                    "crafting table": current_quantity + 1,
-                },
-            )
-            return self.memory.inventory.get("crafting table", 0) >= target_quantity
-
-        if crafted_obj == "stick":
-            crafts_needed = max(0, math.ceil((target_quantity - current_quantity) / 4))
-            planks_needed = crafts_needed * 2
-            if inventory.get("planks", 0) < planks_needed:
-                return False
-            print("Fallback crafting stick after bounded UI craft attempts.")
-            self._set_inventory_from_memory(
-                env,
-                {
-                    "planks": inventory.get("planks", 0) - planks_needed,
-                    "stick": current_quantity + crafts_needed * 4,
-                },
-            )
-            return self.memory.inventory.get("stick", 0) >= target_quantity
-
+        print(f"Inventory fallback for {crafted_obj} is disabled; require physical crafting.")
         return False
-
     def _has_stone_pickaxe_materials(self):
         inventory = self.memory.inventory
         return (
@@ -206,45 +164,19 @@ class Controller:
         )
 
     def _fallback_craft_stone_pickaxe(self, env):
-        if not self._has_stone_pickaxe_materials():
-            return False
-
-        inventory = self.memory.inventory
-        print("Fallback crafting stone pickaxe after bounded UI craft attempts.")
-        self._set_inventory_from_memory(
-            env,
-            {
-                "cobblestone": inventory.get("cobblestone", 0) - 3,
-                "stick": inventory.get("stick", 0) - 2,
-                "stone pickaxe": inventory.get("stone pickaxe", 0) + 1,
-            },
-        )
-        return self.memory.inventory.get("stone pickaxe", 0) >= 1
-
+        if self.memory.inventory.get("stone pickaxe", 0) >= 1:
+            return True
+        print("Stone-pickaxe inventory fallback is disabled; require physical crafting.")
+        return False
     def _fallback_mine_diamond_resource(self, env, inventory_obj, required_quantity):
         inventory_obj = normalize_inventory_name(inventory_obj)
-        current_quantity = self.memory.inventory.get(inventory_obj, 0)
-        if current_quantity >= required_quantity:
+        if self.memory.inventory.get(inventory_obj, 0) >= required_quantity:
             return True
-
-        if inventory_obj == "log":
-            pass
-        elif inventory_obj == "coal" and self.memory.inventory.get("wooden pickaxe", 0) < 1:
-            return False
-        elif inventory_obj == "cobblestone" and self.memory.inventory.get("wooden pickaxe", 0) < 1:
-            return False
-        elif inventory_obj == "iron ore" and self.memory.inventory.get("stone pickaxe", 0) < 1:
-            return False
-        elif inventory_obj in {"diamond", "redstone", "gold"} and self.memory.inventory.get("iron pickaxe", 0) < 1:
-            return False
-
         print(
-            f"Fallback mining {inventory_obj} after bounded MineDojo attempts: "
-            f"{current_quantity} -> {required_quantity}"
+            f"Inventory fallback for {inventory_obj} is disabled; "
+            "require physical collection."
         )
-        self._set_inventory_from_memory(env, {inventory_obj: required_quantity})
-        return self.memory.inventory.get(inventory_obj, 0) >= required_quantity
-
+        return False
     def _deep_mining_required_quantity(self, inventory_obj, step_times):
         inventory_obj = normalize_inventory_name(inventory_obj)
         required_quantity = max(1, int(step_times))
@@ -275,104 +207,20 @@ class Controller:
 
     def _fallback_craft_diamond_item(self, env, crafted_obj, target_quantity):
         crafted_obj = normalize_inventory_name(crafted_obj)
-        inventory = self.memory.inventory
-        current_quantity = inventory.get(crafted_obj, 0)
-        if current_quantity >= target_quantity:
+        if self.memory.inventory.get(crafted_obj, 0) >= target_quantity:
             return True
-
-        if crafted_obj == "iron ingot":
-            target_quantity = max(target_quantity, 3)
-            craft_quantity = int(target_quantity - current_quantity)
-            if (
-                inventory.get("iron ore", 0) < craft_quantity
-                or inventory.get("coal", 0) < craft_quantity
-                or inventory.get("furnace", 0) < 1
-            ):
-                return False
-            print("Fallback smelting iron ingot after bounded furnace attempts.")
-            self._set_inventory_from_memory(
-                env,
-                {
-                    "iron ore": inventory.get("iron ore", 0) - craft_quantity,
-                    "coal": inventory.get("coal", 0) - craft_quantity,
-                    "iron ingot": current_quantity + craft_quantity,
-                },
-            )
-            return self.memory.inventory.get("iron ingot", 0) >= target_quantity
-
-        if crafted_obj == "furnace":
-            if inventory.get("cobblestone", 0) < 8:
-                return False
-            print("Fallback crafting furnace after bounded UI craft attempts.")
-            self._set_inventory_from_memory(
-                env,
-                {
-                    "cobblestone": inventory.get("cobblestone", 0) - 8,
-                    "furnace": current_quantity + 1,
-                },
-            )
-            return self.memory.inventory.get("furnace", 0) >= target_quantity
-
-        if crafted_obj == "iron pickaxe":
-            if inventory.get("iron ingot", 0) < 3 or inventory.get("stick", 0) < 2:
-                return False
-            print("Fallback crafting iron pickaxe after bounded UI craft attempts.")
-            self._set_inventory_from_memory(
-                env,
-                {
-                    "iron ingot": inventory.get("iron ingot", 0) - 3,
-                    "stick": inventory.get("stick", 0) - 2,
-                    "iron pickaxe": current_quantity + 1,
-                },
-            )
-            return self.memory.inventory.get("iron pickaxe", 0) >= target_quantity
-
+        print(
+            f"Inventory fallback for crafted {crafted_obj} is disabled; "
+            "require physical crafting."
+        )
         return False
-
     def _prepare_deep_mining_craft_dependencies(self, env, crafted_obj):
+        """Prepare only through physical actions; never synthesize dependencies."""
         crafted_obj = normalize_inventory_name(crafted_obj)
-
         if crafted_obj == "stone pickaxe":
+            # The wooden bootstrap itself executes normal craft actions.  Its
+            # only permitted mutation is the separately guarded log callback.
             self.ensure_wooden_bootstrap(env, underground=False)
-            if self.memory.inventory.get("cobblestone", 0) < 3:
-                self._fallback_mine_diamond_resource(env, "cobblestone", 3)
-            return
-
-        if crafted_obj == "furnace":
-            if (
-                self.memory.inventory.get("stone pickaxe", 0) < 1
-                and self._has_stone_pickaxe_materials()
-            ):
-                self._fallback_craft_stone_pickaxe(env)
-            if self.memory.inventory.get("cobblestone", 0) < 8:
-                self._fallback_mine_diamond_resource(env, "cobblestone", 8)
-            return
-
-        if crafted_obj == "iron ingot":
-            if (
-                self.memory.inventory.get("stone pickaxe", 0) < 1
-                and self._has_stone_pickaxe_materials()
-            ):
-                self._fallback_craft_stone_pickaxe(env)
-            if self.memory.inventory.get("iron ore", 0) < 3:
-                self._fallback_mine_diamond_resource(env, "iron ore", 3)
-            if self.memory.inventory.get("coal", 0) < 3:
-                self._fallback_mine_diamond_resource(env, "coal", 3)
-            if self.memory.inventory.get("furnace", 0) < 1:
-                if self.memory.inventory.get("cobblestone", 0) < 8:
-                    self._fallback_mine_diamond_resource(env, "cobblestone", 8)
-                self._fallback_craft_diamond_item(env, "furnace", 1)
-            return
-
-        if crafted_obj == "iron pickaxe":
-            if self.memory.inventory.get("iron ingot", 0) < 3:
-                self._prepare_deep_mining_craft_dependencies(env, "iron ingot")
-                self._fallback_craft_diamond_item(env, "iron ingot", 3)
-            if self.memory.inventory.get("stick", 0) < 2:
-                if self.memory.inventory.get("planks", 0) < 2:
-                    self.ensure_wooden_bootstrap(env, underground=False)
-                self._fallback_craft_bootstrap_item(env, "stick", 2)
-
     def _available_pickaxe(self):
         """Return an available pickaxe without maintaining a tool registry."""
         for item_name, quantity in self.memory.inventory.items():
@@ -448,12 +296,18 @@ class Controller:
             target_logs = max(current_logs, plank_crafts)
             if not self._gather_logs(env, False, target_logs):
                 return False, underground
-            if not self._fallback_craft_bootstrap_item(env, "planks", required_planks):
+            for _ in range(plank_crafts):
+                self._craft_bootstrap_item(env, "planks", False, 1)
+                self._sync_memory(env)
+            if self.memory.inventory.get("planks", 0) < required_planks:
                 return False, underground
-        if required_sticks and not self._fallback_craft_bootstrap_item(
-            env, "stick", required_sticks
-        ):
-            return False, underground
+        if required_sticks:
+            stick_crafts = max(0, math.ceil((required_sticks - self.memory.inventory.get("stick", 0)) / 4))
+            for _ in range(stick_crafts):
+                self._craft_bootstrap_item(env, "stick", False, 1)
+                self._sync_memory(env)
+            if self.memory.inventory.get("stick", 0) < required_sticks:
+                return False, underground
 
         self._sync_memory(env)
         recovered = all(
@@ -463,37 +317,16 @@ class Controller:
         return recovered, underground
 
     def _ensure_diamond_resource_before_action(self, env, action, step_times, required_quantity=None):
-        name = action["name"]
-        action_requirement = int(required_quantity or step_times)
-        if name not in {"find", "move_to", "mine"}:
+        """Skip a resource action only when the resource is already physical inventory."""
+        if action["name"] not in {"find", "move_to", "mine"}:
             return False
-
         target = self._diamond_action_target(action)
-        if target == "coal":
-            return self._fallback_mine_diamond_resource(
-                env,
-                "coal",
-                self._deep_mining_required_quantity("coal", action_requirement),
-            )
-        if target == "iron ore":
-            if self.memory.inventory.get("stone pickaxe", 0) < 1 and self._has_stone_pickaxe_materials():
-                self._fallback_craft_stone_pickaxe(env)
-            return self._fallback_mine_diamond_resource(
-                env,
-                "iron ore",
-                self._deep_mining_required_quantity("iron ore", action_requirement),
-            )
-        if target == "furnace":
-            return self.memory.inventory.get("furnace", 0) >= 1
-        if target in {"diamond", "redstone", "gold"}:
-            return self._fallback_mine_diamond_resource(
-                env,
-                target,
-                self._deep_mining_required_quantity(target, action_requirement),
-            )
-
-        return False
-
+        if not target:
+            return False
+        required = self._deep_mining_required_quantity(
+            target, int(required_quantity or step_times)
+        )
+        return self.memory.inventory.get(target, 0) >= required
     def _diamond_action_target(self, action):
         name = action["name"]
         args = action["args"]
@@ -701,7 +534,9 @@ class Controller:
                 "Log callback fired after 100 environment steps; adding only the "
                 f"requested logs: {self.memory.inventory.get('log', 0)} -> {target_logs}"
             )
-            self._set_inventory_from_memory(env, {"log": target_logs})
+            self._set_inventory_from_memory(
+                env, {"log": target_logs}, callback_kind="log_callback"
+            )
         if self.memory.inventory.get("log", 0) >= target_logs:
             self._complete_log_callback_window()
             return True
@@ -1152,22 +987,13 @@ class Controller:
                         craft_success = self._execute_craft_with_retries(
                             env, args, craft_name, craft_num, max_attempts=craft_attempts
                         )
-                        if (
-                            not craft_success
-                            and self._is_deep_mining_task(task_information)
-                            and normalize_inventory_name(list(args["obj"].keys())[0]) == "stone pickaxe"
-                        ):
-                            craft_success = self._fallback_craft_stone_pickaxe(env)
                         if not craft_success and self._is_deep_mining_task(task_information):
-                            crafted_obj = normalize_inventory_name(list(args["obj"].keys())[0])
-                            target_quantity = self._inventory_count(crafted_obj) + int(list(args["obj"].values())[0])
-                            craft_success = self._fallback_craft_diamond_item(env, crafted_obj, target_quantity)
-                        if not craft_success and self._is_deep_mining_task(task_information):
-                            crafted_obj = normalize_inventory_name(list(args["obj"].keys())[0])
-                            print(
-                                f"Craft did not reach requested inventory for {crafted_obj}, "
-                                "continuing deep mining workflow so reflection can adjust within finite attempts."
-                            )
+                            check_result = {
+                                "feedback": f"Physical crafting did not produce {crafted_obj}.",
+                                "success": False,
+                                "suggestion": "Keep the episode paused; do not synthesize the missing item.",
+                            }
+                            return finish_failure(step, step_index, action_index, action, check_result, underground)
                         emit_action_finished(step, step_index, action_index, action, "success", check_result)
 
                     elif name == "mine":
@@ -1189,15 +1015,6 @@ class Controller:
                             self.ensure_wooden_bootstrap(env, underground)
                             if args["tool"] is None:
                                 args["tool"] = "wooden pickaxe"
-
-                        if (
-                            self._is_deep_mining_task(task_information)
-                            and args["obj"] == "iron ore"
-                            and args["tool"] != "stone pickaxe"
-                            and self.memory.inventory.get("stone pickaxe", 0) < 1
-                            and self._has_stone_pickaxe_materials()
-                        ):
-                            self._fallback_craft_stone_pickaxe(env)
 
                         if (
                             self._is_deep_mining_task(task_information)
