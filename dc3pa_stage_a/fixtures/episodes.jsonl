@@ -1,0 +1,252 @@
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": true, "task": "log", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": true, "task": "log", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": true, "task": "log", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": false, "task": "plank", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": false, "task": "plank", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": false, "task": "plank", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": true, "task": "boat", "tier": "easy", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": true, "task": "boat", "tier": "easy", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": false, "task": "boat", "tier": "easy", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": true, "task": "furnace", "tier": "medium", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": false, "task": "furnace", "tier": "medium", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": false, "task": "furnace", "tier": "medium", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": false, "task": "iron ingot", "tier": "hard", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": false, "task": "iron ingot", "tier": "hard", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": false, "task": "iron ingot", "tier": "hard", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": false, "task": "diamond", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": true, "task": "diamond", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": true, "task": "diamond", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": false, "task": "redstone", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": true, "task": "redstone", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": false, "task": "redstone", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": true, "task": "log", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": true, "task": "log", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": true, "task": "log", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": true, "task": "plank", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": false, "task": "plank", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": true, "task": "plank", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": true, "task": "boat", "tier": "easy", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": true, "task": "boat", "tier": "easy", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": true, "task": "boat", "tier": "easy", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": false, "task": "furnace", "tier": "medium", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": false, "task": "furnace", "tier": "medium", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": true, "task": "furnace", "tier": "medium", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": true, "task": "iron ingot", "tier": "hard", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": false, "task": "iron ingot", "tier": "hard", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": false, "task": "iron ingot", "tier": "hard", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": true, "task": "diamond", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": false, "task": "diamond", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": true, "task": "diamond", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": true, "task": "redstone", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": false, "task": "redstone", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": true, "task": "redstone", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": false, "task": "log", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": true, "task": "log", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": false, "task": "log", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": true, "task": "plank", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": true, "task": "plank", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": true, "task": "plank", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": false, "task": "boat", "tier": "easy", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": true, "task": "boat", "tier": "easy", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": true, "task": "boat", "tier": "easy", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": false, "task": "furnace", "tier": "medium", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": false, "task": "furnace", "tier": "medium", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": false, "task": "furnace", "tier": "medium", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": true, "task": "iron ingot", "tier": "hard", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": true, "task": "iron ingot", "tier": "hard", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": true, "task": "iron ingot", "tier": "hard", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": false, "task": "diamond", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": true, "task": "diamond", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": false, "task": "diamond", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": false, "task": "redstone", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": false, "task": "redstone", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": false, "task": "redstone", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": false, "task": "log", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": true, "task": "log", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": false, "task": "log", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": true, "task": "plank", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": true, "task": "plank", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": true, "task": "plank", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": false, "task": "boat", "tier": "easy", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": true, "task": "boat", "tier": "easy", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": true, "task": "boat", "tier": "easy", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": true, "task": "furnace", "tier": "medium", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": true, "task": "furnace", "tier": "medium", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": true, "task": "furnace", "tier": "medium", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": true, "task": "iron ingot", "tier": "hard", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": true, "task": "iron ingot", "tier": "hard", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": false, "task": "iron ingot", "tier": "hard", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": false, "task": "diamond", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": true, "task": "diamond", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": false, "task": "diamond", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": true, "task": "redstone", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": true, "task": "redstone", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": true, "task": "redstone", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": false, "task": "log", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": false, "task": "log", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": true, "task": "log", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": true, "task": "plank", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": true, "task": "plank", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": true, "task": "plank", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": false, "task": "boat", "tier": "easy", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": false, "task": "boat", "tier": "easy", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": false, "task": "boat", "tier": "easy", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": true, "task": "furnace", "tier": "medium", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": true, "task": "furnace", "tier": "medium", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": true, "task": "furnace", "tier": "medium", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": false, "task": "iron ingot", "tier": "hard", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": true, "task": "iron ingot", "tier": "hard", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": true, "task": "iron ingot", "tier": "hard", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": true, "task": "diamond", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": false, "task": "diamond", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": true, "task": "diamond", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": true, "task": "redstone", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": false, "task": "redstone", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": false, "task": "redstone", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": false, "task": "log", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": false, "task": "log", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": true, "task": "log", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": true, "task": "plank", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": false, "task": "plank", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": false, "task": "plank", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": true, "task": "boat", "tier": "easy", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": false, "task": "boat", "tier": "easy", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": false, "task": "boat", "tier": "easy", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": true, "task": "furnace", "tier": "medium", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": true, "task": "furnace", "tier": "medium", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": true, "task": "furnace", "tier": "medium", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": false, "task": "iron ingot", "tier": "hard", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": false, "task": "iron ingot", "tier": "hard", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": true, "task": "iron ingot", "tier": "hard", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": false, "task": "diamond", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": true, "task": "diamond", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": true, "task": "diamond", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": false, "task": "redstone", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": true, "task": "redstone", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "acquire", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": false, "task": "redstone", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": true, "task": "log", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": true, "task": "log", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": false, "task": "log", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": false, "task": "plank", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": false, "task": "plank", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": true, "task": "plank", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": false, "task": "boat", "tier": "easy", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": true, "task": "boat", "tier": "easy", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": true, "task": "boat", "tier": "easy", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": true, "task": "furnace", "tier": "medium", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": true, "task": "furnace", "tier": "medium", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": true, "task": "furnace", "tier": "medium", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": false, "task": "iron ingot", "tier": "hard", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": true, "task": "iron ingot", "tier": "hard", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": true, "task": "iron ingot", "tier": "hard", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": true, "task": "diamond", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": true, "task": "diamond", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": true, "task": "diamond", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": false, "task": "redstone", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": false, "task": "redstone", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": true, "task": "redstone", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": false, "task": "log", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": true, "task": "log", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": true, "task": "log", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": false, "task": "plank", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": true, "task": "plank", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": true, "task": "plank", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": false, "task": "boat", "tier": "easy", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": true, "task": "boat", "tier": "easy", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": true, "task": "boat", "tier": "easy", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": true, "task": "furnace", "tier": "medium", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": false, "task": "furnace", "tier": "medium", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": true, "task": "furnace", "tier": "medium", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": true, "task": "iron ingot", "tier": "hard", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": false, "task": "iron ingot", "tier": "hard", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": false, "task": "iron ingot", "tier": "hard", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": true, "task": "diamond", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": true, "task": "diamond", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": true, "task": "diamond", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": false, "task": "redstone", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": false, "task": "redstone", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": false, "task": "redstone", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": false, "task": "log", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": false, "task": "log", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": true, "task": "log", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": false, "task": "plank", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": true, "task": "plank", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": true, "task": "plank", "tier": "basic", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": true, "task": "boat", "tier": "easy", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": false, "task": "boat", "tier": "easy", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": false, "task": "boat", "tier": "easy", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": false, "task": "furnace", "tier": "medium", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": true, "task": "furnace", "tier": "medium", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": false, "task": "furnace", "tier": "medium", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": true, "task": "iron ingot", "tier": "hard", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": false, "task": "iron ingot", "tier": "hard", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": false, "task": "iron ingot", "tier": "hard", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": true, "task": "diamond", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": false, "task": "diamond", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": true, "task": "diamond", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": false, "task": "redstone", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": true, "task": "redstone", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": false, "task": "redstone", "tier": "complex", "traversal": "forward"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": true, "task": "log", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": true, "task": "log", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": false, "task": "log", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": false, "task": "plank", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": false, "task": "plank", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": true, "task": "plank", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": false, "task": "boat", "tier": "easy", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": true, "task": "boat", "tier": "easy", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": true, "task": "boat", "tier": "easy", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": true, "task": "furnace", "tier": "medium", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": true, "task": "furnace", "tier": "medium", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": true, "task": "furnace", "tier": "medium", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": false, "task": "iron ingot", "tier": "hard", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": true, "task": "iron ingot", "tier": "hard", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": true, "task": "iron ingot", "tier": "hard", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": true, "task": "diamond", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": true, "task": "diamond", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": true, "task": "diamond", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 11, "success": false, "task": "redstone", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 12, "success": false, "task": "redstone", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "dc3pa", "seed": 13, "success": true, "task": "redstone", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": false, "task": "log", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": true, "task": "log", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": true, "task": "log", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": false, "task": "plank", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": true, "task": "plank", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": true, "task": "plank", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": false, "task": "boat", "tier": "easy", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": true, "task": "boat", "tier": "easy", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": true, "task": "boat", "tier": "easy", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": true, "task": "furnace", "tier": "medium", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": false, "task": "furnace", "tier": "medium", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": true, "task": "furnace", "tier": "medium", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": true, "task": "iron ingot", "tier": "hard", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": false, "task": "iron ingot", "tier": "hard", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": false, "task": "iron ingot", "tier": "hard", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": true, "task": "diamond", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": true, "task": "diamond", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": true, "task": "diamond", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 11, "success": false, "task": "redstone", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 12, "success": false, "task": "redstone", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "reasoning_only", "seed": 13, "success": false, "task": "redstone", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": false, "task": "log", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": false, "task": "log", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": true, "task": "log", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": false, "task": "plank", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": true, "task": "plank", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": true, "task": "plank", "tier": "basic", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": true, "task": "boat", "tier": "easy", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": false, "task": "boat", "tier": "easy", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": false, "task": "boat", "tier": "easy", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": false, "task": "furnace", "tier": "medium", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": true, "task": "furnace", "tier": "medium", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": false, "task": "furnace", "tier": "medium", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": true, "task": "iron ingot", "tier": "hard", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": false, "task": "iron ingot", "tier": "hard", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": false, "task": "iron ingot", "tier": "hard", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": true, "task": "diamond", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": false, "task": "diamond", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": true, "task": "diamond", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 11, "success": false, "task": "redstone", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 12, "success": true, "task": "redstone", "tier": "complex", "traversal": "reverse"}
+{"memory_mode": "evaluate_readonly", "run_id": "A", "runtime_mode": "mp5_legacy", "seed": 13, "success": false, "task": "redstone", "tier": "complex", "traversal": "reverse"}

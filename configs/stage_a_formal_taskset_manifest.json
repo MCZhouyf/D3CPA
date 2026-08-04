@@ -1,0 +1,625 @@
+{
+  "schema_version": 1,
+  "source_catalog": "/external/dc3pa/task_assets_schema/final_task_catalog.csv",
+  "source_catalog_sha256": "27f2dcaed41d02bdbc56a8d0b6fd4d7945cde896d412a67f1db862f8eeccda05",
+  "source_mapping_manifest": "/external/dc3pa/task_assets_schema/task_mapping_manifest.json",
+  "source_mapping_manifest_sha256": "e8b2e86a5ee0ca26273137bbe410bc00cefaa2a029b53bd53541605ea071d6cc",
+  "formal_task_count": 50,
+  "tier_counts": {
+    "basic": 10,
+    "easy": 10,
+    "medium": 10,
+    "hard": 10,
+    "complex": 10
+  },
+  "static_substitute_expected_tasks": [
+    "obtain diamond",
+    "mine redstone"
+  ],
+  "static_substitute_expected_fraction": 0.04,
+  "stage_a_coverage_subset": [
+    {
+      "formal_task_name": "mine log",
+      "tier": "basic",
+      "minimum_subgoals": 1,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/mine_log.json",
+      "creative_json_sha256": "4eaa7029325aede8c09c95dae1435bac796940be6b53ad1cbadff8ad954f7f50",
+      "runtime_candidate_target": "log",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft button",
+      "tier": "basic",
+      "minimum_subgoals": 2,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_button.json",
+      "creative_json_sha256": "81c2e53a1e0fcecdcd23a584645813d19d51cb9c5eab39c6bc349e0ef120bd7c",
+      "runtime_candidate_target": "wooden button",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft chest",
+      "tier": "easy",
+      "minimum_subgoals": 3,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_chest.json",
+      "creative_json_sha256": "c74ac600a969bc8c8b9b7495797ab5594cbfc7c09d7188a8a5028a6c4f0b013b",
+      "runtime_candidate_target": "chest",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft wooden pickaxe",
+      "tier": "easy",
+      "minimum_subgoals": 4,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_wooden_pickaxe.json",
+      "creative_json_sha256": "a8cf8ad252d302a387d219ebfb969d9c97d70ad5380bc30285f8bd48795bda9b",
+      "runtime_candidate_target": "wooden pickaxe",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "mine cobblestone",
+      "tier": "medium",
+      "minimum_subgoals": 5,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/mine_cobblestone.json",
+      "creative_json_sha256": "78708cfc81b5ddde91519cca6fd71cd075fca4225c5b9da152cef226ed012b1f",
+      "runtime_candidate_target": "cobblestone",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "mine iron ore",
+      "tier": "medium",
+      "minimum_subgoals": 7,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/mine_iron_ore.json",
+      "creative_json_sha256": "fab8ef2cb56283a66e14dcf566cb04319a5df054d620b560f97b7b079557e238",
+      "runtime_candidate_target": "iron ore",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "smelt glass",
+      "tier": "hard",
+      "minimum_subgoals": 8,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/smelt_glass.json",
+      "creative_json_sha256": "2eda109886e7291302c89d2ac073a36d0f867760216e7a6c18a806e04ee13eac",
+      "runtime_candidate_target": "glass",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft iron pickaxe",
+      "tier": "hard",
+      "minimum_subgoals": 9,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_iron_pickaxe.json",
+      "creative_json_sha256": "236c5e600e5cccd5041d1c9f56c06aaed9748ef7a7c757652389e9c830bb3328",
+      "runtime_candidate_target": "iron pickaxe",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "obtain diamond",
+      "tier": "complex",
+      "minimum_subgoals": 13,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/obtain_diamond.json",
+      "creative_json_sha256": "74be0a4264b1e4b68406bb78b89a780e57259d0965f9b1362cd7cca3cb126864",
+      "runtime_candidate_target": "diamond",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": true
+    },
+    {
+      "formal_task_name": "mine redstone",
+      "tier": "complex",
+      "minimum_subgoals": 13,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/mine_redstone.json",
+      "creative_json_sha256": "0b43d96c80d3f97fed30f623fc723bc2cc9cad566364d881eb397f16f3e9b4e1",
+      "runtime_candidate_target": "redstone",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": true
+    }
+  ],
+  "entries": [
+    {
+      "formal_task_name": "mine log",
+      "tier": "basic",
+      "minimum_subgoals": 1,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/mine_log.json",
+      "creative_json_sha256": "4eaa7029325aede8c09c95dae1435bac796940be6b53ad1cbadff8ad954f7f50",
+      "runtime_candidate_target": "log",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "mine sand",
+      "tier": "basic",
+      "minimum_subgoals": 1,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/mine_sand.json",
+      "creative_json_sha256": "d92a24567cb61fa62763e53e70494cb32b64559a34e8430ed04d0692f5f74716",
+      "runtime_candidate_target": "sand",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "mine sapling",
+      "tier": "basic",
+      "minimum_subgoals": 1,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/mine_sapling.json",
+      "creative_json_sha256": "276bfaf5b10c94dbb02d1bfe5176e7d7f403a08882e29fa882d42f49cb78cee3",
+      "runtime_candidate_target": "sapling",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "mine wheat seeds",
+      "tier": "basic",
+      "minimum_subgoals": 1,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/mine_wheat_seeds.json",
+      "creative_json_sha256": "b48e8a980efb13225abb1f418121ee30de1876730f03c48653d71d0f6c849e3a",
+      "runtime_candidate_target": "wheat seeds",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "mine dirt",
+      "tier": "basic",
+      "minimum_subgoals": 1,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/mine_dirt.json",
+      "creative_json_sha256": "e9f3de0f53e82b7298393f06a70bf33229abdfb300b372b3515631d6f8daec5f",
+      "runtime_candidate_target": "dirt",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "mine grass",
+      "tier": "basic",
+      "minimum_subgoals": 2,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/mine_grass.json",
+      "creative_json_sha256": "377481e83e1fc16f99fcb969d09eb779a4bdf147d4631185d42bd0b7eca6f582",
+      "runtime_candidate_target": "grass",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft plank",
+      "tier": "basic",
+      "minimum_subgoals": 2,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_plank.json",
+      "creative_json_sha256": "533ca7776578d520ff8d971b77d699f4b5f153b28b049289ed2b2ffeaad97691",
+      "runtime_candidate_target": "planks",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft stick",
+      "tier": "basic",
+      "minimum_subgoals": 2,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_stick.json",
+      "creative_json_sha256": "95827d3e604f80f32645056d76601dd2ec1a710459369761f74a1e03a9cfabb3",
+      "runtime_candidate_target": "stick",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft button",
+      "tier": "basic",
+      "minimum_subgoals": 2,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_button.json",
+      "creative_json_sha256": "81c2e53a1e0fcecdcd23a584645813d19d51cb9c5eab39c6bc349e0ef120bd7c",
+      "runtime_candidate_target": "wooden button",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft crafting table",
+      "tier": "basic",
+      "minimum_subgoals": 2,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_crafting_table.json",
+      "creative_json_sha256": "ce94b190b8b763a8e62d00bd48c366d072a9e8964a636ae0246a2f11f7c88fcd",
+      "runtime_candidate_target": "crafting table",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft chest",
+      "tier": "easy",
+      "minimum_subgoals": 3,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_chest.json",
+      "creative_json_sha256": "c74ac600a969bc8c8b9b7495797ab5594cbfc7c09d7188a8a5028a6c4f0b013b",
+      "runtime_candidate_target": "chest",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft bowl",
+      "tier": "easy",
+      "minimum_subgoals": 3,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_bowl.json",
+      "creative_json_sha256": "b51bd6209679c9301e1bfc4b4cec9933eb67aa4adb5ac5f9ffee29b45ed6b201",
+      "runtime_candidate_target": "bowl",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft boat",
+      "tier": "easy",
+      "minimum_subgoals": 3,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_boat.json",
+      "creative_json_sha256": "c84c5722d5a56046ac15c5350caa0a8709cd17c34fa6d12f325f10dd25e5036d",
+      "runtime_candidate_target": "boat",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft wooden slab",
+      "tier": "easy",
+      "minimum_subgoals": 3,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_wooden_slab.json",
+      "creative_json_sha256": "a2dc27cab100f68a70e8a2ed65d0a567b1a7084ff02bae8ff6cd5fd606d87285",
+      "runtime_candidate_target": "wooden slab",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft wooden pressure plate",
+      "tier": "easy",
+      "minimum_subgoals": 3,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_wooden_pressure_plate.json",
+      "creative_json_sha256": "e99c7572d1aa722ffe8255948bd40034a2df5d75393de401ab6ebf7f95e2b472",
+      "runtime_candidate_target": "wooden pressure plate",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft ladder",
+      "tier": "easy",
+      "minimum_subgoals": 4,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_ladder.json",
+      "creative_json_sha256": "a0e9e8b8473f2c4d81d44260eccf87cc2527deb35b46040fe1c3d5adb076191c",
+      "runtime_candidate_target": "ladder",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft barrel",
+      "tier": "easy",
+      "minimum_subgoals": 4,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_barrel.json",
+      "creative_json_sha256": "877fef9a507b8777181e9c770eb00d1635bce487948c9c66e389f79acff9430c",
+      "runtime_candidate_target": "barrel",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft wooden axe",
+      "tier": "easy",
+      "minimum_subgoals": 4,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_wooden_axe.json",
+      "creative_json_sha256": "7ad40c11a547af739e56225a18c81ab00829639444be97f48db146f110d1602a",
+      "runtime_candidate_target": "wooden axe",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft wooden pickaxe",
+      "tier": "easy",
+      "minimum_subgoals": 4,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_wooden_pickaxe.json",
+      "creative_json_sha256": "a8cf8ad252d302a387d219ebfb969d9c97d70ad5380bc30285f8bd48795bda9b",
+      "runtime_candidate_target": "wooden pickaxe",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft wooden sword",
+      "tier": "easy",
+      "minimum_subgoals": 4,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_wooden_sword.json",
+      "creative_json_sha256": "ee56b85fb5dd384db514e45ae7ad5cc13199df445e6e2861232c16dc6add5ddc",
+      "runtime_candidate_target": "wooden sword",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "mine cobblestone",
+      "tier": "medium",
+      "minimum_subgoals": 5,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/mine_cobblestone.json",
+      "creative_json_sha256": "78708cfc81b5ddde91519cca6fd71cd075fca4225c5b9da152cef226ed012b1f",
+      "runtime_candidate_target": "cobblestone",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "mine coal ore",
+      "tier": "medium",
+      "minimum_subgoals": 5,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/mine_coal_ore.json",
+      "creative_json_sha256": "ba8d6276fdab6f1bb99378bb76254257b9aa2cfb232cf029734049945a74e1ac",
+      "runtime_candidate_target": "coal ore",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft furnace",
+      "tier": "medium",
+      "minimum_subgoals": 5,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_furnace.json",
+      "creative_json_sha256": "731f7c18f6bdfc58ea11e90db3700834016703718345b4343dc712861b7e7403",
+      "runtime_candidate_target": "furnace",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft lever",
+      "tier": "medium",
+      "minimum_subgoals": 5,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_lever.json",
+      "creative_json_sha256": "1e94d7c9b7dcbddcdc0613ed575d5703bda9b3449ce5ba612d673e24c08f71b9",
+      "runtime_candidate_target": "lever",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft stone pickaxe",
+      "tier": "medium",
+      "minimum_subgoals": 6,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_stone_pickaxe.json",
+      "creative_json_sha256": "5a45b455c437dda3acc6166b61d3728b7c93c48285fb9b5ee13758bdcd2b0e0b",
+      "runtime_candidate_target": "stone pickaxe",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft stone axe",
+      "tier": "medium",
+      "minimum_subgoals": 6,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_stone_axe.json",
+      "creative_json_sha256": "1fb855af16982cb71cf5f0709c1b12a134ad52293ff795c14835ce17c65a2989",
+      "runtime_candidate_target": "stone axe",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft stone hoe",
+      "tier": "medium",
+      "minimum_subgoals": 6,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_stone_hoe.json",
+      "creative_json_sha256": "557ad6e881335ad298afc35e945ce355cfbc9345a2aeba7dd761063a87c8ed49",
+      "runtime_candidate_target": "stone hoe",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft stone shovel",
+      "tier": "medium",
+      "minimum_subgoals": 6,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_stone_shovel.json",
+      "creative_json_sha256": "35e0fd8d3d086feefca9b0d882fa1791b97e20c326d1490b8e2279c7cb134568",
+      "runtime_candidate_target": "stone shovel",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft stone sword",
+      "tier": "medium",
+      "minimum_subgoals": 6,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_stone_sword.json",
+      "creative_json_sha256": "af97de92b1baa8a4cce4a6064f1627ab410e34644158b9443d2237e0fff734b7",
+      "runtime_candidate_target": "stone sword",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "mine iron ore",
+      "tier": "medium",
+      "minimum_subgoals": 7,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/mine_iron_ore.json",
+      "creative_json_sha256": "fab8ef2cb56283a66e14dcf566cb04319a5df054d620b560f97b7b079557e238",
+      "runtime_candidate_target": "iron ore",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "smelt glass",
+      "tier": "hard",
+      "minimum_subgoals": 8,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/smelt_glass.json",
+      "creative_json_sha256": "2eda109886e7291302c89d2ac073a36d0f867760216e7a6c18a806e04ee13eac",
+      "runtime_candidate_target": "glass",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "smelt iron ingot",
+      "tier": "hard",
+      "minimum_subgoals": 8,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/smelt_iron_ingot.json",
+      "creative_json_sha256": "3cb65c3455a288eaba090cdc35276b01995d3cb8aad64a7f94935bee4c3e8a72",
+      "runtime_candidate_target": "iron ingot",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft iron bars",
+      "tier": "hard",
+      "minimum_subgoals": 8,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_iron_bars.json",
+      "creative_json_sha256": "97ce5d2a435b05246ce36ecf08da7fce7c074ff30429e86bb63e1b318d2bb5cf",
+      "runtime_candidate_target": "iron bars",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft carpentry table",
+      "tier": "hard",
+      "minimum_subgoals": 9,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_carpentry_table.json",
+      "creative_json_sha256": "b155419b3ac8d719495db69b4916d4df44832b0e55a78f0d470f7e05b7b55346",
+      "runtime_candidate_target": "carpentry table",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft iron pickaxe",
+      "tier": "hard",
+      "minimum_subgoals": 9,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_iron_pickaxe.json",
+      "creative_json_sha256": "236c5e600e5cccd5041d1c9f56c06aaed9748ef7a7c757652389e9c830bb3328",
+      "runtime_candidate_target": "iron pickaxe",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft iron door",
+      "tier": "hard",
+      "minimum_subgoals": 9,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_iron_door.json",
+      "creative_json_sha256": "79e3d7c3b65de9ea64a69be0ca3708bbec4147dcd0f577f013981d81b012df54",
+      "runtime_candidate_target": "iron door",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft iron trapdoor",
+      "tier": "hard",
+      "minimum_subgoals": 9,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_iron_trapdoor.json",
+      "creative_json_sha256": "cf7977f21584576e59bd82a30147aac337432491f2555af4a9b351dd213bc873",
+      "runtime_candidate_target": "iron trapdoor",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft rail",
+      "tier": "hard",
+      "minimum_subgoals": 10,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_rail.json",
+      "creative_json_sha256": "8699495993d0adee29b05a0f7c6ab77b22c077eb003c6fce72e155836825e1d5",
+      "runtime_candidate_target": "rail",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft cauldron",
+      "tier": "hard",
+      "minimum_subgoals": 10,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_cauldron.json",
+      "creative_json_sha256": "3c836d45a5a148aae53a407e39ceb35e57868048fb83893be1117f7d030917e3",
+      "runtime_candidate_target": "cauldron",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft bucket",
+      "tier": "hard",
+      "minimum_subgoals": 10,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_bucket.json",
+      "creative_json_sha256": "2b0f612588fc363cec9fb30c59e1ae572c306d88f6cbf45bf71789a3cf9762c9",
+      "runtime_candidate_target": "bucket",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "obtain diamond",
+      "tier": "complex",
+      "minimum_subgoals": 13,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/obtain_diamond.json",
+      "creative_json_sha256": "74be0a4264b1e4b68406bb78b89a780e57259d0965f9b1362cd7cca3cb126864",
+      "runtime_candidate_target": "diamond",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": true
+    },
+    {
+      "formal_task_name": "mine redstone",
+      "tier": "complex",
+      "minimum_subgoals": 13,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/mine_redstone.json",
+      "creative_json_sha256": "0b43d96c80d3f97fed30f623fc723bc2cc9cad566364d881eb397f16f3e9b4e1",
+      "runtime_candidate_target": "redstone",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": true
+    },
+    {
+      "formal_task_name": "craft dropper",
+      "tier": "complex",
+      "minimum_subgoals": 14,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_dropper.json",
+      "creative_json_sha256": "2e8d8d10276695d3984abd540d6eec0a327b885544e4e3787817e3c8794956c3",
+      "runtime_candidate_target": "dropper",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft redstone torch",
+      "tier": "complex",
+      "minimum_subgoals": 14,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_redstone_torch.json",
+      "creative_json_sha256": "86894b9fe8fc5244e61f45be6118216b3f92fd13a7f82f3ef0ed094dd336e8a5",
+      "runtime_candidate_target": "redstone torch",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft compass",
+      "tier": "complex",
+      "minimum_subgoals": 14,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_compass.json",
+      "creative_json_sha256": "1234711c932a251c0a110f535adcbf228a666c5c855da2c9eed2997724072567",
+      "runtime_candidate_target": "compass",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft clock",
+      "tier": "complex",
+      "minimum_subgoals": 15,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_clock.json",
+      "creative_json_sha256": "77fd032895f7e6316f48c26a06330c879c76dabed60295fe908a2fb06d14dff5",
+      "runtime_candidate_target": "clock",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft piston",
+      "tier": "complex",
+      "minimum_subgoals": 15,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_piston.json",
+      "creative_json_sha256": "28f6e750f66cf65599dbadee87af37531212e0c96574cbb77fb575ed7c24d43b",
+      "runtime_candidate_target": "piston",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft diamond pickaxe",
+      "tier": "complex",
+      "minimum_subgoals": 16,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_diamond_pickaxe.json",
+      "creative_json_sha256": "2452b2c2659f75ee02621319462e4c0759d9bce9ae51db8fd538d2d26b360b95",
+      "runtime_candidate_target": "diamond pickaxe",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft diamond sword",
+      "tier": "complex",
+      "minimum_subgoals": 16,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_diamond_sword.json",
+      "creative_json_sha256": "23e26d6b7d89f79ee3b4ec414a3d137b4062bb4789ac05866da5a7789bbc7912",
+      "runtime_candidate_target": "diamond sword",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    },
+    {
+      "formal_task_name": "craft raw gold block",
+      "tier": "complex",
+      "minimum_subgoals": 17,
+      "creative_json": "/external/dc3pa/task_assets_schema/creative_task_jsons/craft_raw_gold_block.json",
+      "creative_json_sha256": "8d7926e1f9924faa2b385297760a0d900208460bca7ec237706e9da44a109e2f",
+      "runtime_candidate_target": "raw gold block",
+      "registry_validation_status": "candidate_requires_runtime_registry_validation",
+      "static_controller_substitute_expected": false
+    }
+  ],
+  "caveat": "The external mapping manifest marks every candidate target as requiring runtime registry validation. Static scope is not an empirical substitute-use result."
+}

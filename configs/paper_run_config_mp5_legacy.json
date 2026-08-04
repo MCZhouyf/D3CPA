@@ -1,0 +1,22 @@
+{
+  "acquire_seeds": [
+    99520835,
+    210213609,
+    1770185547
+  ],
+  "env_flags": {
+    "DC3PA_CONTROLLER_BOUNDED_RESOURCE_FALLBACK": "1",
+    "DC3PA_LEGACY_TASK_HACKS": "0"
+  },
+  "evaluate_seeds": [
+    362974552,
+    435843602,
+    484956612
+  ],
+  "max_execution_attempts": 30,
+  "memory_mode": "evaluate_readonly",
+  "notes": "Stage A Option B frozen configuration. Seeds are a disjoint fixed partition from the locally available authorization schedule; they are not asserted to be the missing formal 50-task registry.",
+  "record_legacy_workflow_memory": false,
+  "record_multimodal_memory": false,
+  "runtime_mode": "mp5_legacy"
+}

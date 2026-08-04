@@ -1,0 +1,435 @@
+{
+  "counts": {
+    "episodes": 252,
+    "inventory_writes": 54
+  },
+  "dual_population": {
+    "all_tasks": {
+      "dc3pa": {
+        "episodes": 84,
+        "success_rate": 0.6190476190476191,
+        "successes": 52
+      },
+      "mp5_legacy": {
+        "episodes": 84,
+        "success_rate": 0.4523809523809524,
+        "successes": 38
+      },
+      "reasoning_only": {
+        "episodes": 84,
+        "success_rate": 0.5952380952380952,
+        "successes": 50
+      }
+    },
+    "substitute_free_task_count": 5,
+    "substitute_free_tasks": {
+      "dc3pa": {
+        "episodes": 60,
+        "success_rate": 0.6166666666666667,
+        "successes": 37
+      },
+      "mp5_legacy": {
+        "episodes": 60,
+        "success_rate": 0.4666666666666667,
+        "successes": 28
+      },
+      "reasoning_only": {
+        "episodes": 60,
+        "success_rate": 0.6166666666666667,
+        "successes": 37
+      }
+    }
+  },
+  "mode_symmetry": {
+    "calls_per_episode_relative_spread": 0.0,
+    "calls_per_episode_spread": 0.0,
+    "per_mode": {
+      "dc3pa": {
+        "calls_per_episode": 0.21428571428571427,
+        "episodes": 84,
+        "episodes_touched": 6,
+        "episodes_touched_fraction": 0.07142857142857142,
+        "granted_items": {
+          "coal": 18,
+          "cobblestone": 18,
+          "iron ore": 18
+        },
+        "substitute_calls": 18
+      },
+      "mp5_legacy": {
+        "calls_per_episode": 0.21428571428571427,
+        "episodes": 84,
+        "episodes_touched": 6,
+        "episodes_touched_fraction": 0.07142857142857142,
+        "granted_items": {
+          "coal": 18,
+          "cobblestone": 18,
+          "iron ore": 18
+        },
+        "substitute_calls": 18
+      },
+      "reasoning_only": {
+        "calls_per_episode": 0.21428571428571427,
+        "episodes": 84,
+        "episodes_touched": 6,
+        "episodes_touched_fraction": 0.07142857142857142,
+        "granted_items": {
+          "coal": 18,
+          "cobblestone": 18,
+          "iron ore": 18
+        },
+        "substitute_calls": 18
+      }
+    },
+    "symmetric_within_10pct": true
+  },
+  "order_invariance": {
+    "acquire": {
+      "agreed": 23,
+      "agreement_rate": 0.36507936507936506,
+      "compared_pairs": 63,
+      "mismatches": [
+        {
+          "forward_success": true,
+          "reverse_success": false,
+          "runtime_mode": "dc3pa",
+          "seed": 11,
+          "task": "log"
+        },
+        {
+          "forward_success": true,
+          "reverse_success": false,
+          "runtime_mode": "dc3pa",
+          "seed": 13,
+          "task": "log"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "dc3pa",
+          "seed": 11,
+          "task": "plank"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "dc3pa",
+          "seed": 12,
+          "task": "plank"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "dc3pa",
+          "seed": 13,
+          "task": "plank"
+        },
+        {
+          "forward_success": true,
+          "reverse_success": false,
+          "runtime_mode": "dc3pa",
+          "seed": 11,
+          "task": "boat"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "dc3pa",
+          "seed": 13,
+          "task": "boat"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "dc3pa",
+          "seed": 12,
+          "task": "furnace"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "dc3pa",
+          "seed": 13,
+          "task": "furnace"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "dc3pa",
+          "seed": 11,
+          "task": "iron ingot"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "dc3pa",
+          "seed": 12,
+          "task": "iron ingot"
+        },
+        {
+          "forward_success": true,
+          "reverse_success": false,
+          "runtime_mode": "dc3pa",
+          "seed": 13,
+          "task": "diamond"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "dc3pa",
+          "seed": 11,
+          "task": "redstone"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "dc3pa",
+          "seed": 13,
+          "task": "redstone"
+        },
+        {
+          "forward_success": true,
+          "reverse_success": false,
+          "runtime_mode": "reasoning_only",
+          "seed": 11,
+          "task": "log"
+        },
+        {
+          "forward_success": true,
+          "reverse_success": false,
+          "runtime_mode": "reasoning_only",
+          "seed": 12,
+          "task": "log"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "reasoning_only",
+          "seed": 12,
+          "task": "plank"
+        },
+        {
+          "forward_success": true,
+          "reverse_success": false,
+          "runtime_mode": "reasoning_only",
+          "seed": 11,
+          "task": "boat"
+        },
+        {
+          "forward_success": true,
+          "reverse_success": false,
+          "runtime_mode": "reasoning_only",
+          "seed": 12,
+          "task": "boat"
+        },
+        {
+          "forward_success": true,
+          "reverse_success": false,
+          "runtime_mode": "reasoning_only",
+          "seed": 13,
+          "task": "boat"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "reasoning_only",
+          "seed": 11,
+          "task": "furnace"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "reasoning_only",
+          "seed": 12,
+          "task": "furnace"
+        },
+        {
+          "forward_success": true,
+          "reverse_success": false,
+          "runtime_mode": "reasoning_only",
+          "seed": 11,
+          "task": "iron ingot"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "reasoning_only",
+          "seed": 12,
+          "task": "iron ingot"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "reasoning_only",
+          "seed": 13,
+          "task": "iron ingot"
+        },
+        {
+          "forward_success": true,
+          "reverse_success": false,
+          "runtime_mode": "reasoning_only",
+          "seed": 13,
+          "task": "redstone"
+        },
+        {
+          "forward_success": true,
+          "reverse_success": false,
+          "runtime_mode": "mp5_legacy",
+          "seed": 12,
+          "task": "log"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "mp5_legacy",
+          "seed": 13,
+          "task": "log"
+        },
+        {
+          "forward_success": true,
+          "reverse_success": false,
+          "runtime_mode": "mp5_legacy",
+          "seed": 12,
+          "task": "plank"
+        },
+        {
+          "forward_success": true,
+          "reverse_success": false,
+          "runtime_mode": "mp5_legacy",
+          "seed": 13,
+          "task": "plank"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "mp5_legacy",
+          "seed": 11,
+          "task": "boat"
+        },
+        {
+          "forward_success": true,
+          "reverse_success": false,
+          "runtime_mode": "mp5_legacy",
+          "seed": 12,
+          "task": "boat"
+        },
+        {
+          "forward_success": true,
+          "reverse_success": false,
+          "runtime_mode": "mp5_legacy",
+          "seed": 13,
+          "task": "boat"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "mp5_legacy",
+          "seed": 11,
+          "task": "furnace"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "mp5_legacy",
+          "seed": 12,
+          "task": "furnace"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "mp5_legacy",
+          "seed": 13,
+          "task": "furnace"
+        },
+        {
+          "forward_success": true,
+          "reverse_success": false,
+          "runtime_mode": "mp5_legacy",
+          "seed": 11,
+          "task": "iron ingot"
+        },
+        {
+          "forward_success": true,
+          "reverse_success": false,
+          "runtime_mode": "mp5_legacy",
+          "seed": 12,
+          "task": "iron ingot"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "mp5_legacy",
+          "seed": 13,
+          "task": "diamond"
+        },
+        {
+          "forward_success": false,
+          "reverse_success": true,
+          "runtime_mode": "mp5_legacy",
+          "seed": 12,
+          "task": "redstone"
+        }
+      ]
+    },
+    "evaluate_readonly": {
+      "agreed": 63,
+      "agreement_rate": 1.0,
+      "compared_pairs": 63,
+      "mismatches": []
+    }
+  },
+  "substitute_scope": {
+    "affected_fraction": 0.2857142857142857,
+    "affected_task_count": 2,
+    "affected_tasks": [
+      "diamond",
+      "redstone"
+    ],
+    "calls_by_task": {
+      "diamond": 27,
+      "redstone": 27
+    },
+    "granted_by_task": {
+      "diamond": {
+        "coal": 27,
+        "cobblestone": 27,
+        "iron ore": 27
+      },
+      "redstone": {
+        "coal": 27,
+        "cobblestone": 27,
+        "iron ore": 27
+      }
+    },
+    "per_tier": {
+      "basic": {
+        "affected_tasks": 0,
+        "total_tasks": 2
+      },
+      "complex": {
+        "affected_tasks": 2,
+        "total_tasks": 2
+      },
+      "easy": {
+        "affected_tasks": 0,
+        "total_tasks": 1
+      },
+      "hard": {
+        "affected_tasks": 0,
+        "total_tasks": 1
+      },
+      "medium": {
+        "affected_tasks": 0,
+        "total_tasks": 1
+      }
+    },
+    "total_tasks": 7,
+    "unaffected_tasks": [
+      "boat",
+      "furnace",
+      "iron ingot",
+      "log",
+      "plank"
+    ]
+  }
+}

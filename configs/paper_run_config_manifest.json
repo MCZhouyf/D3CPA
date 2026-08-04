@@ -1,0 +1,15 @@
+{
+  "primary_config": "configs/paper_run_config.json",
+  "primary_config_hash": "81a3708d4ea8bb790d1186a5de7f1ecd6bdba1d071c1e204e5b370c23ebb7aa2",
+  "shared_non_mode_hash": "79209385e59881cae7fd6e63e63e7bbfca7cc941895e9b761191f38b94a3e510",
+  "runtime_mode_hashes": {
+    "mp5_legacy": "2a0eb00c4f5af881b4b1f2965aa7c6b758ddf4e99672464009f6967c5ca7a0fa",
+    "reasoning_only": "521e5ccc7b3dcff1f3f3239489ca7c664c859326c67fec6156e508997fe05a8a",
+    "dc3pa": "81a3708d4ea8bb790d1186a5de7f1ecd6bdba1d071c1e204e5b370c23ebb7aa2"
+  },
+  "mode_invariance_assertion": "All three serialized dicts are byte-identical after removing runtime_mode.",
+  "taskset_status": "formal_50_task_registry_bound",
+  "formal_taskset_manifest": "configs/stage_a_formal_taskset_manifest.json",
+  "formal_taskset_manifest_sha256": "14b40f1c6366d84f567e9a30a1b4fca77a05620898560ce70124758c7a364e04",
+  "formal_taskset_source_catalog_sha256": "27f2dcaed41d02bdbc56a8d0b6fd4d7945cde896d412a67f1db862f8eeccda05"
+}
