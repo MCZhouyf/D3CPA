@@ -24,8 +24,9 @@ summary is `runs/g0/stage0_audit.json`.
 - `configs/g0_runtime.json` centrally defines the relay endpoint/model (without
   credentials), seed, uniform budgets, and disabled recovery/memory flags. The
   launcher resolves CLI > environment > config and records a redacted resolved
-  configuration. `EPISODE_SEED` drives both MineDojo seeds, Python random, and
-  NumPy with no random fallback.
+  configuration; Planner, Work_Memory, and Reflexion each receive the resolved
+  temperature, top-p, max-token, and retry values. `EPISODE_SEED` drives both
+  MineDojo seeds, Python random, and NumPy with no random fallback.
 
 ## Validation
 

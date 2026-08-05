@@ -137,6 +137,10 @@ def test_g0_runtime_resolution_has_one_seed_and_no_legacy_recovery(monkeypatch, 
     assert os.environ["DC3PA_SIM_SEED"] == "17"
     assert os.environ["DC3PA_CONTROLLER_BOUNDED_RESOURCE_FALLBACK"] == "0"
     assert os.environ["MP5_DISABLE_MEMORY"] == "1"
+    assert os.environ["DC3PA_LLM_TEMPERATURE"] == "0.0"
+    assert os.environ["DC3PA_LLM_TOP_P"] == "1.0"
+    assert os.environ["DC3PA_LLM_MAX_TOKENS"] == "4096"
+    assert os.environ["DC3PA_LLM_MAX_RETRIES"] == "1"
     assert "openai_key" in resolved
 
 
@@ -160,6 +164,7 @@ def test_minecraft_entrypoint_enters_legacy_agent_cwd_with_absolute_paths(monkey
     memory_root = tmp_path / "memory"
     trace_path = tmp_path / "trace.jsonl"
     observed = {}
+    initial_cwd = Path.cwd()
 
     class FakeEnv:
         def reset(self):
@@ -266,4 +271,4 @@ def test_minecraft_entrypoint_enters_legacy_agent_cwd_with_absolute_paths(monkey
     assert observed["cwd"] == ROOT / "agent"
     assert Path(observed["task_path"]).is_absolute()
     assert observed["memory_root"].is_absolute()
-    assert Path.cwd() == ROOT.parent
+    assert Path.cwd() == initial_cwd

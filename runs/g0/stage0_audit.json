@@ -2,7 +2,7 @@
   "status": "PASS",
   "baseline_tag": "success-finish",
   "baseline_commit": "06a708e2dcfc6bb83d48e41b1475cf0581db15d5",
-  "verification_commit": "51a2968",
+  "verification_commit": "994fd49",
   "formal_task_count": 50,
   "formal_task_types": ["mine", "craft", "smelt"],
   "log_callback_unchanged": true,
