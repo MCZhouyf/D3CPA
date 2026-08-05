@@ -499,6 +499,21 @@ def main(argv: Optional[list[str]] = None) -> int:
             openai_key=args.openai_key, memory=memory, model_name=args.gpt_model_name
         )
         trace_writer = JsonlTraceWriter(args.trace)
+        if g1_metadata is not None:
+            from dc3pa.observability.g1_ledger import LedgerChatModel
+            ledger_path = args.g1_run_root / "llm_raw" / f"{g1_metadata['episode_id']}.jsonl"
+            base_ledger_context = {
+                "run_id": g1_metadata["run_id"], "task_id": g1_metadata["task_id"],
+                "step_idx": None, "model": args.gpt_model_name,
+                "temperature": resolved_g0["temperature"], "top_p": resolved_g0["top_p"],
+                "max_tokens": resolved_g0["max_tokens"],
+            }
+            if hasattr(memory, "llm"):
+                memory.llm = LedgerChatModel(memory.llm, ledger_path, context={**base_ledger_context, "caller_type": "other"})
+            if hasattr(reflexion, "llm"):
+                reflexion.llm = LedgerChatModel(reflexion.llm, ledger_path, context={**base_ledger_context, "caller_type": "reflexion"})
+            if hasattr(planner_instance, "llm"):
+                planner_instance.llm = LedgerChatModel(planner_instance.llm, ledger_path, context={**base_ledger_context, "caller_type": "planner"})
         if hasattr(memory, "llm"):
             memory.llm = TracedChatModel(
                 memory.llm, trace_writer, "dc3pa_confidence_and_evaluation"

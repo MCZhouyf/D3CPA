@@ -62,6 +62,13 @@ def main() -> int:
         table = pa.concat_tables([pq.read_table(path) for path in parts])
         pq.write_table(table, run_root / "steps.parquet")
     pq.write_table(pa.Table.from_pylist(matrix), run_root / "episodes.parquet")
+    ledger_rows = []
+    for path in sorted((run_root / "llm_raw").glob("*.jsonl")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            event = json.loads(line)
+            if event.get("event_type") == "llm_relay_attempt":
+                ledger_rows.append(dict(event.get("payload") or {}))
+    pq.write_table(pa.Table.from_pylist(ledger_rows), run_root / "llm_calls.parquet")
     return 0 if all(row["exit_code"] in (0, 1) for row in matrix) else 2
 
 
