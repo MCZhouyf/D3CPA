@@ -113,6 +113,27 @@ def test_inventory_mutation_rejects_non_log_items():
     assert not env.set_inventory_calls
 
 
+def test_low_level_tool_failure_is_forwarded_once_for_llm_replanning():
+    controller = _controller({"cobblestone": 8, "stick": 2})
+    controller.memory._dc3pa_execution_failure = {
+        "reason": "tool_consumed",
+        "tool": "stone pickaxe",
+        "resource_goal": {"item": "coal", "quantity": 3},
+        "feedback": "The planned stone pickaxe was consumed during execution.",
+        "success": False,
+        "suggestion": "Re-plan from the current observed state.",
+    }
+
+    failure = controller._consume_execution_failure()
+
+    assert not failure["success"]
+    assert failure["reason"] == "tool_consumed"
+    assert failure["tool"] == "stone pickaxe"
+    assert failure["resource_goal"] == {"item": "coal", "quantity": 3}
+    assert "Re-plan" in failure["suggestion"]
+    assert controller._consume_execution_failure() is None
+
+
 def test_gather_logs_falls_back_after_bounded_failed_attempts(monkeypatch):
     controller = _controller()
     env = FakeEnv(controller.memory)
@@ -392,6 +413,56 @@ def test_downstream_craft_materials_cap_cobblestone_collection():
     ]
 
     assert Controller._workflow_material_requirement(workflow, 0, "cobblestone", 20) == 11
+
+
+def test_unused_craft_surplus_is_capped_by_downstream_plan_demand():
+    workflow = [
+        {
+            "times": "20",
+            "actions": [
+                {"name": "mine", "args": {"obj": "iron ore", "tool": "stone pickaxe"}}
+            ],
+        },
+        {
+            "times": "1",
+            "actions": [
+                {
+                    "name": "craft",
+                    "args": {
+                        "obj": {"iron ingot": 20},
+                        "materials": {"iron ore": 20, "coal": 20},
+                        "platform": "furnace",
+                    },
+                }
+            ],
+        },
+        {
+            "times": "1",
+            "actions": [
+                {
+                    "name": "craft",
+                    "args": {
+                        "obj": {"iron pickaxe": 1},
+                        "materials": {"iron ingot": 3, "stick": 2},
+                        "platform": "crafting table",
+                    },
+                }
+            ],
+        },
+        {
+            "times": "1",
+            "actions": [
+                {"name": "dig_down", "args": {"y_level": 12, "tool": "iron pickaxe"}}
+            ],
+        },
+    ]
+
+    Controller._cap_unused_craft_surplus(workflow)
+
+    ingot_args = workflow[1]["actions"][0]["args"]
+    assert ingot_args["obj"] == {"iron ingot": 3}
+    assert ingot_args["materials"] == {"iron ore": 3, "coal": 3}
+    assert Controller._workflow_material_requirement(workflow, 0, "iron ore", 20) == 3
 
 
 def test_downstream_material_requirement_drives_cobblestone_skip(monkeypatch):

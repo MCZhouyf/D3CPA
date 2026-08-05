@@ -56,6 +56,27 @@ class Controller:
         share_memory(self.memory, events)
         return events
 
+    def _consume_execution_failure(self):
+        """Consume a low-level failure so the outer agent loop can ask the LLM to re-plan."""
+        failure = getattr(self.memory, "_dc3pa_execution_failure", None)
+        self.memory._dc3pa_execution_failure = None
+        if not isinstance(failure, dict):
+            return None
+        return {
+            "feedback": str(failure.get("feedback", "Low-level execution failed.")),
+            "success": False,
+            "suggestion": str(
+                failure.get(
+                    "suggestion",
+                    "Re-plan from the current observed state before resuming execution.",
+                )
+            ),
+            "reason": str(failure.get("reason", "execution_failure")),
+            "tool": str(failure.get("tool", "")),
+            "resource_goal": failure.get("resource_goal"),
+            "observed_underground": failure.get("observed_underground"),
+        }
+
     def _diamond_bootstrap_ready(self):
         inventory = self.memory.inventory
         return inventory.get("wooden pickaxe", 0) >= 1
@@ -205,6 +226,82 @@ class Controller:
                         required_quantity += repetitions * int(quantity)
         return max(1, required_quantity or int(fallback_quantity))
 
+    @staticmethod
+    def _cap_unused_craft_surplus(workflow):
+        """Cap a craft output to the quantity consumed later in the plan.
+
+        The cap is inferred only from the LLM workflow's own downstream tools,
+        platforms, and material inputs.  It prevents a malformed plan such as
+        crafting 20 iron ingots for one pickaxe from forcing collection of 20
+        ore, without introducing a recipe or resource registry.
+        """
+        downstream_need = {}
+        for step in reversed(workflow):
+            repetitions = max(1, int(step.get("times", 1)))
+            actions = step.get("actions", [])
+            for action in reversed(actions):
+                name = action.get("name")
+                args = action.get("args", {})
+                tool = normalize_inventory_name(args.get("tool"))
+                if tool:
+                    downstream_need[tool] = max(downstream_need.get(tool, 0), 1)
+                if name == "equip":
+                    equipped = normalize_inventory_name(args.get("obj"))
+                    if equipped:
+                        downstream_need[equipped] = max(
+                            downstream_need.get(equipped, 0), 1
+                        )
+                if name != "craft" or not args.get("obj"):
+                    continue
+
+                output_name, output_quantity = next(iter(args["obj"].items()))
+                output_name = normalize_inventory_name(output_name)
+                output_quantity = max(1, int(output_quantity))
+                declared_total = output_quantity * repetitions
+                consumed_later = int(downstream_need.pop(output_name, 0))
+                desired_total = (
+                    min(declared_total, consumed_later)
+                    if consumed_later > 0
+                    else declared_total
+                )
+
+                effective_repetitions = repetitions
+                if len(actions) == 1 and desired_total < declared_total:
+                    effective_repetitions = max(
+                        1, min(repetitions, math.ceil(desired_total / output_quantity))
+                    )
+                    step["times"] = str(effective_repetitions)
+                desired_per_action = max(
+                    1, math.ceil(desired_total / effective_repetitions)
+                )
+                if desired_per_action < output_quantity:
+                    scale = desired_per_action / output_quantity
+                    original_materials = args.get("materials", {})
+                    args["obj"] = {output_name: desired_per_action}
+                    args["materials"] = {
+                        material: max(1, math.ceil(int(quantity) * scale))
+                        for material, quantity in original_materials.items()
+                    }
+                    print(
+                        "Capped unused craft surplus from workflow demand: "
+                        f"{output_name} {declared_total} -> "
+                        f"{desired_per_action * effective_repetitions}."
+                    )
+
+                for material, quantity in args.get("materials", {}).items():
+                    material = normalize_inventory_name(material)
+                    downstream_need[material] = (
+                        downstream_need.get(material, 0)
+                        + int(quantity) * effective_repetitions
+                    )
+                platform = normalize_inventory_name(args.get("platform"))
+                if platform:
+                    downstream_need[platform] = max(
+                        downstream_need.get(platform, 0), 1
+                    )
+
+        return workflow
+
     def _fallback_craft_diamond_item(self, env, crafted_obj, target_quantity):
         crafted_obj = normalize_inventory_name(crafted_obj)
         if self.memory.inventory.get(crafted_obj, 0) >= target_quantity:
@@ -217,10 +314,12 @@ class Controller:
     def _prepare_deep_mining_craft_dependencies(self, env, crafted_obj):
         """Prepare only through physical actions; never synthesize dependencies."""
         crafted_obj = normalize_inventory_name(crafted_obj)
-        if crafted_obj == "stone pickaxe":
-            # The wooden bootstrap itself executes normal craft actions.  Its
-            # only permitted mutation is the separately guarded log callback.
-            self.ensure_wooden_bootstrap(env, underground=False)
+        # A stone pickaxe depends on cobblestone, sticks, and a crafting table;
+        # it does not depend on retaining or recreating a wooden pickaxe.  The
+        # old call to ensure_wooden_bootstrap here consumed the placed table
+        # after furnace crafting and started an impossible underground log
+        # search even though all stone-pickaxe materials were already present.
+        return None
     def _available_pickaxe(self):
         """Return an available pickaxe without maintaining a tool registry."""
         for item_name, quantity in self.memory.inventory.items():
@@ -630,7 +729,15 @@ class Controller:
         inventory = self.memory.inventory
         return inventory.get("wooden pickaxe", 0) >= 1
 
-    def _execute_craft_with_retries(self, env, args, craft_name, craft_num, max_attempts=3):
+    def _execute_craft_with_retries(
+        self,
+        env,
+        args,
+        craft_name,
+        craft_num,
+        max_attempts=3,
+        keep_crafting_table_placed=False,
+    ):
         target_name = normalize_inventory_name(list(args["obj"].keys())[0])
         target_quantity = int(list(args["obj"].values())[0])
         expected_quantity = self._inventory_count(target_name) + target_quantity
@@ -649,6 +756,7 @@ class Controller:
                     args["platform"]=="crafting table",
                     args["platform"]=="furnace",
                     craft_num=adjusted_craft_num,
+                    keep_crafting_table_placed=keep_crafting_table_placed,
                 )
             except Exception as exc:
                 print(f"Craft attempt failed with exception for {target_name}: {exc}")
@@ -665,6 +773,28 @@ class Controller:
     def check_and_execute_workflow(self, env, workflow_dict, task_information, underground):
         events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); 
         workflow = workflow_dict['workflow']
+        if self._is_deep_mining_task(task_information):
+            self._cap_unused_craft_surplus(workflow)
+
+        def next_declared_action_uses_crafting_table(step_index, action_index):
+            """Return true only for an immediately consecutive table craft.
+
+            Looking only at the next declared action prevents a table from
+            being stranded across movement, mining, or environment changes.
+            """
+            current_actions = workflow[step_index].get("actions", [])
+            if action_index + 1 < len(current_actions):
+                next_action = current_actions[action_index + 1]
+            elif step_index + 1 < len(workflow):
+                next_actions = workflow[step_index + 1].get("actions", [])
+                next_action = next_actions[0] if next_actions else None
+            else:
+                next_action = None
+            return bool(
+                next_action
+                and next_action.get("name") == "craft"
+                and next_action.get("args", {}).get("platform") == "crafting table"
+            )
 
         def step_metadata(step, step_index):
             return {
@@ -789,10 +919,26 @@ class Controller:
                         and name in {"find", "move_to", "mine"}
                         and action_target
                     ):
+                        planned_resource_tool = next(
+                            (
+                                normalize_inventory_name(
+                                    planned_action.get("args", {}).get("tool")
+                                )
+                                for planned_action in step["actions"]
+                                if planned_action.get("name") == "mine"
+                                and planned_action.get("args", {}).get("tool")
+                            ),
+                            None,
+                        )
                         self.memory._dc3pa_active_resource_goal = {
                             "item": action_target,
                             "quantity": action_required_quantity,
                         }
+                        # This is copied from the LLM-authored mine action.  It
+                        # lets low-level movement report that the planned tool
+                        # has disappeared without choosing or crafting a tool
+                        # in controller code.
+                        self.memory._dc3pa_active_resource_tool = planned_resource_tool
                         if action_target == "log":
                             self._begin_log_callback_window(
                                 env,
@@ -800,6 +946,7 @@ class Controller:
                             )
                     else:
                         self.memory._dc3pa_active_resource_goal = None
+                        self.memory._dc3pa_active_resource_tool = None
                     emit_action_started(step, step_index, action_index, action, events)
 
                     if (
@@ -829,9 +976,42 @@ class Controller:
                         continue
 
                     events = self._sync_memory(env)
+                    execution_failure = self._consume_execution_failure()
+                    if execution_failure is not None:
+                        if execution_failure.get("observed_underground") is False:
+                            underground = False
+                        print(
+                            "Forwarding low-level execution failure to the LLM re-planning loop: "
+                            f"{execution_failure}"
+                        )
+                        return finish_failure(
+                            step,
+                            step_index,
+                            action_index,
+                            action,
+                            execution_failure,
+                            underground,
+                        )
+                    action_needs_wooden_pickaxe = (
+                        (
+                            name in {"mine", "dig_down"}
+                            and normalize_inventory_name(args.get("tool"))
+                            == "wooden pickaxe"
+                        )
+                        or (
+                            name == "equip"
+                            and normalize_inventory_name(args.get("obj"))
+                            == "wooden pickaxe"
+                        )
+                        or (
+                            name == "craft"
+                            and action_target == "wooden pickaxe"
+                        )
+                    )
                     if (
                         self._is_deep_mining_task(task_information)
                         and not underground
+                        and action_needs_wooden_pickaxe
                         and self._has_wooden_pickaxe_materials()
                         and self.memory.inventory.get("wooden pickaxe", 0) < 1
                     ):
@@ -862,6 +1042,29 @@ class Controller:
                         continue
 
                     if name == "find":
+                        if (
+                            self._is_deep_mining_task(task_information)
+                            and action_target == "log"
+                            and not underground
+                        ):
+                            target_logs = max(
+                                int(action_required_quantity),
+                                int(self.memory.inventory.get("log", 0)) + max(1, times),
+                            )
+                            print(
+                                "Routing planned log search through the bounded "
+                                f"100-step gather path; target={target_logs}."
+                            )
+                            if self._gather_logs(env, underground, target_logs):
+                                mine_finish = True
+                                emit_action_finished(
+                                    step,
+                                    step_index,
+                                    action_index,
+                                    action,
+                                    "skipped_satisfied",
+                                )
+                                break
                         check_result = self.check_action_preparation(env,"find", args,task_information,events)
                         if check_result["success"]:
                             emit_action_finished(step, step_index, action_index, action, "success", check_result)
@@ -871,6 +1074,22 @@ class Controller:
                         find_obj = update_find_obj_name(obj)
                         print(f"find_obj is {find_obj}")
                         explore_above_ground(env=env,args=args, object=find_obj, performer=self, memory=self.memory, task_information=task_information, underground=underground)
+                        execution_failure = self._consume_execution_failure()
+                        if execution_failure is not None:
+                            if execution_failure.get("observed_underground") is False:
+                                underground = False
+                            print(
+                                "Underground search stopped for LLM re-planning: "
+                                f"{execution_failure}"
+                            )
+                            return finish_failure(
+                                step,
+                                step_index,
+                                action_index,
+                                action,
+                                execution_failure,
+                                underground,
+                            )
                         emit_action_finished(step, step_index, action_index, action, "success")
                     
                     elif name == "move_to":
@@ -880,6 +1099,22 @@ class Controller:
 
                         obj = args["obj"]
                         move_success = approach(env=env, memory=self.memory,object=obj, underground=underground)
+                        execution_failure = self._consume_execution_failure()
+                        if execution_failure is not None:
+                            if execution_failure.get("observed_underground") is False:
+                                underground = False
+                            print(
+                                "Underground approach stopped for LLM re-planning: "
+                                f"{execution_failure}"
+                            )
+                            return finish_failure(
+                                step,
+                                step_index,
+                                action_index,
+                                action,
+                                execution_failure,
+                                underground,
+                            )
                         if not move_success:
                             if (
                                 obj == "log"
@@ -984,8 +1219,19 @@ class Controller:
 
                         print(f"action_crafting-----")
                         craft_attempts = 1 if self._is_deep_mining_task(task_information) else 3
+                        keep_table_placed = (
+                            args.get("platform") == "crafting table"
+                            and next_declared_action_uses_crafting_table(
+                                step_index, action_index
+                            )
+                        )
                         craft_success = self._execute_craft_with_retries(
-                            env, args, craft_name, craft_num, max_attempts=craft_attempts
+                            env,
+                            args,
+                            craft_name,
+                            craft_num,
+                            max_attempts=craft_attempts,
+                            keep_crafting_table_placed=keep_table_placed,
                         )
                         if not craft_success and self._is_deep_mining_task(task_information):
                             check_result = {

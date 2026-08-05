@@ -299,6 +299,76 @@ def interaction_ready(target_block, object_name=None):
         and abs(target_block["vertical_offset"]) <= 1
     )
 
+
+def lidar_target_is_reachable(events, object_name, max_distance=4.5):
+    """Whether an unobstructed target ray is within Minecraft attack reach."""
+    rays = events.get("rays", {})
+    names = np.asarray(rays.get("block_name", []))
+    distances = np.asarray(rays.get("block_distance", []), dtype=float)
+    return bool(
+        len(names)
+        and len(names) == len(distances)
+        and np.any(
+            (names == object_name)
+            & np.isfinite(distances)
+            & (distances >= 0.0)
+            & (distances <= max_distance)
+        )
+    )
+
+
+def camera_action_toward_voxel(events, x_index, y_index, z_index):
+    """Return one relative camera action aimed at a voxel's world-space centre.
+
+    MineDojo's voxel grid is aligned to Minecraft world axes, while camera
+    actions are relative to the agent's current yaw/pitch.  Converting through
+    world space avoids assuming that voxel ``z-1`` is always screen-left.
+    """
+    location = events.get("location_stats", {})
+    required = ("pos", "yaw", "pitch")
+    if any(key not in location for key in required):
+        return None
+
+    position = np.asarray(location["pos"], dtype=float).reshape(-1)
+    yaw_values = np.asarray(location["yaw"], dtype=float).reshape(-1)
+    pitch_values = np.asarray(location["pitch"], dtype=float).reshape(-1)
+    if (
+        len(position) < 3
+        or not len(yaw_values)
+        or not len(pitch_values)
+        or not np.all(np.isfinite(position[:3]))
+        or not np.isfinite(yaw_values[0])
+        or not np.isfinite(pitch_values[0])
+    ):
+        return None
+
+    target_x = math.floor(position[0]) + (x_index - vradius) + 0.5
+    target_y = math.floor(position[1]) + (y_index - vradius) + 0.5
+    target_z = math.floor(position[2]) + (z_index - vradius) + 0.5
+    eye_x, eye_y, eye_z = position[0], position[1] + 1.62, position[2]
+    delta_x = target_x - eye_x
+    delta_y = target_y - eye_y
+    delta_z = target_z - eye_z
+    horizontal_distance = math.hypot(delta_x, delta_z)
+    if horizontal_distance < 1e-6 and abs(delta_y) < 1e-6:
+        return None
+
+    # Minecraft yaw 0 faces +Z and -90 faces +X; positive pitch looks down.
+    desired_yaw = math.degrees(math.atan2(-delta_x, delta_z))
+    desired_pitch = -math.degrees(math.atan2(delta_y, horizontal_distance))
+    yaw_delta = ((desired_yaw - yaw_values[0] + 180.0) % 360.0) - 180.0
+    pitch_delta = desired_pitch - pitch_values[0]
+    return [
+        0,
+        0,
+        0,
+        int(np.clip(12 + round(pitch_delta / 15.0), 0, 24)),
+        int(np.clip(12 + round(yaw_delta / 15.0), 0, 24)),
+        0,
+        0,
+        0,
+    ]
+
 # # This function is not used.
 # def mine_around(target,equipment):
 #     events  = sleep(env)
@@ -503,7 +573,7 @@ def mine(target,equipment,underground,env,memory):
             or inventory_quantity(current_events, inventory_target_name) > initial_target_quantity
         )
 
-    def bounded_attack_until_voxel_changes(current_events, still_target, direction_label, max_hits=12):
+    def bounded_attack_until_voxel_changes(current_events, still_target, direction_label, max_hits=36):
         """Mine one adjacent underground voxel without an unbounded attack loop."""
         for _ in range(max_hits):
             if target_collected(current_events) or not still_target(current_events):
@@ -553,6 +623,68 @@ def mine(target,equipment,underground,env,memory):
             lambda latest: centered_ray_hits_target(latest, block_name),
             "centered-lidar",
         )
+
+    def aim_visible_lidar_target(current_events, block_name, max_attempts=3):
+        """Center the nearest reachable resource ray using 15-degree camera bins."""
+        for aim_attempt in range(max_attempts):
+            if centered_ray_hits_target(current_events, block_name):
+                return current_events, True
+            rays = current_events.get("rays", {})
+            names = np.asarray(rays.get("block_name", []))
+            distances = np.asarray(rays.get("block_distance", []), dtype=float)
+            pitches = np.asarray(rays.get("ray_pitch", []), dtype=float)
+            yaws = np.asarray(rays.get("ray_yaw", []), dtype=float)
+            if not (
+                len(names)
+                and len(names) == len(distances) == len(pitches) == len(yaws)
+            ):
+                return current_events, False
+            candidates = np.flatnonzero(
+                (names == block_name)
+                & np.isfinite(distances)
+                & (distances >= 0.0)
+                & (distances <= 4.5)
+            )
+            if not len(candidates):
+                return current_events, False
+            best = min(
+                candidates,
+                key=lambda index: (
+                    abs(float(pitches[index])) + abs(float(yaws[index])),
+                    float(distances[index]),
+                ),
+            )
+            # RichLidar ray offsets use the opposite sign from relative camera
+            # commands.  The previous same-sign conversion made a -10 degree
+            # iron ray diverge to -25 and then -55 degrees in production.
+            pitch_delta = -int(round(np.degrees(float(pitches[best])) / 15.0))
+            yaw_delta = -int(round(np.degrees(float(yaws[best])) / 15.0))
+            # A visible block can occupy the crosshair even when the nearest
+            # configured five-degree ray rounds to zero.  Otherwise apply one
+            # minimum camera bin toward the ray.
+            if pitch_delta == 0 and abs(float(pitches[best])) > 1e-6:
+                pitch_delta = -1 if pitches[best] > 0 else 1
+            if yaw_delta == 0 and abs(float(yaws[best])) > 1e-6:
+                yaw_delta = -1 if yaws[best] > 0 else 1
+            camera_action = [
+                0,
+                0,
+                0,
+                int(np.clip(12 + pitch_delta, 0, 24)),
+                int(np.clip(12 + yaw_delta, 0, 24)),
+                0,
+                0,
+                0,
+            ]
+            print(
+                f"aiming at reachable {block_name} lidar ray "
+                f"(attempt {aim_attempt + 1}/{max_attempts}, "
+                f"pitch={np.degrees(pitches[best]):.1f}, "
+                f"yaw={np.degrees(yaws[best]):.1f}, distance={distances[best]:.2f})"
+            )
+            current_events,_,_,_ = env.step(camera_action)
+            save_rgb_for_video(current_events)
+        return current_events, centered_ray_hits_target(current_events, block_name)
 
     def mine_adjacent_target(events, block_name):
         # Prefer deterministic close-range mining before relying on ray casts.
@@ -765,9 +897,25 @@ def mine(target,equipment,underground,env,memory):
         print(f"Present inventory:{events['inventory']['quantity']}")
     else:
         events = sleep(env)
+        target_block = select_target_block(events, target)
+        if target_block is not None and interaction_ready(target_block, target):
+            world_aim_action = camera_action_toward_voxel(
+                events,
+                target_block["x_index"],
+                target_block["y_index"],
+                target_block["z_index"],
+            )
+            if world_aim_action is not None and world_aim_action[3:5] != [12, 12]:
+                print(
+                    "aiming at adjacent underground target from world-space "
+                    f"voxel centre with camera bins {world_aim_action[3:5]}"
+                )
+                events,_,_,_ = env.step(world_aim_action)
+                save_rgb_for_video(events)
         # ``find`` normally leaves the camera on the resource.  Mine it before
         # applying the legacy voxel-axis turn, because voxels use world axes
         # and cannot by themselves describe screen-left/screen-right.
+        events, _ = aim_visible_lidar_target(events, target)
         events, centered_success = mine_crosshair_target(events, target)
         if centered_success and target_collected(events):
             return events['inventory']['name'].tolist(), events['inventory']['quantity'].tolist()
@@ -938,8 +1086,8 @@ def mine_ahead(env, memory, direction=0, max_hits=12):
     """
     if isinstance(max_hits, bool) or not isinstance(max_hits, int) or max_hits <= 0:
         raise ValueError("max_hits must be a positive integer")
-    if direction not in {0, 1, 2, 3}:
-        raise ValueError("direction must be one of 0, 1, 2, or 3")
+    if direction not in set(range(8)):
+        raise ValueError("direction must be one of 0 through 7")
 
     events, _, _, _ = env.step([0, 0, 0, 12, 12, 0, 0, 0])
     share_memory(memory, events)
@@ -947,18 +1095,51 @@ def mine_ahead(env, memory, direction=0, max_hits=12):
     print("trying to mine")
     print(f"mine_ahead:{memory.inventory}")
 
-    def pickaxe_count(current_events):
+    def pickaxe_inventory(current_events):
         names = current_events["inventory"]["name"].tolist()
         amounts = current_events["inventory"]["quantity"].tolist()
-        return sum(
-            amount
+        return {
+            str(name).replace("_", " "): float(amount)
             for name, amount in zip(names, amounts)
-            if str(name).replace("_", " ").endswith("pickaxe")
-        )
+            if str(name).replace("_", " ").endswith("pickaxe") and amount > 0
+        }
 
-    initial_pickaxe_count = pickaxe_count(events)
+    initial_pickaxes = pickaxe_inventory(events)
+    initial_pickaxe_count = sum(initial_pickaxes.values())
     hits_used = 0
     tool_exhausted = False
+
+    planned_resource_tool = getattr(
+        memory, "_dc3pa_active_resource_tool", None
+    )
+    if (
+        planned_resource_tool
+        and str(planned_resource_tool).replace("_", " ").endswith("pickaxe")
+        and str(planned_resource_tool).replace("_", " ") not in initial_pickaxes
+    ):
+        normalized_tool = str(planned_resource_tool).replace("_", " ")
+        resource_goal = getattr(memory, "_dc3pa_active_resource_goal", None)
+        memory._dc3pa_execution_failure = {
+            "reason": "required_tool_missing",
+            "tool": normalized_tool,
+            "resource_goal": resource_goal,
+            "feedback": (
+                f"Execution cannot continue the current underground resource "
+                f"step because its LLM-planned tool, {normalized_tool}, is no "
+                f"longer present. Current resource goal: {resource_goal}. "
+                f"Current inventory: {memory.inventory}."
+            ),
+            "success": False,
+            "suggestion": (
+                "Re-plan from the current observed state and restore whatever "
+                "prerequisites the resource action requires before resuming it."
+            ),
+        }
+        print(
+            f"mine_ahead stopped because planned tool {normalized_tool} is "
+            "missing; returning structured feedback for LLM re-planning."
+        )
+        return False
 
     def active_resource_goal_satisfied(current_events):
         """Stop tunnel clearing once the controller's current resource goal is met."""
@@ -1000,11 +1181,36 @@ def mine_ahead(env, memory, direction=0, max_hits=12):
             hits_used += 1
             save_rgb_for_video(events)
             share_memory(memory, events)
-            if initial_pickaxe_count > 0 and pickaxe_count(events) < initial_pickaxe_count:
+            current_pickaxes = pickaxe_inventory(events)
+            if initial_pickaxe_count > 0 and sum(current_pickaxes.values()) < initial_pickaxe_count:
                 tool_exhausted = True
+                consumed_tool = next(
+                    (
+                        tool_name
+                        for tool_name, initial_quantity in initial_pickaxes.items()
+                        if current_pickaxes.get(tool_name, 0) < initial_quantity
+                    ),
+                    "pickaxe",
+                )
+                resource_goal = getattr(memory, "_dc3pa_active_resource_goal", None)
+                memory._dc3pa_execution_failure = {
+                    "reason": "tool_consumed",
+                    "tool": consumed_tool,
+                    "resource_goal": resource_goal,
+                    "feedback": (
+                        f"Execution stopped because the planned {consumed_tool} was consumed "
+                        f"while clearing an underground passage. Current resource goal: "
+                        f"{resource_goal}. Current inventory: {memory.inventory}."
+                    ),
+                    "success": False,
+                    "suggestion": (
+                        "Re-plan from the current observed state and restore whatever "
+                        "prerequisites the next resource action requires before resuming it."
+                    ),
+                }
                 print(
-                    "mine_ahead stopped because the active pickaxe was consumed; "
-                    "returning control for tool recovery."
+                    f"mine_ahead stopped because {consumed_tool} was consumed; "
+                    "returning structured feedback for LLM re-planning."
                 )
                 return False
             if active_resource_goal_satisfied(events):
@@ -1030,15 +1236,30 @@ def mine_ahead(env, memory, direction=0, max_hits=12):
     elif direction == 1:
         head_clear = lambda e: e["voxels"]["block_name"][vradius][vradius + 1][vradius - 1] in ("air", "water")
         body_clear = lambda e: e["voxels"]["block_name"][vradius][vradius][vradius - 1] in ("air", "water")
-        body_look, restore_look = [0, 0, 0, 10, 12, 0, 0, 0], [0, 0, 0, 14, 12, 0, 0, 0]
+        body_look, restore_look = [0, 0, 0, 15, 12, 0, 0, 0], [0, 0, 0, 9, 12, 0, 0, 0]
     elif direction == 2:
         head_clear = lambda e: e["voxels"]["block_name"][vradius][vradius + 1][vradius + 1] in ("air", "water")
         body_clear = lambda e: e["voxels"]["block_name"][vradius][vradius][vradius + 1] in ("air", "water")
-        body_look, restore_look = [0, 0, 0, 10, 12, 0, 0, 0], [0, 0, 0, 14, 12, 0, 0, 0]
-    else:
+        body_look, restore_look = [0, 0, 0, 15, 12, 0, 0, 0], [0, 0, 0, 9, 12, 0, 0, 0]
+    elif direction == 3:
         head_clear = lambda e: e["voxels"]["block_name"][vradius - 1][vradius + 1][vradius] in ("air", "water")
         body_clear = lambda e: e["voxels"]["block_name"][vradius - 1][vradius][vradius] in ("air", "water")
-        body_look, restore_look = [0, 0, 0, 10, 12, 0, 0, 0], [0, 0, 0, 14, 12, 0, 0, 0]
+        body_look, restore_look = [0, 0, 0, 15, 12, 0, 0, 0], [0, 0, 0, 9, 12, 0, 0, 0]
+    else:
+        diagonal_offsets = {
+            4: (1, -1),   # front-left
+            5: (-1, -1),  # back-left
+            6: (-1, 1),   # back-right
+            7: (1, 1),    # front-right
+        }
+        x_offset, z_offset = diagonal_offsets[direction]
+        head_clear = lambda e: e["voxels"]["block_name"][vradius + x_offset][vradius + 1][vradius + z_offset] in ("air", "water")
+        body_clear = lambda e: e["voxels"]["block_name"][vradius + x_offset][vradius][vradius + z_offset] in ("air", "water")
+        # Pitch is independent of horizontal heading.  The legacy side/back
+        # branches used pitch=10 here, which raises the crosshair and attacks
+        # above the lower collision block.  Use the same downward/restoring
+        # pitch pair as the proven forward branch for every compass heading.
+        body_look, restore_look = [0, 0, 0, 15, 12, 0, 0, 0], [0, 0, 0, 9, 12, 0, 0, 0]
 
     if head_clear(events) and body_clear(events):
         return True
@@ -1056,11 +1277,92 @@ def mine_ahead(env, memory, direction=0, max_hits=12):
     return cleared
 
 
+WORLD_DIRECTION_YAWS = {
+    0: -90.0,   # +X, front in the canonical task frame
+    1: -180.0,  # Z-, left
+    2: 0.0,     # Z+, right
+    3: 90.0,    # -X, back
+    4: -135.0,  # +X/Z-, front-left
+    5: 135.0,   # -X/Z-, back-left
+    6: 45.0,    # -X/Z+, back-right
+    7: -45.0,   # +X/Z+, front-right
+}
+
+
+def observed_yaw(events):
+    """Return the scalar Minecraft yaw when exposed by MineDojo."""
+    location = events.get("location_stats", {})
+    if "yaw" not in location:
+        return None
+    values = np.asarray(location["yaw"], dtype=float).reshape(-1)
+    if not len(values) or not np.isfinite(values[0]):
+        return None
+    return float(values[0])
+
+
+def yaw_delta_action(delta_degrees):
+    """Encode a normalized relative yaw delta as one MineDojo camera action."""
+    normalized = ((float(delta_degrees) + 180.0) % 360.0) - 180.0
+    yaw_bin = int(np.clip(12 + round(normalized / 15.0), 0, 24))
+    return [0,0,0,12,yaw_bin,0,0,0]
+
+
+def world_heading_turn_and_restore(events, direction):
+    """Actions that face a world heading and restore the observed entry yaw.
+
+    Reading the actual yaw removes the fragile assumption that every earlier
+    action (notably table placement and shaft escape) restored the canonical
+    +X camera heading.
+    """
+    entry_yaw = observed_yaw(events)
+    if entry_yaw is None:
+        fallback_deltas = {
+            0: 0,
+            1: -90,
+            2: 90,
+            3: -180,
+            4: -45,
+            5: -135,
+            6: 135,
+            7: 45,
+        }
+        delta = fallback_deltas[direction]
+    else:
+        delta = WORLD_DIRECTION_YAWS[direction] - entry_yaw
+    turn_action = yaw_delta_action(delta)
+    applied_delta = (turn_action[4] - 12) * 15
+    restore_action = yaw_delta_action(-applied_delta)
+    return turn_action, restore_action, entry_yaw, applied_delta
+
+
 # Function enabling the agent to move one block. Underground specifies if agent is underground or not.
 # The direction parameter should fall within [0,3], 0: ahead along the positive direction of the x axis, 1: left, 2: right, 3: backward
 # Regardless of whether agent is aboveground, agent will always WALK when jumpornot = 0.
 # Jumpornot = 1 when underground = 0: agent will jump towards the given direction instead of walking.
 # Jumpornot = 1 when underground = 1: agent will utilize mine_ahead to mine its way towards the given direction instead of walking.
+def _record_player_respawn_failure(memory, events, start_position, current_position, phase):
+    """Forward an observed underground-to-spawn discontinuity to the planner."""
+    share_memory(memory, events)
+    memory._dc3pa_execution_failure = {
+        "reason": "player_respawned",
+        "resource_goal": getattr(memory, "_dc3pa_active_resource_goal", None),
+        "observed_underground": False,
+        "feedback": (
+            "Execution observed an abrupt underground-to-spawn transition "
+            f"during {phase}, from {np.asarray(start_position).tolist()} to "
+            f"{np.asarray(current_position).tolist()}, with current inventory "
+            f"{memory.inventory}. The player appears to have died and "
+            "respawned."
+        ),
+        "success": False,
+        "suggestion": (
+            "Re-plan from the current observed surface state and current "
+            "inventory; do not assume the earlier underground position or "
+            "inventory still exists."
+        ),
+    }
+
+
 def move_one_block(env,memory,movedir=0,underground=0,jumpornot = 0):
     if underground:
         print(f"MOVEONEBLOCK: movedir is {movedir}, underground is {underground}, jumpornot is {jumpornot}")
@@ -1150,30 +1452,103 @@ def move_one_block(env,memory,movedir=0,underground=0,jumpornot = 0):
             # The legacy direction=3 loop compared Z against floor(X), called
             # mine_ahead on every movement retry, and could burn a whole tool
             # while reporting a small drift as progress.
-            turn_actions = {
-                0: [],
-                1: [[0,0,0,12,10,0,0,0]] * 3,
-                2: [[0,0,0,12,14,0,0,0]] * 3,
-                3: [[0,0,0,12,6,0,0,0]] * 3,
-            }
-            restore_actions = {
-                0: [],
-                1: [[0,0,0,12,14,0,0,0]] * 3,
-                2: [[0,0,0,12,10,0,0,0]] * 3,
-                3: [[0,0,0,12,18,0,0,0]] * 3,
-            }
+            # MineDojo camera bins are exact 15-degree deltas.  From the
+            # canonical +X heading, negative yaw faces world Z- (left) and
+            # positive yaw faces Z+ (right).  This agrees with the adjacent
+            # resource aiming table above; swapping these signs lets attacks
+            # break blocks on one side while clearance checks inspect the
+            # untouched opposite side.
+            turn_action, restore_action, entry_yaw, applied_yaw = (
+                world_heading_turn_and_restore(events, movedir)
+            )
+            print(
+                f"underground world-heading alignment: direction={movedir}, "
+                f"entry_yaw={entry_yaw}, applied_delta={applied_yaw}"
+            )
 
             start_position = np.array(events['location_stats']['pos'], dtype=float)
-            for turn_action in turn_actions[movedir]:
+            start_inventory = dict(getattr(memory, "inventory", {}))
+            if turn_action[4] != 12:
                 events,_,_,_ = env.step(turn_action); save_rgb_for_video(events)
 
-            # Camera-relative forward is direction zero after the turn.  Never
-            # walk into a passage that mine_ahead did not confirm as clear: a
-            # short collision drift used to be misclassified as progress and
-            # left the camera pressed into a stone face.
-            tunnel_cleared = mine_ahead(env, memory, 0)
+            # The attack is camera-relative after the turn, but the voxel
+            # clearance checks inside ``mine_ahead`` are world-axis-relative.
+            # Pass the requested movement direction so the function verifies
+            # the same body/head cells that are actually being mined.  Passing
+            # zero here made left/right/backward mining attack one tunnel while
+            # repeatedly checking a different one.
+            tunnel_cleared = mine_ahead(env, memory, movedir)
+            # MineDojo can deliver death/respawn on the first observation made
+            # inside mine_ahead.  In that case mine_ahead may notice an empty
+            # tool slot and return before the movement loop below, so always
+            # classify the coordinate discontinuity here as the more
+            # informative failure.
+            events = sleep(env)
+            post_tunnel_position = np.array(
+                events['location_stats']['pos'], dtype=float
+            )
+            post_tunnel_inventory = {
+                str(name).replace("_", " "): float(quantity)
+                for name, quantity in zip(
+                    events['inventory']['name'].tolist(),
+                    events['inventory']['quantity'].tolist(),
+                )
+                if str(name) != "air" and quantity > 0
+            }
+            if (
+                start_position[1] < 50
+                and post_tunnel_position[1] >= 55
+                and post_tunnel_position[1] - start_position[1] >= 8
+            ):
+                _record_player_respawn_failure(
+                    memory,
+                    events,
+                    start_position,
+                    post_tunnel_position,
+                    "tunnel-clearance observation",
+                )
+                print(
+                    "underground tunnel clearance detected a respawn "
+                    "discontinuity; returning structured feedback for LLM "
+                    "re-planning."
+                )
+                return False
+            if start_inventory and not post_tunnel_inventory:
+                # MineDojo may clear the complete inventory one observation
+                # before it publishes the respawn coordinate.  A pickaxe can
+                # be consumed normally, but every unrelated stack cannot; this
+                # is an authoritative death signal even while Y still lags.
+                resource_goal = getattr(
+                    memory, "_dc3pa_active_resource_goal", None
+                )
+                share_memory(memory, events)
+                memory._dc3pa_execution_failure = {
+                    "reason": "player_respawned",
+                    "resource_goal": resource_goal,
+                    "observed_underground": False,
+                    "feedback": (
+                        "Execution observed the complete underground inventory "
+                        f"disappear during tunnel clearance. Before: "
+                        f"{start_inventory}; after: {memory.inventory}; last "
+                        f"observed position: {post_tunnel_position.tolist()}. "
+                        "MineDojo can publish inventory loss one observation "
+                        "before the respawn coordinate, so the player appears "
+                        "to have died and respawned."
+                    ),
+                    "success": False,
+                    "suggestion": (
+                        "Re-plan from the current surface state and empty "
+                        "inventory; do not assume the earlier underground "
+                        "position or inventory still exists."
+                    ),
+                }
+                print(
+                    "underground tunnel clearance detected complete inventory "
+                    "loss; returning death/respawn feedback for LLM re-planning."
+                )
+                return False
             if not tunnel_cleared:
-                for restore_action in restore_actions[movedir]:
+                if restore_action[4] != 12:
                     events,_,_,_ = env.step(restore_action); save_rgb_for_video(events)
                 print(
                     f"underground move direction {movedir} rejected: "
@@ -1187,6 +1562,30 @@ def move_one_block(env,memory,movedir=0,underground=0,jumpornot = 0):
                 previous_position = np.array(events['location_stats']['pos'], dtype=float)
                 events,_,_,_ = env.step([1,0,0,12,12,0,0,0]); save_rgb_for_video(events)
                 current_position = np.array(events['location_stats']['pos'], dtype=float)
+                # A death/respawn can teleport an underground agent back to
+                # spawn and clear its inventory.  The legacy code interpreted
+                # that large horizontal jump as successful tunnel progress and
+                # kept searching for ore on the surface with an empty pack.
+                # Report the discontinuity to the normal LLM re-planning path.
+                if (
+                    start_position[1] < 50
+                    and current_position[1] >= 55
+                    and current_position[1] - start_position[1] >= 8
+                ):
+                    _record_player_respawn_failure(
+                        memory,
+                        events,
+                        start_position,
+                        current_position,
+                        "tunnel movement",
+                    )
+                    print(
+                        "underground movement detected a respawn discontinuity; "
+                        "returning structured feedback for LLM re-planning."
+                    )
+                    if restore_action[4] != 12:
+                        events,_,_,_ = env.step(restore_action); save_rgb_for_video(events)
+                    return False
                 horizontal_progress = np.linalg.norm(
                     current_position[[0, 2]] - start_position[[0, 2]]
                 )
@@ -1200,7 +1599,7 @@ def move_one_block(env,memory,movedir=0,underground=0,jumpornot = 0):
                 if no_progress_steps >= 3:
                     break
 
-            for restore_action in restore_actions[movedir]:
+            if restore_action[4] != 12:
                 events,_,_,_ = env.step(restore_action); save_rgb_for_video(events)
 
             if not moved:
@@ -1210,6 +1609,78 @@ def move_one_block(env,memory,movedir=0,underground=0,jumpornot = 0):
         if movedir == 0 or movedir == 2:
             action_stack.append(action_tuple)
         return True
+
+
+def recover_through_eight_underground_headings(env, memory, max_hits=12):
+    """Clear and enter the first viable one of eight compass headings.
+
+    The camera is restored to its entry yaw before returning, so callers can
+    immediately re-detect the resource in the canonical voxel frame.
+    """
+    heading_specs = [
+        (0, "front"),
+        (4, "front-left"),
+        (1, "left"),
+        (5, "back-left"),
+        (3, "back"),
+        (6, "back-right"),
+        (2, "right"),
+        (7, "front-right"),
+    ]
+    for attempt, (direction, label) in enumerate(
+        heading_specs, start=1
+    ):
+        events = sleep(env)
+        start_position = np.array(events["location_stats"]["pos"], dtype=float)
+        turn_action, restore_action, entry_yaw, applied_yaw = (
+            world_heading_turn_and_restore(events, direction)
+        )
+        if turn_action[4] != 12:
+            events,_,_,_ = env.step(turn_action)
+            save_rgb_for_video(events)
+        print(
+            f"eight-heading recovery {attempt}/8: {label} "
+            f"(direction={direction}, entry_yaw={entry_yaw}, "
+            f"applied_delta={applied_yaw})"
+        )
+        cleared = mine_ahead(env, memory, direction, max_hits=max_hits)
+        moved = False
+        if cleared:
+            no_progress_steps = 0
+            for _ in range(12):
+                previous_position = np.array(
+                    events["location_stats"]["pos"], dtype=float
+                )
+                events,_,_,_ = env.step([1,0,0,12,12,0,0,0])
+                save_rgb_for_video(events)
+                current_position = np.array(
+                    events["location_stats"]["pos"], dtype=float
+                )
+                if np.linalg.norm(
+                    current_position[[0, 2]] - start_position[[0, 2]]
+                ) >= UNDERGROUND_BLOCK_PROGRESS:
+                    moved = True
+                    break
+                if np.allclose(
+                    previous_position[[0, 2]], current_position[[0, 2]]
+                ):
+                    no_progress_steps += 1
+                else:
+                    no_progress_steps = 0
+                if no_progress_steps >= 3:
+                    break
+        if restore_action[4] != 12:
+            events,_,_,_ = env.step(restore_action)
+            save_rgb_for_video(events)
+        if moved:
+            end_position = np.array(events["location_stats"]["pos"], dtype=float)
+            print(
+                f"eight-heading recovery advanced through {label}: "
+                f"horizontal_delta={np.linalg.norm(end_position[[0, 2]] - start_position[[0, 2]]):.3f}"
+            )
+            return True
+    print("eight-heading recovery found no viable passage")
+    return False
 
 
 # This function decides whether agent can reach block ahead of him.
@@ -1851,10 +2322,38 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
             object = "stone"
         elif args['obj'] =="diamond":
             object = "diamond ore"
+        last_underground_position = np.array(
+            events['location_stats']['pos'], dtype=float
+        )
         for i in range(max_try_steps):
             # create_observation(env,f"observation_{i}")
             # move_one_block(env,0,1,1)
             events = sleep(env)
+            current_position = np.array(
+                events['location_stats']['pos'], dtype=float
+            )
+            # Death can be delivered by MineDojo after move_one_block returns.
+            # Compare successive exploration observations as well as the
+            # individual movement call, otherwise a respawn between loop
+            # iterations is mistaken for continued underground exploration.
+            if (
+                last_underground_position[1] < 50
+                and current_position[1] >= 55
+                and current_position[1] - last_underground_position[1] >= 8
+            ):
+                _record_player_respawn_failure(
+                    memory,
+                    events,
+                    last_underground_position,
+                    current_position,
+                    "successive underground exploration observations",
+                )
+                print(
+                    "underground exploration detected a cross-iteration "
+                    "respawn discontinuity; returning structured feedback "
+                    "for LLM re-planning."
+                )
+                return False
             print(f"try step is {i} and dir is {direction}")
             print(f"explore step is {explore_steps} and position is {events['location_stats']['pos']}")
             
@@ -1865,7 +2364,29 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
                 print("explore steps exceed limit")
                 explore_steps = 0
                 return False
-            if args['obj'] in memory.inventory:
+            # Mining an ore records its drop name in inventory (for example,
+            # ``diamond ore`` becomes ``diamond``).  Comparing the planner's
+            # voxel name directly made exploration continue after the task
+            # item had already been collected.
+            inventory_object = update_inventory_obj_name(args['obj'])
+            active_resource_goal = getattr(
+                memory, "_dc3pa_active_resource_goal", None
+            )
+            required_quantity = 1
+            if (
+                isinstance(active_resource_goal, dict)
+                and active_resource_goal.get("item") == inventory_object
+            ):
+                required_quantity = float(
+                    active_resource_goal.get("quantity", required_quantity)
+                )
+            current_quantity = memory.inventory.get(inventory_object, 0)
+            if current_quantity >= required_quantity:
+                print(
+                    "underground exploration stops: "
+                    f"{inventory_object} satisfies "
+                    f"{current_quantity}/{required_quantity}."
+                )
                 return True
             print(f"args obj is {args['obj']},object is {object}")
 
@@ -1890,8 +2411,15 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
                 move_succeeded = move_one_block(
                     env, memory, candidate_direction, 1, 1
                 )
+                if getattr(memory, "_dc3pa_execution_failure", None):
+                    print(
+                        "underground exploration received a low-level execution "
+                        "failure; returning immediately to the controller."
+                    )
+                    return False
                 events = sleep(env)
                 after_position = np.array(events['location_stats']['pos'], dtype=float)
+                last_underground_position = after_position.copy()
                 horizontal_progress = np.linalg.norm(
                     after_position[[0, 2]] - before_position[[0, 2]]
                 )
@@ -2076,6 +2604,7 @@ def approach(env,memory,object,underground):# tbd: scanning blocknames not enoug
 
     last_signature = None
     stagnation_count = 0
+    eight_heading_recovery_used = False
     for try_num in range(30):
         events = sleep(env)
         target_block = select_target_block(events, object)
@@ -2114,23 +2643,36 @@ def approach(env,memory,object,underground):# tbd: scanning blocknames not enoug
             print("approach stagnated on same target/position signature")
             return False
 
-        if side_offset >= 2:
+        align_diagonal_underground = underground and forward_offset >= 2
+        if side_offset >= (1 if align_diagonal_underground else 2):
             print("have to move right")
             if not try_rightward(env,memory,underground,1):
+                if underground and not eight_heading_recovery_used:
+                    eight_heading_recovery_used = True
+                    if recover_through_eight_underground_headings(env, memory):
+                        continue
                 print("stuck trying to go right in APPROACH!")
                 return False
             continue
 
-        if side_offset <= -2:
+        if side_offset <= (-1 if align_diagonal_underground else -2):
             print("have to move left")
             if not try_leftward(env,memory,underground,1):
+                if underground and not eight_heading_recovery_used:
+                    eight_heading_recovery_used = True
+                    if recover_through_eight_underground_headings(env, memory):
+                        continue
                 print("stuck trying to go left in APPROACH!")
                 return False
             continue
 
         print("finished moving sideways")
         if forward_offset >= 2:
-            if try_forward(env,memory,0,1) == False:
+            if try_forward(env,memory,underground,1) == False:
+                if underground and not eight_heading_recovery_used:
+                    eight_heading_recovery_used = True
+                    if recover_through_eight_underground_headings(env, memory):
+                        continue
                 print("stuck trying to go ahead in APPROACH!")
                 return False
             continue
@@ -2155,7 +2697,7 @@ def approach(env,memory,object,underground):# tbd: scanning blocknames not enoug
                     return False
             continue
         if forward_offset == 1:
-            if try_forward(env,memory,0,1) == False:
+            if try_forward(env,memory,underground,1) == False:
                 return False
             continue
         break
@@ -2241,7 +2783,15 @@ def sleep(env, duration = 1):
 
 # The structured action for craft, it first finds level ground for a crafting table 
 # if crafting table is needed, then proceeds to craft the desired tool.
-def action_craft(env, item, memory,use_crafting_table,use_furnace,craft_num):
+def action_craft(
+    env,
+    item,
+    memory,
+    use_crafting_table,
+    use_furnace,
+    craft_num,
+    keep_crafting_table_placed=False,
+):
     """
     Craft item
     :env: minedojo env
@@ -2411,7 +2961,25 @@ def action_craft(env, item, memory,use_crafting_table,use_furnace,craft_num):
                 and events['voxels']['block_name'][vradius+1][vradius][vradius] == "air"
                 and events['voxels']['block_name'][vradius+1][vradius+1][vradius] == "air"
             )
-            if not ready_for_table:
+            inventory_names = {
+                str(name).replace('_', ' ')
+                for name, quantity in zip(
+                    events['inventory']['name'].tolist(),
+                    events['inventory']['quantity'].tolist(),
+                )
+                if float(quantity) > 0
+            }
+            has_pickaxe = any(
+                name in inventory_names
+                for name in (
+                    'wooden pickaxe',
+                    'stone pickaxe',
+                    'iron pickaxe',
+                    'golden pickaxe',
+                    'diamond pickaxe',
+                )
+            )
+            if not ready_for_table and has_pickaxe:
                 # Keep table-placement preparation bounded; getting stuck here blocks all later tool upgrades.
                 for prep_try in range(3):
                     print(f"crafting-table prep try {prep_try + 1}/3")
@@ -2430,18 +2998,26 @@ def action_craft(env, item, memory,use_crafting_table,use_furnace,craft_num):
                         break
                     move_one_block(env,memory,3,0,0)
                     events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
+            elif not ready_for_table:
+                # The first wooden pickaxe is exactly what this recipe is
+                # trying to create.  Repeatedly punching stone here cannot
+                # prepare a table site and previously consumed all bootstrap
+                # retries.  The physical placement loop below already checks
+                # eight headings and verifies success by inventory decrease,
+                # so let it search for an exposed floor/face directly.
+                print(
+                    "crafting-table front site is blocked and no pickaxe is "
+                    "available; trying bounded 8-heading placement"
+                )
             print(f"action_craft: front floor{events['voxels']['block_name'][vradius+1][vradius-1][vradius]}\n block in front of body is {events['voxels']['block_name'][vradius+1][vradius][vradius]} \n and block in front of head is {events['voxels']['block_name'][vradius+1][vradius+1][vradius]}\n begin crafting {item}")
             print(f"7777777777")
-            if not ready_for_table:
-                # A table cannot be placed/used inside a solid tunnel. Continuing
-                # here made the bootstrap loop retry UI crafting, then drift farther
-                # underground without a usable pickaxe.
-                print("crafting-table prep failed; aborting this craft without placement")
-                name = events['inventory']['name'].tolist()
-                num = events['inventory']['quantity'].tolist()
-                return name, num
-            else:
+            if ready_for_table and has_pickaxe:
                 mine_ahead(env,memory)
+            elif not ready_for_table:
+                print(
+                    "crafting-table front site remains blocked; deferring to "
+                    "verified 8-heading placement"
+                )
             move_to_middle(env)
         events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
         #events = sleep(env)
@@ -2451,17 +3027,27 @@ def action_craft(env, item, memory,use_crafting_table,use_furnace,craft_num):
         print('crafting table' in memory.inventory)
         
         inventory = events['inventory']['name'].tolist()
-        if 'crafting table' not in inventory:
-            print("crafting table is not currently in inventory; assuming it may already be placed nearby")
+        nearby_tools = events.get('nearby_tools', {})
+        table_is_nearby = bool(nearby_tools.get('table', False))
+        reusing_placed_table = 'crafting table' not in inventory and table_is_nearby
+        if 'crafting table' not in inventory and not table_is_nearby:
+            print("crafting table is neither in inventory nor nearby; returning without crafting")
             name = events['inventory']['name'].tolist()
             num = events['inventory']['quantity'].tolist()
             return name, num
-        cb_inventory_index = inventory.index('crafting table')
-        print(f"crafting table is there")
-        events,_,_,_ = env.step([0,0,0,16,12,0,0,0]); save_rgb_for_video(events)
-        events = sleep(env)
-        events,_,_,_ = env.step([0,0,0,12,12,5,0,cb_inventory_index]); save_rgb_for_video(events) #equip crafting tabsle
-        events = sleep(env)
+
+        if reusing_placed_table:
+            # The preceding craft deliberately left this table in place.  The
+            # camera is still aimed at it, so do not replace it or perturb the
+            # heading before sending the next recipe command.
+            print("reusing the crafting table left by the preceding craft")
+        else:
+            cb_inventory_index = inventory.index('crafting table')
+            print(f"crafting table is there")
+            events,_,_,_ = env.step([0,0,0,16,12,0,0,0]); save_rgb_for_video(events)
+            events = sleep(env)
+            events,_,_,_ = env.step([0,0,0,12,12,5,0,cb_inventory_index]); save_rgb_for_video(events) #equip crafting tabsle
+            events = sleep(env)
 
         def inventory_item_count(current_events, target):
             names = current_events['inventory']['name'].tolist()
@@ -2477,15 +3063,16 @@ def action_craft(env, item, memory,use_crafting_table,use_furnace,craft_num):
         # in an underground shaft.  Try every heading once and verify placement
         # from the inventory decrease before opening the crafting interface.
         table_count_before = inventory_item_count(events, 'crafting table')
-        table_placed = False
-        for placement_attempt in range(8):
-            events,_,_,_ = env.step([0,0,0,12,12,6,0,0]); save_rgb_for_video(events)
-            events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-            if inventory_item_count(events, 'crafting table') < table_count_before:
-                table_placed = True
-                break
-            if placement_attempt < 7:
-                events,_,_,_ = env.step([0,0,0,12,15,0,0,0]); save_rgb_for_video(events)
+        table_placed = reusing_placed_table
+        if not reusing_placed_table:
+            for placement_attempt in range(8):
+                events,_,_,_ = env.step([0,0,0,12,12,6,0,0]); save_rgb_for_video(events)
+                events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
+                if inventory_item_count(events, 'crafting table') < table_count_before:
+                    table_placed = True
+                    break
+                if placement_attempt < 7:
+                    events,_,_,_ = env.step([0,0,0,12,15,0,0,0]); save_rgb_for_video(events)
 
         if not table_placed:
             print("crafting-table placement failed after 8 headings; returning without crafting")
@@ -2494,22 +3081,73 @@ def action_craft(env, item, memory,use_crafting_table,use_furnace,craft_num):
                 events['inventory']['quantity'].tolist(),
             )
 
+        def aim_at_nearby_crafting_table(current_events):
+            """Put the placed table inside craftNearby's required field of view.
+
+            Malmo's ``craftNearby`` command checks both distance and FOV.  A
+            successful placement only proves that the table left inventory;
+            it does not prove that the post-placement camera still sees it.
+            """
+            blocks = current_events.get('voxels', {}).get('block_name')
+            if blocks is not None:
+                candidates = np.argwhere(np.asarray(blocks) == 'crafting table')
+                if len(candidates):
+                    nearest = min(
+                        candidates,
+                        key=lambda index: sum(
+                            abs(int(index[axis]) - vradius) for axis in range(3)
+                        ),
+                    )
+                    aim_action = camera_action_toward_voxel(
+                        current_events,
+                        int(nearest[0]),
+                        int(nearest[1]),
+                        int(nearest[2]),
+                    )
+                    if aim_action is not None and aim_action[3:5] != [12, 12]:
+                        current_events,_,_,_ = env.step(aim_action)
+                        save_rgb_for_video(current_events)
+            current_events,_,_,_ = env.step([0,0,0,12,12,0,0,0])
+            save_rgb_for_video(current_events)
+            table_visible = bool(
+                current_events.get('nearby_tools', {}).get('table', False)
+            )
+            print(f"craftNearby table in FOV: {table_visible}")
+            return current_events, table_visible
+
         crafted_item_name = str(item).replace('_', ' ')
         crafted_count_before = inventory_item_count(events, crafted_item_name)
-        # Placement does not guarantee that the following single ``use``
-        # packet opens the table UI (especially just after an underground
-        # heading sweep).  Retry the physical interaction and recipe command,
-        # and verify real inventory growth before recovering the table.
+        # ``craftNearby`` is a server command, not a GUI click.  Opening the
+        # table with a separate ``use`` packet can leave the client in a GUI
+        # while the server command is issued.  Re-aim at the physical table,
+        # send craftNearby directly, and verify real inventory growth.
+        craft_succeeded = False
         for interaction_attempt in range(3):
-            events,_,_,_ = env.step([0,0,0,12,12,1,0,0]); save_rgb_for_video(events) #use
+            events, table_visible = aim_at_nearby_crafting_table(events)
             print(f"crafting interaction attempt {interaction_attempt + 1}/3 .....")
+            if not table_visible:
+                continue
             for i in range(craft_num):
                 events,_,_,_ = env.step([0,0,0,12,12,4,item_recipy_index,0]); save_rgb_for_video(events) #craft item
             events = sleep(env)
             if inventory_item_count(events, crafted_item_name) > crafted_count_before:
+                craft_succeeded = True
                 break
         else:
             print(f"crafting-table interaction did not produce {crafted_item_name} after 3 attempts")
+
+        if craft_succeeded and keep_crafting_table_placed:
+            # Consecutive table recipes should share one physical placement.
+            # This avoids a lossy destroy/drop/re-place cycle in a narrow shaft.
+            share_memory(memory, events)
+            print(
+                f"leaving crafting table placed after {crafted_item_name} "
+                "for the immediately following table craft"
+            )
+            return (
+                events['inventory']['name'].tolist(),
+                events['inventory']['quantity'].tolist(),
+            )
         '''
         cb_inventory_index = events['inventory']['name'].tolist().index('dirt')  #################for debug, could be changed
         events,_,_,_ = env.step([0,0,0,12,12,5,0,cb_inventory_index]); save_rgb_for_video(events) #equip stone pickaxe
@@ -2607,9 +3245,8 @@ def go_up(
     if stalled_level > entry_level + 0.05:
         print(
             f"go_up retained partial elevation: {entry_level:.2f} -> "
-            f"{stalled_level:.2f}; returning control to the workflow."
+            f"{stalled_level:.2f}; continuing until target Y={y_level}."
         )
-        return True
     if not allow_directional_recovery or max_direction_attempts == 0:
         print(f"go_up stalled at {stalled_level} while targeting {y_level}; returning to caller.")
         return False
@@ -2618,6 +3255,27 @@ def go_up(
         f"go_up stalled at {stalled_level}; trying up to "
         f"{max_direction_attempts} escape headings."
     )
+
+    def restore_escape_yaw(heading_count):
+        """Undo the cumulative +45-degree escape-heading sweep.
+
+        All underground direction indices are defined in the canonical world
+        frame.  Letting ``go_up`` return with a residual 45-degree yaw makes a
+        later cardinal attack hit a diagonal block while ``mine_ahead`` checks
+        a cardinal voxel.  Normalize the inverse rotation to one camera bin so
+        every exit preserves the entry heading.
+        """
+        accumulated_yaw = 45 * heading_count
+        inverse_yaw = ((-accumulated_yaw + 180) % 360) - 180
+        yaw_bin = 12 + int(round(inverse_yaw / 15.0))
+        restored_events,_,_,_ = env.step([0,0,0,12,yaw_bin,0,0,0])
+        save_rgb_for_video(restored_events)
+        print(
+            f"go_up restored entry yaw after {heading_count} escape "
+            f"heading(s): inverse_delta={inverse_yaw} degrees."
+        )
+        return restored_events
+
     for direction_idx in range(max_direction_attempts):
         # One +45-degree yaw step gives eight evenly spaced horizontal headings.
         events,_,_,_ = env.step([0,0,0,12,15,0,0,0]); save_rgb_for_video(events)
@@ -2652,10 +3310,9 @@ def go_up(
         stable_level = float(events['location_stats']['pos'][1])
         if stable_level > stalled_level + 0.05:
             print(
-                f"go_up escaped through heading {direction_idx + 1} with stable "
-                f"elevation {stalled_level:.2f} -> {stable_level:.2f}."
+                f"go_up gained stable elevation through heading {direction_idx + 1}: "
+                f"{stalled_level:.2f} -> {stable_level:.2f}; continuing toward {y_level}."
             )
-            return True
 
         if go_up(
             env,
@@ -2666,10 +3323,12 @@ def go_up(
             max_vertical_attempts=3,
             stalled_limit=2,
         ):
+            events = restore_escape_yaw(direction_idx + 1)
             print(f"go_up escaped through heading {direction_idx + 1}.")
             return True
         events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
 
+    events = restore_escape_yaw(max_direction_attempts)
     final_level = float(events['location_stats']['pos'][1])
     print(
         f"go_up exhausted {max_direction_attempts} escape headings at Y={final_level} "
