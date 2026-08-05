@@ -47,8 +47,8 @@ MINE_DOJO_TARGET_TO_SPAWN_ITEM = {
 
 def resolve_image_size():
     """Return the native MineDojo frame size, optionally overridden for VNC."""
-    height = int(os.environ.get("DC3PA_IMAGE_HEIGHT", "512"))
-    width = int(os.environ.get("DC3PA_IMAGE_WIDTH", "820"))
+    height = int(os.environ.get("DC3PA_IMAGE_HEIGHT", "1024"))
+    width = int(os.environ.get("DC3PA_IMAGE_WIDTH", "1640"))
     if height < 256 or width < 256:
         raise ValueError("DC3PA image dimensions must each be at least 256 pixels")
     return height, width
