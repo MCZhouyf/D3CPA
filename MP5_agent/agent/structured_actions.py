@@ -1794,11 +1794,43 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
                 return False
             if args['obj'] in memory.inventory:
                 return True
-            #print(f"object is {object},{events['voxels']['block_name']}")
             print(f"args obj is {args['obj']},object is {object}")
-            #print(f"my inventory is {memory.inventory}")
-            #left
-            move_one_block(env,memory,0,1,1)
+
+            # Do not repeatedly clear the same forward wall.  A failed bounded
+            # mine_ahead means this heading did not open a passage, so probe the
+            # remaining cardinal headings and require observed displacement
+            # before treating the move as progress.  If all four fail, return
+            # control to the controller so the episode pauses instead of
+            # silently consuming a pickaxe in one direction.
+            moved = False
+            for heading_offset in range(4):
+                candidate_direction = (i + heading_offset) % 4
+                before_position = np.array(events['location_stats']['pos'], dtype=float)
+                print(
+                    f"underground exploration heading {heading_offset + 1}/4: "
+                    f"direction={candidate_direction}"
+                )
+                move_one_block(env, memory, candidate_direction, 1, 1)
+                events = sleep(env)
+                after_position = np.array(events['location_stats']['pos'], dtype=float)
+                horizontal_progress = np.linalg.norm(
+                    after_position[[0, 2]] - before_position[[0, 2]]
+                )
+                if horizontal_progress >= 0.20:
+                    direction = candidate_direction
+                    moved = True
+                    print(
+                        f"underground exploration advanced {horizontal_progress:.3f} "
+                        f"through direction {candidate_direction}"
+                    )
+                    break
+
+            if not moved:
+                print(
+                    "underground exploration could not advance through any "
+                    "cardinal heading; returning control for a paused failure."
+                )
+                return False
 
 # go out to top             
 def go_out(env):

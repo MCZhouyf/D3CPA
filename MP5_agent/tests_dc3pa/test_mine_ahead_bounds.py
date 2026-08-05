@@ -197,6 +197,54 @@ def test_underground_crafting_places_table_before_use_and_recipe(monkeypatch):
     assert operation_codes.index(4) > placement_index
 
 
+class _UndergroundExploreEnv:
+    def __init__(self):
+        size = structured_actions.vradius * 2 + 3
+        self.events = {
+            "location_stats": {"pos": np.array([0.0, 40.0, 0.0])},
+            "inventory": {
+                "name": np.array(["stone pickaxe"], dtype=object),
+                "quantity": np.array([1.0]),
+            },
+            "voxels": {"block_name": np.full((size, size, size), "stone", dtype=object)},
+        }
+
+    def step(self, _action):
+        return self.events, 0.0, False, {}
+
+
+def test_underground_exploration_rotates_after_blocked_heading(monkeypatch):
+    env = _UndergroundExploreEnv()
+    memory = _Memory()
+    attempted_directions = []
+    monkeypatch.setattr(structured_actions, "sleep", lambda _env: env.events)
+    monkeypatch.setattr(structured_actions, "surrounding_voxel_detect", lambda *args: False)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda _events: None)
+    monkeypatch.setattr(structured_actions, "explore_steps", 0)
+
+    def fake_move(_env, _memory, movedir, underground, jumpornot):
+        assert underground == 1 and jumpornot == 1
+        attempted_directions.append(movedir)
+        if movedir == 2:
+            env.events["location_stats"]["pos"][2] += 1.0
+            return True
+        return False
+
+    monkeypatch.setattr(structured_actions, "move_one_block", fake_move)
+
+    assert not structured_actions.explore_above_ground(
+        env,
+        {"obj": "iron ore"},
+        "iron ore",
+        1,
+        performer=object(),
+        memory=memory,
+        task_information={},
+        max_try_steps=1,
+    )
+    assert attempted_directions == [0, 1, 2]
+
+
 def test_underground_mine_caps_static_target_attacks(monkeypatch):
     env = _StoneAheadEnv()
     memory = _Memory()
