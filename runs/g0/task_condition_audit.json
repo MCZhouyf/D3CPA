@@ -1,0 +1,383 @@
+{
+  "count": 40,
+  "findings": [
+    {
+      "condition": "(target_object not in self.memory.inventory or self.memory.inventory[target_object] <= 0) and (task_information['task'] not in self.memory.inventory or self.memory.inventory[task_information['task']] <= 0)",
+      "file": "MP5_agent/agent/20240716-1/controller.py",
+      "kind": "If",
+      "line": 177,
+      "target_literals": [],
+      "task_conditioned": true
+    },
+    {
+      "condition": "task_information['task'] == item and task_information['quantity'] <= math.ceil(memory.inventory[item])",
+      "file": "MP5_agent/agent/20240716-1/run_agent.py",
+      "kind": "If",
+      "line": 164,
+      "target_literals": [],
+      "task_conditioned": true
+    },
+    {
+      "condition": "task_information['task'] == item and task_information['quantity'] <= math.ceil(memory.inventory[item])",
+      "file": "MP5_agent/agent/20240724/controller.py",
+      "kind": "If",
+      "line": 290,
+      "target_literals": [],
+      "task_conditioned": true
+    },
+    {
+      "condition": "(target_object not in self.memory.inventory or self.memory.inventory[target_object] <= 0) and (task_information['task'] not in self.memory.inventory or self.memory.inventory[task_information['task']] <= 0)",
+      "file": "MP5_agent/agent/20240724/controller.py",
+      "kind": "If",
+      "line": 204,
+      "target_literals": [],
+      "task_conditioned": true
+    },
+    {
+      "condition": "target == 'diamond'",
+      "file": "MP5_agent/agent/20240724/structured_actions.py",
+      "kind": "If",
+      "line": 446,
+      "target_literals": [
+        "diamond"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "object == 'diamond'",
+      "file": "MP5_agent/agent/20240724/structured_actions.py",
+      "kind": "If",
+      "line": 1656,
+      "target_literals": [
+        "diamond"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "object == 'diamond'",
+      "file": "MP5_agent/agent/20240724/structured_actions.py",
+      "kind": "If",
+      "line": 2098,
+      "target_literals": [
+        "diamond"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "object == 'diamond'",
+      "file": "MP5_agent/agent/20240724/structured_actions.py",
+      "kind": "If",
+      "line": 2291,
+      "target_literals": [
+        "diamond"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "args['obj'] == 'diamond'",
+      "file": "MP5_agent/agent/20240724/structured_actions.py",
+      "kind": "If",
+      "line": 1568,
+      "target_literals": [
+        "diamond"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "task_information['task'] == item and task_information['quantity'] <= math.ceil(memory.inventory[item])",
+      "file": "MP5_agent/agent/20240726/controller.py",
+      "kind": "If",
+      "line": 298,
+      "target_literals": [],
+      "task_conditioned": true
+    },
+    {
+      "condition": "(target_object not in self.memory.inventory or self.memory.inventory[target_object] <= 0) and (task_information['task'] not in self.memory.inventory or self.memory.inventory[task_information['task']] <= 0)",
+      "file": "MP5_agent/agent/20240726/controller.py",
+      "kind": "If",
+      "line": 205,
+      "target_literals": [],
+      "task_conditioned": true
+    },
+    {
+      "condition": "target == 'diamond'",
+      "file": "MP5_agent/agent/20240726/structured_actions.py",
+      "kind": "If",
+      "line": 446,
+      "target_literals": [
+        "diamond"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "object == 'diamond'",
+      "file": "MP5_agent/agent/20240726/structured_actions.py",
+      "kind": "If",
+      "line": 1656,
+      "target_literals": [
+        "diamond"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "object == 'diamond'",
+      "file": "MP5_agent/agent/20240726/structured_actions.py",
+      "kind": "If",
+      "line": 2100,
+      "target_literals": [
+        "diamond"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "object == 'diamond'",
+      "file": "MP5_agent/agent/20240726/structured_actions.py",
+      "kind": "If",
+      "line": 2293,
+      "target_literals": [
+        "diamond"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "args['obj'] == 'diamond'",
+      "file": "MP5_agent/agent/20240726/structured_actions.py",
+      "kind": "If",
+      "line": 1568,
+      "target_literals": [
+        "diamond"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "task_information['task'] == item and task_information['quantity'] <= math.ceil(memory.inventory[item])",
+      "file": "MP5_agent/agent/20240729\u0431\u255b\u256b\u044e\u2553\u2552\u0431\u2510/controller.py",
+      "kind": "If",
+      "line": 312,
+      "target_literals": [],
+      "task_conditioned": true
+    },
+    {
+      "condition": "(target_object not in self.memory.inventory or self.memory.inventory[target_object] <= 0) and (task_information['task'] not in self.memory.inventory or self.memory.inventory[task_information['task']] <= 0)",
+      "file": "MP5_agent/agent/20240729\u0431\u255b\u256b\u044e\u2553\u2552\u0431\u2510/controller.py",
+      "kind": "If",
+      "line": 209,
+      "target_literals": [],
+      "task_conditioned": true
+    },
+    {
+      "condition": "target == 'diamond'",
+      "file": "MP5_agent/agent/20240729\u0431\u255b\u256b\u044e\u2553\u2552\u0431\u2510/structured_actions.py",
+      "kind": "If",
+      "line": 446,
+      "target_literals": [
+        "diamond"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "object == 'diamond'",
+      "file": "MP5_agent/agent/20240729\u0431\u255b\u256b\u044e\u2553\u2552\u0431\u2510/structured_actions.py",
+      "kind": "If",
+      "line": 1656,
+      "target_literals": [
+        "diamond"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "object == 'diamond'",
+      "file": "MP5_agent/agent/20240729\u0431\u255b\u256b\u044e\u2553\u2552\u0431\u2510/structured_actions.py",
+      "kind": "If",
+      "line": 2121,
+      "target_literals": [
+        "diamond"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "object == 'diamond'",
+      "file": "MP5_agent/agent/20240729\u0431\u255b\u256b\u044e\u2553\u2552\u0431\u2510/structured_actions.py",
+      "kind": "If",
+      "line": 2314,
+      "target_literals": [
+        "diamond"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "args['obj'] == 'diamond'",
+      "file": "MP5_agent/agent/20240729\u0431\u255b\u256b\u044e\u2553\u2552\u0431\u2510/structured_actions.py",
+      "kind": "If",
+      "line": 1568,
+      "target_literals": [
+        "diamond"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "target in {'diamond', 'redstone', 'gold'}",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "If",
+      "line": 50,
+      "target_literals": [
+        "diamond",
+        "gold",
+        "redstone"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "task_information['task'] == item and task_information['quantity'] <= math.ceil(memory.inventory[item])",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "If",
+      "line": 1687,
+      "target_literals": [],
+      "task_conditioned": true
+    },
+    {
+      "condition": "item_name == 'gold'",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "IfExp",
+      "line": 159,
+      "target_literals": [
+        "gold"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "(target_object not in self.memory.inventory or self.memory.inventory[target_object] <= 0) and (task_information['task'] not in self.memory.inventory or self.memory.inventory[task_information['task']] <= 0)",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "If",
+      "line": 1578,
+      "target_literals": [],
+      "task_conditioned": true
+    },
+    {
+      "condition": "self._is_deep_mining_task(task_information) and inventory_obj in {'cobblestone', 'coal', 'iron ore', 'diamond', 'redstone', 'gold'} and self._fallback_mine_diamond_resource(env, inventory_obj, self._deep_mining_required_quantity(inventory_obj, action_required_quantity))",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "If",
+      "line": 1176,
+      "target_literals": [
+        "diamond",
+        "gold",
+        "redstone"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "task_target_name == 'redstone'",
+      "file": "MP5_agent/agent/run_agent.py",
+      "kind": "If",
+      "line": 111,
+      "target_literals": [
+        "redstone"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "task_information.get('task') != 'redstone'",
+      "file": "MP5_agent/agent/run_agent.py",
+      "kind": "If",
+      "line": 132,
+      "target_literals": [
+        "redstone"
+      ],
+      "task_conditioned": true
+    },
+    {
+      "condition": "target == 'diamond'",
+      "file": "MP5_agent/agent/structured_actions.py",
+      "kind": "If",
+      "line": 551,
+      "target_literals": [
+        "diamond"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "object == 'diamond'",
+      "file": "MP5_agent/agent/structured_actions.py",
+      "kind": "If",
+      "line": 2611,
+      "target_literals": [
+        "diamond"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "object == 'diamond'",
+      "file": "MP5_agent/agent/structured_actions.py",
+      "kind": "If",
+      "line": 3460,
+      "target_literals": [
+        "diamond"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "args['obj'] == 'diamond'",
+      "file": "MP5_agent/agent/structured_actions.py",
+      "kind": "If",
+      "line": 2340,
+      "target_literals": [
+        "diamond"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "normalized == 'diamond'",
+      "file": "MP5_agent/agent/utils/common_utils.py",
+      "kind": "If",
+      "line": 84,
+      "target_literals": [
+        "diamond"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "normalized == 'redstone'",
+      "file": "MP5_agent/agent/utils/common_utils.py",
+      "kind": "If",
+      "line": 86,
+      "target_literals": [
+        "redstone"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "normalized == 'gold'",
+      "file": "MP5_agent/agent/utils/common_utils.py",
+      "kind": "If",
+      "line": 88,
+      "target_literals": [
+        "gold"
+      ],
+      "task_conditioned": false
+    },
+    {
+      "condition": "len(rows) != 1 or not isinstance(rows[0], Mapping) or (not rows[0].get('task'))",
+      "file": "dc3pa_stage_a/run_stage_a_episode.py",
+      "kind": "If",
+      "line": 109,
+      "target_literals": [],
+      "task_conditioned": true
+    },
+    {
+      "condition": "formal_entry['tier'] != args.tier",
+      "file": "dc3pa_stage_a/run_stage_a_episode.py",
+      "kind": "If",
+      "line": 263,
+      "target_literals": [],
+      "task_conditioned": true
+    },
+    {
+      "condition": "operation == 'obtain' and creative.get('material') is None and (creative.get('platform') is None) and creative.get('tool') and (spec.get('target', {}).get('candidate_item_name') == creative.get('task'))",
+      "file": "scripts/g0_verify_taskset.py",
+      "kind": "If",
+      "line": 25,
+      "target_literals": [],
+      "task_conditioned": true
+    }
+  ]
+}

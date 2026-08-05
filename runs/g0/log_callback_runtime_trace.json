@@ -1,0 +1,16 @@
+{
+  "environment_steps": 101,
+  "final_inventory": {
+    "log": 2.0
+  },
+  "inventory_writes": [
+    [
+      {
+        "name": "log",
+        "quantity": 2
+      }
+    ]
+  ],
+  "scenario": "unreachable_log_until_delayed_callback",
+  "success": true
+}

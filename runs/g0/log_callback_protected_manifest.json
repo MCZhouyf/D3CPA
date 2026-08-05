@@ -1,0 +1,257 @@
+{
+  "baseline_commit": "06a708e2dcfc6bb83d48e41b1475cf0581db15d5",
+  "baseline_definitions": {
+    "_LOG_CALLBACK_DELAY_STEPS": "27d3150f82e49f374bed74929838de1b51dd81849068abe35ac6d4c01765e1bc",
+    "_begin_log_callback_window": "fda4d2ed4ee310d14b1e42393b25f2363464a7f98aab53d45c86234a8c47a4d2",
+    "_complete_log_callback_window": "20e6fa742336a84dd4d80342e72e6520ea19fb0eded8274c76443dbc8c5593e0",
+    "_gather_logs": "ce6c3814563e636e8c3b48355176c25df6b376774f7a3e9c1733dd3681a95eb5",
+    "_log_callback_due": "b5ed81012d31ba3f42110484a10b777e5b53c08e9de53415f194a3f38b4560bd",
+    "_set_inventory_from_memory": "d9d8c5680392d3bb0829a0ed15caa022bbc74da021bf0d5e93764a114a454f7a",
+    "_sync_memory": "ce9d9d8c0210642c81254c6d407449e3246a38c2916b81e68c5ca8a6d6e09b81"
+  },
+  "baseline_tag": "success-finish",
+  "call_sites": [
+    {
+      "callee": "_set_inventory_from_memory",
+      "caller": "_gather_logs",
+      "file": "MP5_agent/agent/controller.py",
+      "line": 639,
+      "normalized_ast_sha256": "9f6380a9f7cc13d5d5f28078b7b359c47a6221cccdb63707935f7bbad2720169",
+      "ordinal": 0
+    },
+    {
+      "callee": "_begin_log_callback_window",
+      "caller": "_gather_logs",
+      "file": "MP5_agent/agent/controller.py",
+      "line": 578,
+      "normalized_ast_sha256": "441f21d2ee9852de7a00f7dab45b1a30914d9159b02bb783b432c010d59f1b60",
+      "ordinal": 0
+    },
+    {
+      "callee": "_log_callback_due",
+      "caller": "_gather_logs",
+      "file": "MP5_agent/agent/controller.py",
+      "line": 586,
+      "normalized_ast_sha256": "c7e728fe6e88f7d27b285ace343ca0e26ca90a30b9965beb37f88c57b574eff3",
+      "ordinal": 0
+    },
+    {
+      "callee": "_log_callback_due",
+      "caller": "_gather_logs",
+      "file": "MP5_agent/agent/controller.py",
+      "line": 617,
+      "normalized_ast_sha256": "c7e728fe6e88f7d27b285ace343ca0e26ca90a30b9965beb37f88c57b574eff3",
+      "ordinal": 1
+    },
+    {
+      "callee": "_complete_log_callback_window",
+      "caller": "_gather_logs",
+      "file": "MP5_agent/agent/controller.py",
+      "line": 643,
+      "normalized_ast_sha256": "ee6fc96f7a46ad50c80fd6620d13e4050766017d37bf500ccad829e6ed122a75",
+      "ordinal": 0
+    },
+    {
+      "callee": "_complete_log_callback_window",
+      "caller": "_gather_logs",
+      "file": "MP5_agent/agent/controller.py",
+      "line": 584,
+      "normalized_ast_sha256": "ee6fc96f7a46ad50c80fd6620d13e4050766017d37bf500ccad829e6ed122a75",
+      "ordinal": 1
+    },
+    {
+      "callee": "_complete_log_callback_window",
+      "caller": "_gather_logs",
+      "file": "MP5_agent/agent/controller.py",
+      "line": 609,
+      "normalized_ast_sha256": "ee6fc96f7a46ad50c80fd6620d13e4050766017d37bf500ccad829e6ed122a75",
+      "ordinal": 2
+    },
+    {
+      "callee": "_complete_log_callback_window",
+      "caller": "_gather_logs",
+      "file": "MP5_agent/agent/controller.py",
+      "line": 632,
+      "normalized_ast_sha256": "ee6fc96f7a46ad50c80fd6620d13e4050766017d37bf500ccad829e6ed122a75",
+      "ordinal": 3
+    },
+    {
+      "callee": "_complete_log_callback_window",
+      "caller": "_gather_logs",
+      "file": "MP5_agent/agent/controller.py",
+      "line": 615,
+      "normalized_ast_sha256": "ee6fc96f7a46ad50c80fd6620d13e4050766017d37bf500ccad829e6ed122a75",
+      "ordinal": 4
+    }
+  ],
+  "config_keys": [
+    "Controller._LOG_CALLBACK_DELAY_STEPS"
+  ],
+  "current_call_sites": [
+    {
+      "callee": "_set_inventory_from_memory",
+      "caller": "_gather_logs",
+      "file": "MP5_agent/agent/controller.py",
+      "line": 639,
+      "normalized_ast_sha256": "9f6380a9f7cc13d5d5f28078b7b359c47a6221cccdb63707935f7bbad2720169",
+      "ordinal": 0
+    },
+    {
+      "callee": "_begin_log_callback_window",
+      "caller": "_gather_logs",
+      "file": "MP5_agent/agent/controller.py",
+      "line": 578,
+      "normalized_ast_sha256": "441f21d2ee9852de7a00f7dab45b1a30914d9159b02bb783b432c010d59f1b60",
+      "ordinal": 0
+    },
+    {
+      "callee": "_log_callback_due",
+      "caller": "_gather_logs",
+      "file": "MP5_agent/agent/controller.py",
+      "line": 586,
+      "normalized_ast_sha256": "c7e728fe6e88f7d27b285ace343ca0e26ca90a30b9965beb37f88c57b574eff3",
+      "ordinal": 0
+    },
+    {
+      "callee": "_log_callback_due",
+      "caller": "_gather_logs",
+      "file": "MP5_agent/agent/controller.py",
+      "line": 617,
+      "normalized_ast_sha256": "c7e728fe6e88f7d27b285ace343ca0e26ca90a30b9965beb37f88c57b574eff3",
+      "ordinal": 1
+    },
+    {
+      "callee": "_complete_log_callback_window",
+      "caller": "_gather_logs",
+      "file": "MP5_agent/agent/controller.py",
+      "line": 643,
+      "normalized_ast_sha256": "ee6fc96f7a46ad50c80fd6620d13e4050766017d37bf500ccad829e6ed122a75",
+      "ordinal": 0
+    },
+    {
+      "callee": "_complete_log_callback_window",
+      "caller": "_gather_logs",
+      "file": "MP5_agent/agent/controller.py",
+      "line": 584,
+      "normalized_ast_sha256": "ee6fc96f7a46ad50c80fd6620d13e4050766017d37bf500ccad829e6ed122a75",
+      "ordinal": 1
+    },
+    {
+      "callee": "_complete_log_callback_window",
+      "caller": "_gather_logs",
+      "file": "MP5_agent/agent/controller.py",
+      "line": 609,
+      "normalized_ast_sha256": "ee6fc96f7a46ad50c80fd6620d13e4050766017d37bf500ccad829e6ed122a75",
+      "ordinal": 2
+    },
+    {
+      "callee": "_complete_log_callback_window",
+      "caller": "_gather_logs",
+      "file": "MP5_agent/agent/controller.py",
+      "line": 632,
+      "normalized_ast_sha256": "ee6fc96f7a46ad50c80fd6620d13e4050766017d37bf500ccad829e6ed122a75",
+      "ordinal": 3
+    },
+    {
+      "callee": "_complete_log_callback_window",
+      "caller": "_gather_logs",
+      "file": "MP5_agent/agent/controller.py",
+      "line": 615,
+      "normalized_ast_sha256": "ee6fc96f7a46ad50c80fd6620d13e4050766017d37bf500ccad829e6ed122a75",
+      "ordinal": 4
+    }
+  ],
+  "current_definitions": {
+    "_LOG_CALLBACK_DELAY_STEPS": "27d3150f82e49f374bed74929838de1b51dd81849068abe35ac6d4c01765e1bc",
+    "_begin_log_callback_window": "fda4d2ed4ee310d14b1e42393b25f2363464a7f98aab53d45c86234a8c47a4d2",
+    "_complete_log_callback_window": "20e6fa742336a84dd4d80342e72e6520ea19fb0eded8274c76443dbc8c5593e0",
+    "_gather_logs": "ce6c3814563e636e8c3b48355176c25df6b376774f7a3e9c1733dd3681a95eb5",
+    "_log_callback_due": "b5ed81012d31ba3f42110484a10b777e5b53c08e9de53415f194a3f38b4560bd",
+    "_set_inventory_from_memory": "d9d8c5680392d3bb0829a0ed15caa022bbc74da021bf0d5e93764a114a454f7a",
+    "_sync_memory": "ce9d9d8c0210642c81254c6d407449e3246a38c2916b81e68c5ca8a6d6e09b81"
+  },
+  "definitions": [
+    {
+      "end_line": 542,
+      "file": "MP5_agent/agent/controller.py",
+      "normalized_ast_sha256": "27d3150f82e49f374bed74929838de1b51dd81849068abe35ac6d4c01765e1bc",
+      "start_line": 542,
+      "symbol": "_LOG_CALLBACK_DELAY_STEPS"
+    },
+    {
+      "end_line": 57,
+      "file": "MP5_agent/agent/controller.py",
+      "normalized_ast_sha256": "ce9d9d8c0210642c81254c6d407449e3246a38c2916b81e68c5ca8a6d6e09b81",
+      "start_line": 54,
+      "symbol": "_sync_memory"
+    },
+    {
+      "end_line": 172,
+      "file": "MP5_agent/agent/controller.py",
+      "normalized_ast_sha256": "d9d8c5680392d3bb0829a0ed15caa022bbc74da021bf0d5e93764a114a454f7a",
+      "start_line": 121,
+      "symbol": "_set_inventory_from_memory"
+    },
+    {
+      "end_line": 563,
+      "file": "MP5_agent/agent/controller.py",
+      "normalized_ast_sha256": "fda4d2ed4ee310d14b1e42393b25f2363464a7f98aab53d45c86234a8c47a4d2",
+      "start_line": 544,
+      "symbol": "_begin_log_callback_window"
+    },
+    {
+      "end_line": 571,
+      "file": "MP5_agent/agent/controller.py",
+      "normalized_ast_sha256": "b5ed81012d31ba3f42110484a10b777e5b53c08e9de53415f194a3f38b4560bd",
+      "start_line": 565,
+      "symbol": "_log_callback_due"
+    },
+    {
+      "end_line": 574,
+      "file": "MP5_agent/agent/controller.py",
+      "normalized_ast_sha256": "20e6fa742336a84dd4d80342e72e6520ea19fb0eded8274c76443dbc8c5593e0",
+      "start_line": 573,
+      "symbol": "_complete_log_callback_window"
+    },
+    {
+      "end_line": 645,
+      "file": "MP5_agent/agent/controller.py",
+      "normalized_ast_sha256": "ce6c3814563e636e8c3b48355176c25df6b376774f7a3e9c1733dd3681a95eb5",
+      "start_line": 576,
+      "symbol": "_gather_logs"
+    }
+  ],
+  "direct_helpers": [
+    "Controller._sync_memory"
+  ],
+  "inventory_write_sites": [
+    {
+      "call": "env.set_inventory",
+      "file": "MP5_agent/agent/controller.py",
+      "symbol": "Controller._set_inventory_from_memory"
+    }
+  ],
+  "notes": [
+    "Protected boundary includes the existing delayed log callback and its direct Controller helper.",
+    "Calls into _gather_logs outside the callback implementation are audited separately because they may be prohibited automatic recovery paths."
+  ],
+  "runtime_trace": [
+    {
+      "environment_steps": 101,
+      "final_inventory": {
+        "log": 2.0
+      },
+      "inventory_writes": [
+        [
+          {
+            "name": "log",
+            "quantity": 2
+          }
+        ]
+      ],
+      "scenario": "unreachable_log_until_delayed_callback",
+      "success": true
+    }
+  ],
+  "unchanged": true
+}

@@ -1,0 +1,964 @@
+{
+  "count": 137,
+  "findings": [
+    {
+      "expression": "old_inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/20240716-1/controller.py",
+      "kind": "Assign",
+      "line": 169,
+      "target": "old_inventory"
+    },
+    {
+      "expression": "new_inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/20240716-1/controller.py",
+      "kind": "Assign",
+      "line": 173,
+      "target": "new_inventory"
+    },
+    {
+      "callee": "self.env.set_inventory",
+      "expression": "self.env.set_inventory([InventoryItem(slot=9, name='dirt', variant=None, quantity=6), InventoryItem(slot=17, name='coal', variant=None, quantity=3)])",
+      "file": "MP5_agent/agent/20240716-1/run_agent.py",
+      "kind": "call",
+      "line": 84
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/20240716-1/structured_actions.py",
+      "kind": "Assign",
+      "line": 350,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/20240716-1/structured_actions.py",
+      "kind": "Assign",
+      "line": 452,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/20240716-1/structured_actions.py",
+      "kind": "Assign",
+      "line": 1588,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/20240716-1/structured_actions.py",
+      "kind": "Assign",
+      "line": 694,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/20240716-1/structured_actions.py",
+      "kind": "Assign",
+      "line": 1981,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/20240716-1/structured_actions.py",
+      "kind": "Assign",
+      "line": 388,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/20240716-1/structured_actions.py",
+      "kind": "Assign",
+      "line": 414,
+      "target": "inventory"
+    },
+    {
+      "expression": "self.inventory = {}",
+      "file": "MP5_agent/agent/20240716-1/work_memory.py",
+      "kind": "Assign",
+      "line": 49,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "self.inventory = new_inventory",
+      "file": "MP5_agent/agent/20240716-1/work_memory.py",
+      "kind": "Assign",
+      "line": 235,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "self.inventory = {}",
+      "file": "MP5_agent/agent/20240716-1/work_memory.py",
+      "kind": "Assign",
+      "line": 238,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "old_inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/20240724/controller.py",
+      "kind": "Assign",
+      "line": 196,
+      "target": "old_inventory"
+    },
+    {
+      "expression": "new_inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/20240724/controller.py",
+      "kind": "Assign",
+      "line": 200,
+      "target": "new_inventory"
+    },
+    {
+      "callee": "self.env.set_inventory",
+      "expression": "self.env.set_inventory([InventoryItem(slot=9, name='dirt', variant=None, quantity=6), InventoryItem(slot=17, name='coal', variant=None, quantity=3)])",
+      "file": "MP5_agent/agent/20240724/run_agent.py",
+      "kind": "call",
+      "line": 84
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/20240724/structured_actions.py",
+      "kind": "Assign",
+      "line": 456,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/20240724/structured_actions.py",
+      "kind": "Assign",
+      "line": 1604,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/20240724/structured_actions.py",
+      "kind": "Assign",
+      "line": 703,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/20240724/structured_actions.py",
+      "kind": "Assign",
+      "line": 1999,
+      "target": "inventory"
+    },
+    {
+      "expression": "self.inventory = {}",
+      "file": "MP5_agent/agent/20240724/work_memory.py",
+      "kind": "Assign",
+      "line": 49,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "self.inventory = new_inventory",
+      "file": "MP5_agent/agent/20240724/work_memory.py",
+      "kind": "Assign",
+      "line": 238,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "self.inventory = {}",
+      "file": "MP5_agent/agent/20240724/work_memory.py",
+      "kind": "Assign",
+      "line": 241,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "old_inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/20240726/controller.py",
+      "kind": "Assign",
+      "line": 197,
+      "target": "old_inventory"
+    },
+    {
+      "expression": "new_inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/20240726/controller.py",
+      "kind": "Assign",
+      "line": 201,
+      "target": "new_inventory"
+    },
+    {
+      "callee": "self.env.set_inventory",
+      "expression": "self.env.set_inventory([InventoryItem(slot=9, name='dirt', variant=None, quantity=6), InventoryItem(slot=17, name='coal', variant=None, quantity=3)])",
+      "file": "MP5_agent/agent/20240726/run_agent.py",
+      "kind": "call",
+      "line": 84
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/20240726/structured_actions.py",
+      "kind": "Assign",
+      "line": 456,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/20240726/structured_actions.py",
+      "kind": "Assign",
+      "line": 1604,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/20240726/structured_actions.py",
+      "kind": "Assign",
+      "line": 703,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/20240726/structured_actions.py",
+      "kind": "Assign",
+      "line": 2001,
+      "target": "inventory"
+    },
+    {
+      "expression": "self.inventory = {}",
+      "file": "MP5_agent/agent/20240726/work_memory.py",
+      "kind": "Assign",
+      "line": 49,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "self.inventory = new_inventory",
+      "file": "MP5_agent/agent/20240726/work_memory.py",
+      "kind": "Assign",
+      "line": 240,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "self.inventory = {}",
+      "file": "MP5_agent/agent/20240726/work_memory.py",
+      "kind": "Assign",
+      "line": 243,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "old_inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/20240729\u0431\u255b\u256b\u044e\u2553\u2552\u0431\u2510/controller.py",
+      "kind": "Assign",
+      "line": 201,
+      "target": "old_inventory"
+    },
+    {
+      "expression": "new_inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/20240729\u0431\u255b\u256b\u044e\u2553\u2552\u0431\u2510/controller.py",
+      "kind": "Assign",
+      "line": 205,
+      "target": "new_inventory"
+    },
+    {
+      "callee": "self.env.set_inventory",
+      "expression": "self.env.set_inventory([InventoryItem(slot=9, name='dirt', variant=None, quantity=6), InventoryItem(slot=17, name='coal', variant=None, quantity=3)])",
+      "file": "MP5_agent/agent/20240729\u0431\u255b\u256b\u044e\u2553\u2552\u0431\u2510/run_agent.py",
+      "kind": "call",
+      "line": 84
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/20240729\u0431\u255b\u256b\u044e\u2553\u2552\u0431\u2510/structured_actions.py",
+      "kind": "Assign",
+      "line": 456,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/20240729\u0431\u255b\u256b\u044e\u2553\u2552\u0431\u2510/structured_actions.py",
+      "kind": "Assign",
+      "line": 1604,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/20240729\u0431\u255b\u256b\u044e\u2553\u2552\u0431\u2510/structured_actions.py",
+      "kind": "Assign",
+      "line": 703,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/20240729\u0431\u255b\u256b\u044e\u2553\u2552\u0431\u2510/structured_actions.py",
+      "kind": "Assign",
+      "line": 2020,
+      "target": "inventory"
+    },
+    {
+      "expression": "self.inventory = {}",
+      "file": "MP5_agent/agent/20240729\u0431\u255b\u256b\u044e\u2553\u2552\u0431\u2510/work_memory.py",
+      "kind": "Assign",
+      "line": 49,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "self.inventory = new_inventory",
+      "file": "MP5_agent/agent/20240729\u0431\u255b\u256b\u044e\u2553\u2552\u0431\u2510/work_memory.py",
+      "kind": "Assign",
+      "line": 240,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "self.inventory = {}",
+      "file": "MP5_agent/agent/20240729\u0431\u255b\u256b\u044e\u2553\u2552\u0431\u2510/work_memory.py",
+      "kind": "Assign",
+      "line": 243,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "Assign",
+      "line": 81,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "Assign",
+      "line": 114,
+      "target": "inventory"
+    },
+    {
+      "expression": "current_inventory = {normalize_inventory_name(item_name): float(quantity) for (item_name, quantity) in self.memory.inventory.items() if item_name != 'air' and quantity > 0}",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "Assign",
+      "line": 133,
+      "target": "current_inventory"
+    },
+    {
+      "expression": "merged_inventory = dict(current_inventory)",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "Assign",
+      "line": 144,
+      "target": "merged_inventory"
+    },
+    {
+      "expression": "self.memory.inventory = merged_inventory",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "Assign",
+      "line": 172,
+      "target": "self.memory.inventory"
+    },
+    {
+      "expression": "inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "Assign",
+      "line": 183,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "Assign",
+      "line": 450,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "Assign",
+      "line": 663,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "Assign",
+      "line": 687,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "Assign",
+      "line": 695,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "Assign",
+      "line": 700,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "Assign",
+      "line": 705,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "Assign",
+      "line": 712,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "Assign",
+      "line": 717,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "Assign",
+      "line": 732,
+      "target": "inventory"
+    },
+    {
+      "callee": "env.set_inventory",
+      "expression": "env.set_inventory(inventory_items)",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "call",
+      "line": 169
+    },
+    {
+      "expression": "inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "Assign",
+      "line": 726,
+      "target": "inventory"
+    },
+    {
+      "expression": "old_inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "Assign",
+      "line": 1570,
+      "target": "old_inventory"
+    },
+    {
+      "expression": "new_inventory = self.memory.inventory",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "Assign",
+      "line": 1574,
+      "target": "new_inventory"
+    },
+    {
+      "expression": "inventory = dict(self.memory.inventory)",
+      "file": "MP5_agent/agent/reflexion.py",
+      "kind": "Assign",
+      "line": 28,
+      "target": "inventory"
+    },
+    {
+      "callee": "self.env.set_inventory",
+      "expression": "self.env.set_inventory([])",
+      "file": "MP5_agent/agent/run_agent.py",
+      "kind": "call",
+      "line": 213
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/structured_actions.py",
+      "kind": "Assign",
+      "line": 561,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/structured_actions.py",
+      "kind": "Assign",
+      "line": 2475,
+      "target": "inventory"
+    },
+    {
+      "expression": "delta_inventory = current_events.get('delta_inv', {})",
+      "file": "MP5_agent/agent/structured_actions.py",
+      "kind": "Assign",
+      "line": 587,
+      "target": "delta_inventory"
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/structured_actions.py",
+      "kind": "Assign",
+      "line": 1238,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/structured_actions.py",
+      "kind": "Assign",
+      "line": 3106,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = events['inventory']['name'].tolist()",
+      "file": "MP5_agent/agent/structured_actions.py",
+      "kind": "Assign",
+      "line": 3291,
+      "target": "inventory"
+    },
+    {
+      "expression": "start_inventory = dict(getattr(memory, 'inventory', {}))",
+      "file": "MP5_agent/agent/structured_actions.py",
+      "kind": "Assign",
+      "line": 1487,
+      "target": "start_inventory"
+    },
+    {
+      "expression": "post_tunnel_inventory = {str(name).replace('_', ' '): float(quantity) for (name, quantity) in zip(events['inventory']['name'].tolist(), events['inventory']['quantity'].tolist()) if str(name) != 'air' and quantity > 0}",
+      "file": "MP5_agent/agent/structured_actions.py",
+      "kind": "Assign",
+      "line": 1507,
+      "target": "post_tunnel_inventory"
+    },
+    {
+      "expression": "observed_inventory = count_inventory(inventory_name_list, inventory_num_list)",
+      "file": "MP5_agent/agent/utils/common_utils.py",
+      "kind": "Assign",
+      "line": 54,
+      "target": "observed_inventory"
+    },
+    {
+      "expression": "memory.inventory[obj] += 1",
+      "file": "MP5_agent/agent/utils/common_utils.py",
+      "kind": "AugAssign",
+      "line": 193,
+      "target": "memory.inventory[obj]"
+    },
+    {
+      "expression": "memory.inventory[obj] = 1",
+      "file": "MP5_agent/agent/utils/common_utils.py",
+      "kind": "Assign",
+      "line": 195,
+      "target": "memory.inventory[obj]"
+    },
+    {
+      "expression": "memory.inventory[material] -= quantity",
+      "file": "MP5_agent/agent/utils/common_utils.py",
+      "kind": "AugAssign",
+      "line": 203,
+      "target": "memory.inventory[material]"
+    },
+    {
+      "expression": "memory.inventory[item] += quantity",
+      "file": "MP5_agent/agent/utils/common_utils.py",
+      "kind": "AugAssign",
+      "line": 211,
+      "target": "memory.inventory[item]"
+    },
+    {
+      "expression": "memory.inventory[item] = quantity",
+      "file": "MP5_agent/agent/utils/common_utils.py",
+      "kind": "Assign",
+      "line": 213,
+      "target": "memory.inventory[item]"
+    },
+    {
+      "expression": "self.inventory = {}",
+      "file": "MP5_agent/agent/work_memory.py",
+      "kind": "Assign",
+      "line": 49,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "self.inventory = new_inventory",
+      "file": "MP5_agent/agent/work_memory.py",
+      "kind": "Assign",
+      "line": 294,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "self.inventory = {}",
+      "file": "MP5_agent/agent/work_memory.py",
+      "kind": "Assign",
+      "line": 297,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "inventory: Dict[str, float] = field(default_factory=dict)",
+      "file": "MP5_agent/dc3pa/contracts.py",
+      "kind": "AnnAssign",
+      "line": 213,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = normalized_inventory(state.inventory)",
+      "file": "MP5_agent/dc3pa/evaluation/material_repair.py",
+      "kind": "Assign",
+      "line": 295,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = getattr(memory, 'inventory', {}) if memory is not None else {}",
+      "file": "MP5_agent/dc3pa/integration/execution_observer.py",
+      "kind": "Assign",
+      "line": 169,
+      "target": "inventory"
+    },
+    {
+      "expression": "self.inventory_provider = inventory_provider",
+      "file": "MP5_agent/dc3pa/integration/state.py",
+      "kind": "Assign",
+      "line": 132,
+      "target": "self.inventory_provider"
+    },
+    {
+      "expression": "inventory = InventorySnapshot.from_mapping(self.inventory_provider()).to_dict()",
+      "file": "MP5_agent/dc3pa/integration/state.py",
+      "kind": "Assign",
+      "line": 140,
+      "target": "inventory"
+    },
+    {
+      "expression": "pre_inventory: Dict[str, Any] = field(default_factory=dict)",
+      "file": "MP5_agent/dc3pa/memory/acquisition.py",
+      "kind": "AnnAssign",
+      "line": 49,
+      "target": "pre_inventory"
+    },
+    {
+      "expression": "normalized_inventory = {normalize_item_name(item): float(quantity) for (item, quantity) in inventory.items()}",
+      "file": "MP5_agent/dc3pa/memory/dependency_store.py",
+      "kind": "Assign",
+      "line": 113,
+      "target": "normalized_inventory"
+    },
+    {
+      "expression": "inventory: Dict[str, float]",
+      "file": "MP5_agent/dc3pa/memory/exemplar_store.py",
+      "kind": "AnnAssign",
+      "line": 61,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory: Dict[str, float]",
+      "file": "MP5_agent/dc3pa/memory/multimodal_memory.py",
+      "kind": "AnnAssign",
+      "line": 27,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = normalized_inventory(projection.before(step_index))",
+      "file": "MP5_agent/dc3pa/reliability/knowledge.py",
+      "kind": "Assign",
+      "line": 106,
+      "target": "inventory"
+    },
+    {
+      "expression": "projected_inventory = project_inventory(plan, state).before(step_index)",
+      "file": "MP5_agent/dc3pa/reliability/model.py",
+      "kind": "Assign",
+      "line": 122,
+      "target": "projected_inventory"
+    },
+    {
+      "expression": "projected_inventory = None",
+      "file": "MP5_agent/dc3pa/reliability/model.py",
+      "kind": "Assign",
+      "line": 138,
+      "target": "projected_inventory"
+    },
+    {
+      "expression": "inventory = normalized_inventory(state.inventory)",
+      "file": "MP5_agent/dc3pa/reliability/projection.py",
+      "kind": "Assign",
+      "line": 70,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = {'log': 1.0} if self.count >= 3 else {}",
+      "file": "MP5_agent/scripts_dc3pa/stage6_closed_loop_demo.py",
+      "kind": "Assign",
+      "line": 50,
+      "target": "inventory"
+    },
+    {
+      "callee": "evaluator.env.set_inventory",
+      "expression": "evaluator.env.set_inventory([])",
+      "file": "MP5_agent/scripts_dc3pa/stage6_run_minecraft.py",
+      "kind": "call",
+      "line": 312
+    },
+    {
+      "expression": "inventory = {'log': float(max(0, self.calls - 1))}",
+      "file": "MP5_agent/tests_dc3pa/helpers_stage6.py",
+      "kind": "Assign",
+      "line": 80,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory: Dict[str, float]",
+      "file": "MP5_agent/tests_dc3pa/helpers_stage6_cobblestone.py",
+      "kind": "AnnAssign",
+      "line": 272,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = self.world.snapshot_inventory()",
+      "file": "MP5_agent/tests_dc3pa/helpers_stage6_cobblestone.py",
+      "kind": "Assign",
+      "line": 290,
+      "target": "inventory"
+    },
+    {
+      "expression": "self.world.inventory['cobblestone'] = self.world.inventory.get('cobblestone', 0.0) + 4.0",
+      "file": "MP5_agent/tests_dc3pa/helpers_stage6_cobblestone.py",
+      "kind": "Assign",
+      "line": 502,
+      "target": "self.world.inventory['cobblestone']"
+    },
+    {
+      "expression": "self.world.inventory['log'] = self.world.inventory.get('log', 0.0) + float(step.times)",
+      "file": "MP5_agent/tests_dc3pa/helpers_stage6_cobblestone.py",
+      "kind": "Assign",
+      "line": 479,
+      "target": "self.world.inventory['log']"
+    },
+    {
+      "expression": "self.world.inventory[obj] = self.world.inventory.get(obj, 0.0) + float(quantity) * step.times",
+      "file": "MP5_agent/tests_dc3pa/helpers_stage6_cobblestone.py",
+      "kind": "Assign",
+      "line": 485,
+      "target": "self.world.inventory[obj]"
+    },
+    {
+      "expression": "self.world.inventory[item] = self.world.inventory.get(item, 0.0) - float(quantity) * step.times",
+      "file": "MP5_agent/tests_dc3pa/helpers_stage6_cobblestone.py",
+      "kind": "Assign",
+      "line": 483,
+      "target": "self.world.inventory[item]"
+    },
+    {
+      "expression": "controller.memory.inventory['cobblestone'] = 3",
+      "file": "MP5_agent/tests_dc3pa/test_deep_mining_controller_fallbacks.py",
+      "kind": "Assign",
+      "line": 217,
+      "target": "controller.memory.inventory['cobblestone']"
+    },
+    {
+      "expression": "self.inventory = dict(inventory or {})",
+      "file": "MP5_agent/tests_dc3pa/test_deep_mining_controller_fallbacks.py",
+      "kind": "Assign",
+      "line": 20,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "self.inventory = dict(inventory)",
+      "file": "MP5_agent/tests_dc3pa/test_deep_mining_controller_fallbacks.py",
+      "kind": "Assign",
+      "line": 23,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "self.memory.inventory = {item.name.replace('_', ' '): float(item.quantity) for item in inventory_items if item.quantity > 0}",
+      "file": "MP5_agent/tests_dc3pa/test_deep_mining_controller_fallbacks.py",
+      "kind": "Assign",
+      "line": 46,
+      "target": "self.memory.inventory"
+    },
+    {
+      "expression": "self.memory.inventory['log'] -= craft_num",
+      "file": "MP5_agent/tests_dc3pa/test_deep_mining_controller_fallbacks.py",
+      "kind": "AugAssign",
+      "line": 606,
+      "target": "self.memory.inventory['log']"
+    },
+    {
+      "expression": "self.memory.inventory['planks'] = self.memory.inventory.get('planks', 0) + 4 * craft_num",
+      "file": "MP5_agent/tests_dc3pa/test_deep_mining_controller_fallbacks.py",
+      "kind": "Assign",
+      "line": 607,
+      "target": "self.memory.inventory['planks']"
+    },
+    {
+      "expression": "self.memory.inventory['planks'] -= 2 * craft_num",
+      "file": "MP5_agent/tests_dc3pa/test_deep_mining_controller_fallbacks.py",
+      "kind": "AugAssign",
+      "line": 609,
+      "target": "self.memory.inventory['planks']"
+    },
+    {
+      "expression": "self.memory.inventory['stick'] = self.memory.inventory.get('stick', 0) + 4 * craft_num",
+      "file": "MP5_agent/tests_dc3pa/test_deep_mining_controller_fallbacks.py",
+      "kind": "Assign",
+      "line": 610,
+      "target": "self.memory.inventory['stick']"
+    },
+    {
+      "expression": "self.inventory: dict[str, float] = {}",
+      "file": "MP5_agent/tests_dc3pa/test_g0_log_callback_runtime.py",
+      "kind": "AnnAssign",
+      "line": 19,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "self.inventory = dict(inventory)",
+      "file": "MP5_agent/tests_dc3pa/test_g0_log_callback_runtime.py",
+      "kind": "Assign",
+      "line": 22,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "self.memory.inventory = {item.name.replace('_', ' '): float(item.quantity) for item in items}",
+      "file": "MP5_agent/tests_dc3pa/test_g0_log_callback_runtime.py",
+      "kind": "Assign",
+      "line": 37,
+      "target": "self.memory.inventory"
+    },
+    {
+      "expression": "self.inventory = inventory",
+      "file": "MP5_agent/tests_dc3pa/test_inventory_observation_sync.py",
+      "kind": "Assign",
+      "line": 19,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "self.inventory = inventory",
+      "file": "MP5_agent/tests_dc3pa/test_inventory_observation_sync.py",
+      "kind": "Assign",
+      "line": 22,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "inventory = {}",
+      "file": "MP5_agent/tests_dc3pa/test_mine_ahead_bounds.py",
+      "kind": "Assign",
+      "line": 18,
+      "target": "inventory"
+    },
+    {
+      "expression": "memory.inventory = {'stone pickaxe': 1.0}",
+      "file": "MP5_agent/tests_dc3pa/test_mine_ahead_bounds.py",
+      "kind": "Assign",
+      "line": 316,
+      "target": "memory.inventory"
+    },
+    {
+      "expression": "memory.inventory = {'cobblestone': 139.0, 'stick': 4.0}",
+      "file": "MP5_agent/tests_dc3pa/test_mine_ahead_bounds.py",
+      "kind": "Assign",
+      "line": 337,
+      "target": "memory.inventory"
+    },
+    {
+      "expression": "memory.inventory = {'stone pickaxe': 1.0}",
+      "file": "MP5_agent/tests_dc3pa/test_mine_ahead_bounds.py",
+      "kind": "Assign",
+      "line": 376,
+      "target": "memory.inventory"
+    },
+    {
+      "expression": "memory.inventory = {'stone pickaxe': 1.0}",
+      "file": "MP5_agent/tests_dc3pa/test_mine_ahead_bounds.py",
+      "kind": "Assign",
+      "line": 415,
+      "target": "memory.inventory"
+    },
+    {
+      "expression": "memory.inventory = {'stone pickaxe': 1.0, 'cobblestone': 34.0, 'furnace': 1.0}",
+      "file": "MP5_agent/tests_dc3pa/test_mine_ahead_bounds.py",
+      "kind": "Assign",
+      "line": 468,
+      "target": "memory.inventory"
+    },
+    {
+      "expression": "memory.inventory = {'stone pickaxe': 1.0}",
+      "file": "MP5_agent/tests_dc3pa/test_mine_ahead_bounds.py",
+      "kind": "Assign",
+      "line": 522,
+      "target": "memory.inventory"
+    },
+    {
+      "expression": "target_memory.inventory = {str(name).replace('_', ' '): float(quantity) for (name, quantity) in zip(events['inventory']['name'].tolist(), events['inventory']['quantity'].tolist()) if str(name) != 'air' and quantity > 0}",
+      "file": "MP5_agent/tests_dc3pa/test_mine_ahead_bounds.py",
+      "kind": "Assign",
+      "line": 380,
+      "target": "target_memory.inventory"
+    },
+    {
+      "expression": "target_memory.inventory = {str(name).replace('_', ' '): float(quantity) for (name, quantity) in zip(events['inventory']['name'].tolist(), events['inventory']['quantity'].tolist()) if str(name) != 'air' and quantity > 0}",
+      "file": "MP5_agent/tests_dc3pa/test_mine_ahead_bounds.py",
+      "kind": "Assign",
+      "line": 419,
+      "target": "target_memory.inventory"
+    },
+    {
+      "expression": "target_memory.inventory = {str(name).replace('_', ' '): float(quantity) for (name, quantity) in zip(events['inventory']['name'].tolist(), events['inventory']['quantity'].tolist()) if str(name) != 'air' and quantity > 0}",
+      "file": "MP5_agent/tests_dc3pa/test_mine_ahead_bounds.py",
+      "kind": "Assign",
+      "line": 476,
+      "target": "target_memory.inventory"
+    },
+    {
+      "expression": "target_memory.inventory = {str(name).replace('_', ' '): float(quantity) for (name, quantity) in zip(events['inventory']['name'].tolist(), events['inventory']['quantity'].tolist()) if str(name) != 'air' and quantity > 0}",
+      "file": "MP5_agent/tests_dc3pa/test_mine_ahead_bounds.py",
+      "kind": "Assign",
+      "line": 531,
+      "target": "target_memory.inventory"
+    },
+    {
+      "expression": "self.inventory = {'crafting table': 1.0, 'planks': 6.0, 'stick': 4.0}",
+      "file": "MP5_agent/tests_dc3pa/test_mine_ahead_bounds.py",
+      "kind": "Assign",
+      "line": 651,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "self.inventory = {}",
+      "file": "MP5_agent/tests_dc3pa/test_round1_execution_observer.py",
+      "kind": "Assign",
+      "line": 98,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "self.inventory = dict(inventory)",
+      "file": "MP5_agent/tests_dc3pa/test_round1_execution_observer.py",
+      "kind": "Assign",
+      "line": 101,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "inventory = {}",
+      "file": "MP5_agent/tests_dc3pa/test_stage6_factory.py",
+      "kind": "Assign",
+      "line": 25,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = {}",
+      "file": "MP5_agent/tests_dc3pa/test_stage6_providers_and_legacy.py",
+      "kind": "Assign",
+      "line": 26,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = {}",
+      "file": "MP5_agent/tests_dc3pa/test_stage6_scripts.py",
+      "kind": "Assign",
+      "line": 139,
+      "target": "inventory"
+    },
+    {
+      "expression": "env.set_inventory = wrapped",
+      "file": "dc3pa_stage_a/inventory_write_logger.py",
+      "kind": "Assign",
+      "line": 162,
+      "target": "env.set_inventory"
+    },
+    {
+      "expression": "self._env.set_inventory = self._original",
+      "file": "dc3pa_stage_a/inventory_write_logger.py",
+      "kind": "Assign",
+      "line": 171,
+      "target": "self._env.set_inventory"
+    },
+    {
+      "callee": "env.set_inventory",
+      "expression": "env.set_inventory([_FakeItem(0, 'iron_ore', 3)])",
+      "file": "dc3pa_stage_a/test_stage_a.py",
+      "kind": "call",
+      "line": 51
+    },
+    {
+      "callee": "env.set_inventory",
+      "expression": "env.set_inventory([_FakeItem(0, 'iron_ore', 3), _FakeItem(1, 'coal', 3)])",
+      "file": "dc3pa_stage_a/test_stage_a.py",
+      "kind": "call",
+      "line": 52
+    }
+  ]
+}
