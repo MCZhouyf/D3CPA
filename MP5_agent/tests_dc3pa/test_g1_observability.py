@@ -97,3 +97,22 @@ def test_g1_ledger_records_logical_call_without_raw_prompt_or_secret(tmp_path: P
     records = [json.loads(line) for line in text.splitlines()]
     assert records[-1]["payload"]["token_count_source"] == "api_usage"
     assert records[-1]["payload"]["total_tokens"] == 5
+
+
+def test_g1_ledger_estimates_usage_when_relay_omits_usage_metadata(tmp_path: Path):
+    class Result:
+        usage_metadata = {"prompt_tokens": None, "completion_tokens": None}
+        content = "brief response"
+
+    class Model:
+        def invoke(self, prompt):
+            return Result()
+
+    path = tmp_path / "ledger.jsonl"
+    LedgerChatModel(Model(), path, context={"caller_type": "planner"}).invoke("private prompt")
+    records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    payload = records[-1]["payload"]
+    assert payload["token_count_source"] == "estimated"
+    assert payload["prompt_tokens"] > 0
+    assert payload["completion_tokens"] > 0
+    assert payload["total_tokens"] == payload["prompt_tokens"] + payload["completion_tokens"]

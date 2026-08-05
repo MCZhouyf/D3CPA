@@ -24,7 +24,27 @@ def _usage(result: Any) -> tuple[int | None, int | None, int | None, str]:
     prompt = metadata.get("input_tokens", metadata.get("prompt_tokens"))
     completion = metadata.get("output_tokens", metadata.get("completion_tokens"))
     total = metadata.get("total_tokens")
+    if not all(isinstance(value, int) and not isinstance(value, bool) for value in (prompt, completion, total)):
+        return None, None, None, "unavailable"
     return prompt, completion, total, "api_usage"
+
+
+def _estimate_tokens(value: Any) -> int:
+    """Stable local fallback, intentionally computed but never persisted verbatim.
+
+    The relay used for G1 does not provide provider token-usage fields.  A
+    conservative four-Unicode-character approximation lets throughput reports
+    remain numeric without retaining a prompt or completion in the ledger.
+    """
+
+    text = repr(value)
+    return max(1, (len(text) + 3) // 4)
+
+
+def _estimated_usage(args: tuple[Any, ...], kwargs: Mapping[str, Any], result: Any) -> tuple[int, int, int]:
+    prompt = _estimate_tokens((args, sorted(kwargs.items())))
+    completion = _estimate_tokens(getattr(result, "content", result))
+    return prompt, completion, prompt + completion
 
 
 class LedgerChatModel:
@@ -47,6 +67,9 @@ class LedgerChatModel:
             self._writer.write("llm_relay_attempt", {**base, "status": "failure", "error_type": type(exc).__name__, "latency_ms": round((time.perf_counter() - started) * 1000, 3), "prompt_tokens": None, "completion_tokens": None, "total_tokens": None, "token_count_source": "unavailable"})
             raise
         prompt, completion, total, source = _usage(result)
+        if source == "unavailable":
+            prompt, completion, total = _estimated_usage(args, kwargs, result)
+            source = "estimated"
         self._writer.write("llm_relay_attempt", {**base, "status": "success", "error_type": None, "latency_ms": round((time.perf_counter() - started) * 1000, 3), "prompt_tokens": prompt, "completion_tokens": completion, "total_tokens": total, "token_count_source": source})
         return result
 
