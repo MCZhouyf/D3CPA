@@ -382,6 +382,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Keep task-name-specific legacy rules outside mp5_legacy mode.",
     )
     parser.add_argument("--disable-controller-recovery", action="store_true")
+    parser.add_argument("--g1-run-root", type=Path)
+    parser.add_argument(
+        "--g1-episode-metadata",
+        type=Path,
+        help="G1-only metadata JSON; enables passive episode event capture.",
+    )
     return parser
 
 
@@ -404,6 +410,13 @@ def main(argv: Optional[list[str]] = None) -> int:
     args.memory_root = args.memory_root.resolve()
     args.trace = args.trace.resolve()
     args.trace.parent.mkdir(parents=True, exist_ok=True)
+    if (args.g1_run_root is None) != (args.g1_episode_metadata is None):
+        parser.error("--g1-run-root and --g1-episode-metadata must be supplied together")
+    g1_metadata: Mapping[str, Any] | None = None
+    if args.g1_run_root is not None:
+        args.g1_run_root = args.g1_run_root.resolve()
+        args.g1_episode_metadata = args.g1_episode_metadata.resolve()
+        g1_metadata = _load_json(args.g1_episode_metadata)
     resolved_path = args.trace.with_suffix(args.trace.suffix + ".resolved_config.json")
     resolved_path.write_text(
         json.dumps(resolved_g0, indent=2, sort_keys=True) + "\n", encoding="utf-8"
@@ -460,6 +473,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         )
         evaluator = legacy_runner.Evaluator()
         evaluator.env = StepBudgetEnv(evaluator.env, max_env_steps)
+        g1_state_observer = None
+        if g1_metadata is not None:
+            from dc3pa.observability.g1_state_audit import StateWriteObserver
+            g1_state_observer = StateWriteObserver()
+            g1_state_observer.attach(evaluator.env)
         evaluator.env.reset()
         evaluator.env.set_inventory([])
         initial_result = evaluator.env.step([0, 0, 0, 12, 6, 0, 0, 0])
@@ -534,6 +552,16 @@ def main(argv: Optional[list[str]] = None) -> int:
                 trigger_config=trigger_config,
                 trace_writer=trace_writer,
             )
+            g1_captured_executions: list[tuple[Any, Any]] = []
+            if g1_metadata is not None:
+                original_execute = bundle.runtime.controller.execute
+
+                def observe_execute(env, plan, task_information, underground):
+                    execution = original_execute(env, plan, task_information, underground)
+                    g1_captured_executions.append((plan, execution))
+                    return execution
+
+                bundle.runtime.controller.execute = observe_execute
             tasks = json.loads(Path(args.task).read_text(encoding="utf-8"))
             if isinstance(tasks, Mapping):
                 task_list = [tasks]
@@ -547,6 +575,24 @@ def main(argv: Optional[list[str]] = None) -> int:
                 if not isinstance(task_information, Mapping):
                     raise ValueError("Every task entry must be an object")
                 result = bundle.runtime.run_task(task_information, underground=underground)
+                if g1_metadata is not None:
+                    from dc3pa.integration.events import sanitize_for_trace
+                    from dc3pa.observability.g1_steps import step_rows_from_telemetry
+                    from dc3pa.observability.g1_writer import G1EpisodeWriter, sha256_json, write_parquet_atomically
+                    g1_run_id = str(g1_metadata["run_id"])
+                    g1_episode_id = str(g1_metadata["episode_id"])
+                    writer = G1EpisodeWriter(args.g1_run_root, g1_episode_id)
+                    all_rows = []
+                    for plan, execution in g1_captured_executions:
+                        telemetry = [sanitize_for_trace(event.to_dict()) for event in execution.telemetry]
+                        writer.write("controller_telemetry", {"plan_id": plan.plan_id, "events": telemetry})
+                        context = {**dict(g1_metadata), "run_id": g1_run_id, "episode_id": g1_episode_id,
+                                   "episode_seed": int(os.environ["EPISODE_SEED"]), "commit_hash": resolved_g0.get("commit_hash", ""),
+                                   "config_hash": sha256_json(resolved_g0), "model_config_hash": sha256_json({key: resolved_g0[key] for key in ("model", "base_url", "temperature", "top_p", "max_tokens", "max_retries")})}
+                        all_rows.extend(step_rows_from_telemetry(telemetry=telemetry, context=context))
+                    writer.write("episode_result", sanitize_for_trace(result.to_dict()))
+                    writer.finalize()
+                    write_parquet_atomically(all_rows, args.g1_run_root / "episodes" / f"{g1_episode_id}.steps.parquet")
                 underground = result.final_underground
                 print(json.dumps(result.to_dict(), ensure_ascii=False, sort_keys=True))
                 if not result.success:
