@@ -40,7 +40,9 @@ class G1EpisodeWriter:
         self.writer.write(event_type, payload)
 
     def finalize(self) -> Path:
-        completed = self.partial_path.with_suffix(".jsonl")
+        completed = self.partial_path.with_name(
+            self.partial_path.name.removesuffix(".partial.jsonl") + ".jsonl"
+        )
         os.replace(self.partial_path, completed)
         return completed
 

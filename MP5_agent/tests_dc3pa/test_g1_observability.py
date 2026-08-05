@@ -59,6 +59,8 @@ def test_g1_writer_keeps_partial_raw_events_out_of_completed_parquet(tmp_path: P
     assert list((tmp_path / "raw_events").glob("*.partial.jsonl"))
     final_raw = writer.finalize()
     assert final_raw.is_file()
+    assert ".partial." not in final_raw.name
+    assert not list((tmp_path / "raw_events").glob("*.partial.jsonl"))
     rows = step_rows_from_telemetry(telemetry=_events(), context=CONTEXT)
     path = write_parquet_atomically(rows, tmp_path / "steps.parquet")
     assert pq.read_table(path).num_rows == 1
