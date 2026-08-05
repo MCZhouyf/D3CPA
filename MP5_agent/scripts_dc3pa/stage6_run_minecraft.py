@@ -438,6 +438,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     runtime_config = replace(
         runtime_config, max_execution_attempts=max_execution_attempts
     )
+    if g1_metadata is not None:
+        # ExecutionObserver is an observer-only dependency; enabling it cannot
+        # affect planning, Controller dispatch, or the protected log callback.
+        runtime_config = replace(runtime_config, telemetry_enabled=True)
     if args.unresolved_plan_policy is not None:
         runtime_config = replace(
             runtime_config, unresolved_plan_policy=args.unresolved_plan_policy
@@ -607,7 +611,8 @@ def main(argv: Optional[list[str]] = None) -> int:
                         all_rows.extend(step_rows_from_telemetry(telemetry=telemetry, context=context))
                     writer.write("episode_result", sanitize_for_trace(result.to_dict()))
                     writer.finalize()
-                    write_parquet_atomically(all_rows, args.g1_run_root / "episodes" / f"{g1_episode_id}.steps.parquet")
+                    if all_rows:
+                        write_parquet_atomically(all_rows, args.g1_run_root / "episodes" / f"{g1_episode_id}.steps.parquet")
                 underground = result.final_underground
                 print(json.dumps(result.to_dict(), ensure_ascii=False, sort_keys=True))
                 if not result.success:
