@@ -12,9 +12,9 @@
     31005,
     31006
   ],
-  "max_execution_attempts": 1,
+  "max_execution_attempts": 4,
   "memory_mode": "disabled",
-  "notes": "Stage A diagnostic run: pause after the first controller failure (no automatic reset/replan) so execution-layer failures can be inspected in place; not a paper configuration.",
+  "notes": "Stage A diagnostic run: allow bounded LLM re-planning from the current world state after structured controller feedback; no automatic environment reset between reactive attempts; not a paper configuration.",
   "record_legacy_workflow_memory": false,
   "record_multimodal_memory": false,
   "runtime_mode": "mp5_legacy"

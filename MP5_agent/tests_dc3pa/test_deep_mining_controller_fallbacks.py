@@ -113,6 +113,14 @@ def test_inventory_mutation_rejects_non_log_items():
     assert not env.set_inventory_calls
 
 
+def test_only_torch_is_optional_deep_mining_craft():
+    controller = _controller()
+
+    assert controller._is_optional_deep_mining_craft("torch")
+    assert not controller._is_optional_deep_mining_craft("furnace")
+    assert not controller._is_optional_deep_mining_craft("iron ingot")
+
+
 def test_low_level_tool_failure_is_forwarded_once_for_llm_replanning():
     controller = _controller({"cobblestone": 8, "stick": 2})
     controller.memory._dc3pa_execution_failure = {
@@ -375,12 +383,12 @@ def test_dig_down_normalizes_legacy_wooden_pickaxe_target(monkeypatch):
     called = []
 
     monkeypatch.setattr("controller.share_memory", lambda *args, **kwargs: None)
-    monkeypatch.setattr(
-        "controller.go_down_to_y_level",
-        lambda target_env, target_y, equipment="": called.append(
-            (target_env, target_y, equipment)
-        ),
-    )
+    def fake_go_down(target_env, target_y, equipment=""):
+        called.append((target_env, target_y, equipment))
+        target_env.y_level = float(target_y)
+        return True
+
+    monkeypatch.setattr("controller.go_down_to_y_level", fake_go_down)
     workflow = {
         "workflow": [
             {
@@ -403,6 +411,54 @@ def test_dig_down_normalizes_legacy_wooden_pickaxe_target(monkeypatch):
     assert underground
     assert called == [(env, 50, "wooden pickaxe")]
     assert workflow["workflow"][0]["actions"][0]["args"]["y_level"] == 50
+
+
+def test_dig_down_failure_stops_before_resource_mining(monkeypatch):
+    controller = _controller({"wooden pickaxe": 1})
+    env = _UpwardEnv(controller.memory, y_level=64.0)
+    called = []
+
+    monkeypatch.setattr("controller.share_memory", lambda *args, **kwargs: None)
+
+    def fake_go_down(target_env, target_y, equipment=""):
+        called.append((target_env, target_y, equipment))
+        target_env.y_level = 64.0
+        return False
+
+    monkeypatch.setattr("controller.go_down_to_y_level", fake_go_down)
+
+    result, underground = controller.check_and_execute_workflow(
+        env,
+        {
+            "workflow": [
+                {
+                    "times": "1",
+                    "actions": [
+                        {
+                            "name": "dig_down",
+                            "args": {"y_level": 50, "tool": "wooden pickaxe"},
+                        }
+                    ],
+                },
+                {
+                    "times": "1",
+                    "actions": [
+                        {
+                            "name": "mine",
+                            "args": {"obj": "cobblestone", "tool": "wooden pickaxe"},
+                        }
+                    ],
+                },
+            ]
+        },
+        {"task": "diamond"},
+        underground=False,
+    )
+
+    assert not result["success"]
+    assert not underground
+    assert called == [(env, 50, "wooden pickaxe")]
+    assert "did not reach the requested Y level" in result["feedback"]
 
 
 def test_downstream_craft_materials_cap_cobblestone_collection():

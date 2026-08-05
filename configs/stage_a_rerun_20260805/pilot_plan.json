@@ -1,0 +1,14 @@
+{
+  "purpose": "Stage A disabled-memory rerun pilot after execution-layer repairs; not a paper configuration",
+  "tasks": [
+    {"task": "mine log", "tier": "basic"},
+    {"task": "obtain diamond", "tier": "complex"}
+  ],
+  "runtime_modes": ["mp5_legacy", "reasoning_only", "dc3pa"],
+  "pilot_seed": 51001,
+  "evaluate_seed_pool": [51001, 51002, 51003, 51004, 51005, 51006],
+  "episodes": 6,
+  "max_env_steps": 12000,
+  "record_inventory_writes": true,
+  "execution_rule": "Run these six episodes before any expansion. If the extrapolated 252-episode diagnostic wall-clock exceeds eight hours, stop and request a human scale decision."
+}

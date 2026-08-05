@@ -51,7 +51,28 @@ def count_inventory(inventory_name_list, inventory_num_list):
 def share_memory(memory, events):
     inventory_name_list = events['inventory']['name'].tolist()
     inventory_num_list = events['inventory']['quantity'].tolist()
-    memory.update_inventory(count_inventory(inventory_name_list, inventory_num_list))
+    observed_inventory = count_inventory(inventory_name_list, inventory_num_list)
+
+    # MineDojo occasionally emits a single all-``air`` inventory frame while
+    # the player is moving out of a vertical tunnel.  Treating that one frame
+    # as authoritative erases the controller's material ledger, although the
+    # following observation still contains the physical inventory.  Require a
+    # consecutive confirmation before replacing a non-empty ledger with an
+    # empty one.  A real respawn/empty inventory therefore remains observable
+    # on the next synchronization, without inventing any item.
+    if not observed_inventory and memory.inventory:
+        empty_observations = getattr(memory, "_dc3pa_empty_inventory_observations", 0) + 1
+        memory._dc3pa_empty_inventory_observations = empty_observations
+        if empty_observations < 2:
+            log_info(
+                "Ignoring one transient empty inventory observation; "
+                "waiting for confirmation before clearing the ledger."
+            )
+            return
+    else:
+        memory._dc3pa_empty_inventory_observations = 0
+
+    memory.update_inventory(observed_inventory)
 
 def update_find_obj_name(obj_name):
     normalized = obj_name.lower().strip() if isinstance(obj_name, str) else obj_name

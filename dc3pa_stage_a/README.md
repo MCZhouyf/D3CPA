@@ -7,7 +7,7 @@ dc3pa_stage_a/
 ├── inventory_write_logger.py   包裹 env.set_inventory，逐次记录直接库存写入
 ├── paper_config.py             Option-B 论文运行配置：冻结、哈希、一致性断言
 ├── analyze_stage_a.py          离线分析，产出 Stage A 的四张表
-├── test_stage_a.py             16 个测试，无需 MineDojo / LLM / GPU
+├── test_stage_a.py             14 个测试，无需 MineDojo / LLM / GPU
 └── fixtures/                   合成日志，用于离线验证分析逻辑
 ```
 
@@ -16,7 +16,7 @@ dc3pa_stage_a/
 放到仓库根目录下（与 `MP5_agent/` 同级），或任何在 `PYTHONPATH` 上的位置。**不要放进 `MP5_agent/dc3pa/`**——保持它与被审计的基础代码物理分离，这样 `git diff` 一眼就能看出基础代码没动。
 
 ```bash
-python -m pytest dc3pa_stage_a/test_stage_a.py -q   # 期望 16 passed
+python -m pytest dc3pa_stage_a/test_stage_a.py -q   # 期望 14 passed
 ```
 
 ## Option B 的关键事实

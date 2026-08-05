@@ -107,6 +107,9 @@ class Controller:
     def _inventory_count(self, item_name):
         return self.memory.inventory.get(normalize_inventory_name(item_name), 0)
 
+    def _is_optional_deep_mining_craft(self, crafted_obj):
+        return normalize_inventory_name(crafted_obj) in {"torch"}
+
     def _has_wooden_pickaxe_materials(self):
         inventory = self.memory.inventory
         return (
@@ -1094,6 +1097,24 @@ class Controller:
                     
                     elif name == "move_to":
                         check_result = self.check_action_preparation(env,"move_to",  args,task_information,events)
+                        if (
+                            not check_result["success"]
+                            and self._is_deep_mining_task(task_information)
+                            and self._is_optional_deep_mining_craft(crafted_obj)
+                        ):
+                            print(
+                                f"Skipping optional deep-mining craft {crafted_obj}: "
+                                f"{check_result.get('feedback', '')}"
+                            )
+                            emit_action_finished(
+                                step,
+                                step_index,
+                                action_index,
+                                action,
+                                "skipped_optional_unavailable",
+                                check_result,
+                            )
+                            continue
                         if not check_result["success"]:
                             return finish_failure(step, step_index, action_index, action, check_result, underground)
 
@@ -1381,9 +1402,44 @@ class Controller:
                         if not check_result["success"]:
                             return finish_failure(step, step_index, action_index, action, check_result, underground)
 
-                        underground = True
                         tool = "" if args["tool"] is None else args["tool"]
-                        go_down_to_y_level(env,args["y_level"],equipment = tool)
+                        start_location = events.get("location_stats", {})
+                        start_level = float(start_location.get("pos", [0, 0, 0])[1])
+                        dig_down_success = go_down_to_y_level(
+                            env,args["y_level"],equipment = tool
+                        )
+                        events = self._sync_memory(env)
+                        end_location = events.get("location_stats", {})
+                        end_level = float(
+                            end_location.get("pos", [0, start_level, 0])[1]
+                        )
+                        if (
+                            not dig_down_success
+                            or end_level > float(args["y_level"]) + 0.5
+                        ):
+                            check_result = {
+                                "feedback": (
+                                    "The 'dig_down' action did not reach the requested "
+                                    f"Y level. Requested Y={args['y_level']}; "
+                                    f"started at Y={start_level:.2f}; ended at "
+                                    f"Y={end_level:.2f}."
+                                ),
+                                "success": False,
+                                "suggestion": (
+                                    "Retry dig_down after re-centering/clearing the block "
+                                    "below, or choose a new route/seed if descent is blocked."
+                                ),
+                            }
+                            underground = end_level < 55
+                            return finish_failure(
+                                step,
+                                step_index,
+                                action_index,
+                                action,
+                                check_result,
+                                underground,
+                            )
+                        underground = True
                         emit_action_finished(step, step_index, action_index, action, "success", check_result)
 
 

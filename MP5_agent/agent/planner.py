@@ -26,7 +26,8 @@ class Planner:
             openai_api_base=api_base,
             openai_api_key=openai_key,
             temperature=temperature,
-            request_timeout=60,
+            request_timeout=float(os.environ.get("DC3PA_LLM_REQUEST_TIMEOUT", "180")),
+            max_retries=1,
         )
 
         self.memory = memory
@@ -47,6 +48,8 @@ class Planner:
             "unauthorized",
             "invalid api key",
             "incorrect api key",
+            "request rate exceeds",
+            "tpm limit",
         )
         return any(marker in message for marker in non_retryable_markers)
 
@@ -99,7 +102,7 @@ class Planner:
 
         return workflow_dict
     
-    def get_workflow(self, message, max_retries=5):
+    def get_workflow(self, message, max_retries=2):
 
         if max_retries == 0:
             log_info("************Failed to get workflow. Consider updating your prompt.************\n\n")

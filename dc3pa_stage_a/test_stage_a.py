@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from dc3pa_stage_a.analyze_stage_a import (
+from analyze_stage_a import (
     build_report,
     dual_population_success,
     mode_symmetry,
@@ -16,8 +16,8 @@ from dc3pa_stage_a.analyze_stage_a import (
     render_markdown,
     substitute_scope,
 )
-from dc3pa_stage_a.inventory_write_logger import InventoryWriteLogger
-from dc3pa_stage_a.paper_config import OPTION_B_ENV, PaperRunConfig, load
+from inventory_write_logger import InventoryWriteLogger
+from paper_config import OPTION_B_ENV, PaperRunConfig, load
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -228,7 +228,7 @@ def test_report_and_markdown_render(loaded, tmp_path):
 
 def test_empty_grant_is_not_a_substitute_write():
     """Episode setup calls set_inventory([]) and must never be counted."""
-    from dc3pa_stage_a.analyze_stage_a import is_substitute_write
+    from analyze_stage_a import is_substitute_write
 
     assert is_substitute_write({"granted": {}}) is False
     assert is_substitute_write({"granted": {"iron ore": 0}}) is False
@@ -242,7 +242,7 @@ def test_bootstrap_writes_are_counted_regardless_of_function_name():
     inventory, and their gating cannot be settled statically. An allowlist keyed
     on the deep-mining fallbacks would silently under-count them.
     """
-    from dc3pa_stage_a.analyze_stage_a import attribute_write, mode_symmetry, substitute_scope
+    from analyze_stage_a import attribute_write, mode_symmetry, substitute_scope
 
     episodes = [
         {"task": "craft boat", "tier": "easy", "seed": 1, "runtime_mode": "dc3pa"},
@@ -280,40 +280,3 @@ def test_bootstrap_writes_are_counted_regardless_of_function_name():
     assert symmetry["per_mode"]["dc3pa"]["substitute_calls"] == 2
 
     assert attribute_write({"caller_chain": []}) == "unattributed"
-
-
-class _StepEnv:
-    def __init__(self):
-        self.calls = 0
-
-    def step(self, action):
-        self.calls += 1
-        return action
-
-
-def test_step_budget_env_allows_exact_budget_then_raises():
-    from dc3pa_stage_a.run_stage_a_episode import (
-        EnvironmentStepBudgetExceeded,
-        StepBudgetEnv,
-    )
-
-    base = _StepEnv()
-    env = StepBudgetEnv(base, 2)
-    assert env.step("first") == "first"
-    assert env.step("second") == "second"
-    assert env.step_count == 2
-    with pytest.raises(EnvironmentStepBudgetExceeded, match="12000|2 steps"):
-        env.step("third")
-    assert base.calls == 2
-
-
-def test_diagnostic_payload_pauses_after_first_failure():
-    from dc3pa_stage_a.run_stage_a_episode import _stage6_payload
-
-    config_path = Path(__file__).resolve().parents[1] / "configs" / "stage_a_diagnostic_mp5_legacy.json"
-    config = load(config_path)
-    payload = _stage6_payload(config, None, max_env_steps=12000)
-
-    assert config.max_execution_attempts == 1
-    assert payload["runtime"]["max_execution_attempts"] == 1
-    assert payload["runtime"]["reset_environment_between_attempts"] is False

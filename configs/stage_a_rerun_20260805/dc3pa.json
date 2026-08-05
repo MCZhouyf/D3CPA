@@ -1,0 +1,14 @@
+{
+  "acquire_seeds": [],
+  "env_flags": {
+    "DC3PA_CONTROLLER_BOUNDED_RESOURCE_FALLBACK": "1",
+    "DC3PA_LEGACY_TASK_HACKS": "0"
+  },
+  "evaluate_seeds": [51001, 51002, 51003, 51004, 51005, 51006],
+  "max_execution_attempts": 30,
+  "memory_mode": "disabled",
+  "notes": "Stage A rerun after execution-layer repairs: memory disabled so substitute scope and per-mode symmetry are measured without memory as a confound; new evaluate seeds; not a paper configuration.",
+  "record_legacy_workflow_memory": false,
+  "record_multimodal_memory": false,
+  "runtime_mode": "dc3pa"
+}

@@ -588,6 +588,64 @@ def test_underground_furnace_placement_is_bounded_without_tunnel_clearing(monkey
     assert all(action[5] != 4 for action in env.calls)
 
 
+class _VisibleFurnaceEnv(_StoneAheadEnv):
+    def __init__(self):
+        super().__init__()
+        size = structured_actions.vradius * 2 + 3
+        self.events["location_stats"] = {
+            "pos": np.array([0.0, 40.0, 0.0]),
+            "yaw": np.array([0.0]),
+            "pitch": np.array([0.0]),
+        }
+        self.events["inventory"] = {
+            "name": np.array(
+                ["furnace", "coal", "iron ore", "stone pickaxe", "air"],
+                dtype=object,
+            ),
+            "quantity": np.array([1.0, 1.0, 1.0, 1.0, 0.0]),
+        }
+        self.events["nearby_tools"] = {"furnace": False}
+        self.events["voxels"] = {
+            "block_name": np.full((size, size, size), "air", dtype=object)
+        }
+
+    def step(self, action):
+        action = list(action)
+        self.calls.append(action)
+        if action[5] == 6:
+            self.events["inventory"]["quantity"][0] = 0.0
+            self.events["nearby_tools"]["furnace"] = True
+            self.events["voxels"]["block_name"][
+                structured_actions.vradius + 1,
+                structured_actions.vradius,
+                structured_actions.vradius,
+            ] = "furnace"
+        if action[5] == 4 and self.events["nearby_tools"]["furnace"]:
+            self.events["inventory"]["name"][4] = "iron ingot"
+            self.events["inventory"]["quantity"][4] = 1.0
+        return self.events, 0.0, False, {}
+
+
+def test_underground_furnace_requires_visible_placement_before_smelt(monkeypatch):
+    env = _VisibleFurnaceEnv()
+    memory = _Memory()
+    monkeypatch.setattr(structured_actions, "share_memory", lambda *args: None)
+    monkeypatch.setattr(structured_actions, "sleep", lambda _env: env.events)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda _events: None)
+
+    names, quantities = structured_actions.action_craft(
+        env, "iron_ingot", memory, False, True, craft_num=1
+    )
+
+    assert dict(zip(names, quantities))["iron ingot"] == 1.0
+    operation_codes = [action[5] for action in env.calls]
+    placement_index = operation_codes.index(6)
+    assert operation_codes.index(4) > placement_index
+    # Furnace craftNearby is sent directly once it is visible; opening a GUI
+    # first can leave the server-side command without a valid target.
+    assert 1 not in operation_codes
+
+
 class _CraftMemory:
     def __init__(self):
         self.inventory = {"crafting table": 1.0, "planks": 6.0, "stick": 4.0}
@@ -733,6 +791,41 @@ def test_underground_crafting_places_table_before_use_and_recipe(monkeypatch):
     operation_codes = [action[5] for action in env.calls]
     placement_index = operation_codes.index(6)
     assert operation_codes.index(4) > placement_index
+    assert 1 not in operation_codes
+
+
+class _UndergroundTableNearbyFlagLagEnv(_UndergroundTablePlacementEnv):
+    def step(self, action):
+        action = list(action)
+        self.calls.append(action)
+        if action[5] == 6:
+            self.events["inventory"]["quantity"][0] = 0.0
+            self.events["nearby_tools"]["table"] = False
+            self.events["voxels"]["block_name"][
+                structured_actions.vradius + 1,
+                structured_actions.vradius,
+                structured_actions.vradius,
+            ] = "crafting table"
+        if action[5] == 4:
+            self.events["inventory"]["name"][0] = "furnace"
+            self.events["inventory"]["quantity"][0] = 1.0
+        return self.events, 0.0, False, {}
+
+
+def test_underground_crafting_tries_recipe_when_table_flag_lags(monkeypatch):
+    env = _UndergroundTableNearbyFlagLagEnv()
+    memory = _CraftMemory()
+    monkeypatch.setattr(structured_actions, "share_memory", lambda *args: None)
+    monkeypatch.setattr(structured_actions, "sleep", lambda _env: env.events)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda _events: None)
+
+    names, quantities = structured_actions.action_craft(
+        env, "furnace", memory, True, False, craft_num=1
+    )
+
+    assert dict(zip(names, quantities))["furnace"] == 1.0
+    operation_codes = [action[5] for action in env.calls]
+    assert 4 in operation_codes
     assert 1 not in operation_codes
 
 

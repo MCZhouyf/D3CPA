@@ -317,6 +317,23 @@ def lidar_target_is_reachable(events, object_name, max_distance=4.5):
     )
 
 
+def nearby_tool_available(events, tool_name):
+    """Return whether MineDojo reports a nearby crafting platform."""
+    nearby_tools = events.get("nearby_tools", {}) or {}
+    if tool_name == "crafting table":
+        keys = ("table", "crafting_table", "crafting table")
+    else:
+        keys = (tool_name, tool_name.replace(" ", "_"))
+    return any(bool(nearby_tools.get(key, False)) for key in keys)
+
+
+def nearby_voxel_present(events, block_name):
+    blocks = events.get("voxels", {}).get("block_name")
+    if blocks is None:
+        return False
+    return bool(np.any(np.asarray(blocks) == block_name))
+
+
 def camera_action_toward_voxel(events, x_index, y_index, z_index):
     """Return one relative camera action aimed at a voxel's world-space centre.
 
@@ -2454,6 +2471,7 @@ def go_out(env):
 def go_down_to_y_level(env,goal_level,equipment = ""):
     events  = sleep(env)
     move_to_middle(env)
+    events  = sleep(env)
     inventory = events['inventory']['name'].tolist()
     try:
         cb_inventory_index = inventory.index(equipment)
@@ -2465,7 +2483,7 @@ def go_down_to_y_level(env,goal_level,equipment = ""):
         events,_,_,_ = env.step([0,0,0,12,12,5,0,cb_inventory_index]); save_rgb_for_video(events) #equip tool
         print(f"found equipment {equipment}")
 
-    curlevel = events['location_stats']['pos'][1]
+    curlevel = float(events['location_stats']['pos'][1])
     pre_level = curlevel
     if (curlevel > goal_level):
         events,reward,ended,addinfo = env.step([0,0,0,18,12,0,0,0]); save_rgb_for_video(events)  
@@ -2474,30 +2492,32 @@ def go_down_to_y_level(env,goal_level,equipment = ""):
             if curlevel <= goal_level:
                 break
             print(f"present level is { events['location_stats']['pos'][1]}")
-            events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
-            events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
-            events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
+            for _ in range(6):
+                events,reward,ended,addinfo = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events)
             events = sleep(env)
-            curlevel = events['location_stats']['pos'][1]
+            curlevel = float(events['location_stats']['pos'][1])
             if (curlevel >= pre_level - 0.05):
                 stalled_steps += 1
-                events,reward,ended,addinfo = env.step([1,0,0,12,12,0,0,0]); save_rgb_for_video(events)
+                move_to_middle(env)
+                events,reward,ended,addinfo = env.step([0,0,0,18,12,0,0,0]); save_rgb_for_video(events)
                 if stalled_steps >= 5:
                     print(
                         f"go_down_to_y_level stalled at {curlevel} while targeting {goal_level}; "
-                        "leaving dig_down so the workflow can continue."
+                        "reporting dig_down failure to the controller."
                     )
-                    break
+                    events,reward,ended,addinfo = env.step([0,0,0,6,12,0,0,0]); save_rgb_for_video(events)
+                    return False
             else:
                 stalled_steps = 0
             pre_level = curlevel
         events,reward,ended,addinfo = env.step([0,0,0,6,12,0,0,0]); save_rgb_for_video(events)  
+        return float(events['location_stats']['pos'][1]) <= goal_level
     else:
     # events,reward,ended,addinfo = env.step([0,0,0,12,6,0,0,0]); save_rgb_for_video(events)  
     
         #cb_inventory_index = events['inventory']['name'].tolist().index('dirt')  #################for debug, could be changed
         #events,_,_,_ = env.step([0,0,0,12,12,5,0,cb_inventory_index]); save_rgb_for_video(events) #equip dirt
-        return
+        return True
     #cb_inventory_index = events['inventory']['name'].tolist().index('dirt')  #################for debug, could be changed
     #events,_,_,_ = env.step([0,0,0,12,12,5,0,cb_inventory_index]); save_rgb_for_video(events) #equip dirt
 
@@ -2893,10 +2913,67 @@ def action_craft(
                     events['inventory']['quantity'].tolist(),
                 )
 
-            events,_,_,_ = env.step([0,0,0,12,12,1,0,0]); save_rgb_for_video(events) #use furnace
-            for i in range(craft_num):
-                events,_,_,_ = env.step([0,0,0,12,12,4,item_recipy_index,0]); save_rgb_for_video(events) #craft item by craft_num
-            events = sleep(env)
+            def aim_at_nearby_furnace(current_events):
+                """Aim at the placed furnace before issuing MineDojo craftNearby.
+
+                ``craftNearby`` requires a physical furnace in the agent's
+                field of view.  The old furnace path merely opened a GUI and
+                then sent a recipe command, so a successfully placed furnace
+                could still be invisible to the server command and silently
+                produce no ingot.  This mirrors the verified crafting-table
+                protocol: target the placed block, refresh observation, check
+                ``nearby_tools``, then craft and verify inventory growth.
+                """
+                blocks = current_events.get('voxels', {}).get('block_name')
+                if blocks is not None:
+                    candidates = np.argwhere(np.asarray(blocks) == 'furnace')
+                    if len(candidates):
+                        nearest = min(
+                            candidates,
+                            key=lambda index: sum(
+                                abs(int(index[axis]) - vradius) for axis in range(3)
+                            ),
+                        )
+                        aim_action = camera_action_toward_voxel(
+                            current_events,
+                            int(nearest[0]),
+                            int(nearest[1]),
+                            int(nearest[2]),
+                        )
+                        if aim_action is not None and aim_action[3:5] != [12, 12]:
+                            current_events,_,_,_ = env.step(aim_action)
+                            save_rgb_for_video(current_events)
+                current_events,_,_,_ = env.step([0,0,0,12,12,0,0,0])
+                save_rgb_for_video(current_events)
+                furnace_visible = nearby_tool_available(current_events, 'furnace')
+                print(f"craftNearby furnace in FOV: {furnace_visible}")
+                return current_events, furnace_visible
+
+            crafted_item_name = str(item).replace('_', ' ')
+            crafted_count_before = inventory_item_count(events, crafted_item_name)
+            smelt_succeeded = False
+            for interaction_attempt in range(3):
+                events, furnace_visible = aim_at_nearby_furnace(events)
+                print(f"furnace interaction attempt {interaction_attempt + 1}/3 .....")
+                if not furnace_visible:
+                    continue
+                for i in range(craft_num):
+                    events,_,_,_ = env.step([0,0,0,12,12,4,item_recipy_index,0])
+                    save_rgb_for_video(events)
+                events = sleep(env)
+                if inventory_item_count(events, crafted_item_name) > crafted_count_before:
+                    smelt_succeeded = True
+                    break
+
+            if not smelt_succeeded:
+                print(
+                    f"furnace interaction did not produce {crafted_item_name} "
+                    "after 3 attempts; leave the furnace placed for re-planning"
+                )
+                return (
+                    events['inventory']['name'].tolist(),
+                    events['inventory']['quantity'].tolist(),
+                )
 
             inventory_names = events['inventory']['name'].tolist()
             inventory_amounts = events['inventory']['quantity'].tolist()
@@ -3027,8 +3104,10 @@ def action_craft(
         print('crafting table' in memory.inventory)
         
         inventory = events['inventory']['name'].tolist()
-        nearby_tools = events.get('nearby_tools', {})
-        table_is_nearby = bool(nearby_tools.get('table', False))
+        table_is_nearby = (
+            nearby_tool_available(events, 'crafting table')
+            or nearby_voxel_present(events, 'crafting table')
+        )
         reusing_placed_table = 'crafting table' not in inventory and table_is_nearby
         if 'crafting table' not in inventory and not table_is_nearby:
             print("crafting table is neither in inventory nor nearby; returning without crafting")
@@ -3068,7 +3147,11 @@ def action_craft(
             for placement_attempt in range(8):
                 events,_,_,_ = env.step([0,0,0,12,12,6,0,0]); save_rgb_for_video(events)
                 events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-                if inventory_item_count(events, 'crafting table') < table_count_before:
+                if (
+                    inventory_item_count(events, 'crafting table') < table_count_before
+                    or nearby_tool_available(events, 'crafting table')
+                    or nearby_voxel_present(events, 'crafting table')
+                ):
                     table_placed = True
                     break
                 if placement_attempt < 7:
@@ -3109,8 +3192,9 @@ def action_craft(
                         save_rgb_for_video(current_events)
             current_events,_,_,_ = env.step([0,0,0,12,12,0,0,0])
             save_rgb_for_video(current_events)
-            table_visible = bool(
-                current_events.get('nearby_tools', {}).get('table', False)
+            table_visible = (
+                nearby_tool_available(current_events, 'crafting table')
+                or nearby_voxel_present(current_events, 'crafting table')
             )
             print(f"craftNearby table in FOV: {table_visible}")
             return current_events, table_visible
@@ -3126,7 +3210,7 @@ def action_craft(
             events, table_visible = aim_at_nearby_crafting_table(events)
             print(f"crafting interaction attempt {interaction_attempt + 1}/3 .....")
             if not table_visible:
-                continue
+                print("crafting table not confirmed in FOV; trying craftNearby once against the placed table")
             for i in range(craft_num):
                 events,_,_,_ = env.step([0,0,0,12,12,4,item_recipy_index,0]); save_rgb_for_video(events) #craft item
             events = sleep(env)
@@ -3136,14 +3220,22 @@ def action_craft(
         else:
             print(f"crafting-table interaction did not produce {crafted_item_name} after 3 attempts")
 
-        if craft_succeeded and keep_crafting_table_placed:
+        if keep_crafting_table_placed or not craft_succeeded:
             # Consecutive table recipes should share one physical placement.
-            # This avoids a lossy destroy/drop/re-place cycle in a narrow shaft.
+            # On failed craftNearby attempts, leave the table in place as
+            # evidence for recovery instead of burning tool durability while
+            # trying to pick it back up.
             share_memory(memory, events)
-            print(
-                f"leaving crafting table placed after {crafted_item_name} "
-                "for the immediately following table craft"
-            )
+            if craft_succeeded:
+                print(
+                    f"leaving crafting table placed after {crafted_item_name} "
+                    "for the immediately following table craft"
+                )
+            else:
+                print(
+                    f"leaving crafting table placed after failed {crafted_item_name} "
+                    "craft for controller recovery"
+                )
             return (
                 events['inventory']['name'].tolist(),
                 events['inventory']['quantity'].tolist(),
