@@ -18,6 +18,24 @@ class _Memory:
     inventory = {}
 
 
+def test_interaction_ready_accepts_adjacent_diagonal_ore():
+    target = {
+        "forward_offset": 0,
+        "side_offset": -1,
+        "vertical_offset": 1,
+    }
+    assert structured_actions.interaction_ready(target, "iron ore")
+
+
+def test_interaction_ready_rejects_block_more_than_one_cell_to_side():
+    target = {
+        "forward_offset": 0,
+        "side_offset": 2,
+        "vertical_offset": 1,
+    }
+    assert not structured_actions.interaction_ready(target, "iron ore")
+
+
 class _StoneAheadEnv:
     def __init__(self):
         self.calls = []

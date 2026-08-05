@@ -290,15 +290,12 @@ def nearby(env,object):
 def interaction_ready(target_block, object_name=None):
     if target_block is None:
         return False
-    if object_name == "wood":
-        return (
-            target_block["forward_offset"] <= 1
-            and abs(target_block["side_offset"]) <= 1
-            and abs(target_block["vertical_offset"]) <= 1
-        )
+    # Blocks in any immediately adjacent cell are already within mining reach.
+    # Requiring side_offset == 0 made approach try to stand directly beneath a
+    # diagonal ore block, even though that cell was commonly occupied by stone.
     return (
         target_block["forward_offset"] <= 1
-        and abs(target_block["side_offset"]) == 0
+        and abs(target_block["side_offset"]) <= 1
         and abs(target_block["vertical_offset"]) <= 1
     )
 
@@ -1321,6 +1318,14 @@ def try_leftward(env,memory,underground,approach = 0):
     # create_observation(env,"leftward_approach")
     if (approach):
         start_pos = np.array(events['location_stats']['pos'], dtype=float)
+        if underground:
+            moved = move_one_block(env, memory, 1, 1, 1)
+            events = sleep(env)
+            progress = np.linalg.norm(
+                np.array(events['location_stats']['pos'], dtype=float)[[0, 2]]
+                - start_pos[[0, 2]]
+            )
+            return bool(moved and progress >= UNDERGROUND_BLOCK_PROGRESS)
         if events['voxels']['block_name'][vradius][vradius+1][vradius-1]!= "air" :
             # if (events['voxels']['block_name'][vradius][vradius-1][vradius]=="water" or events['voxels']['block_name'][vradius][vradius][vradius]=="water"):
             #     return False
@@ -1452,6 +1457,14 @@ def try_rightward(env,memory,underground,approach = 0):
     # create_observation(env,"righward_approach")
     if (approach):
         start_pos = np.array(events['location_stats']['pos'], dtype=float)
+        if underground:
+            moved = move_one_block(env, memory, 2, 1, 1)
+            events = sleep(env)
+            progress = np.linalg.norm(
+                np.array(events['location_stats']['pos'], dtype=float)[[0, 2]]
+                - start_pos[[0, 2]]
+            )
+            return bool(moved and progress >= UNDERGROUND_BLOCK_PROGRESS)
         if events['voxels']['block_name'][vradius][vradius+1][vradius+1]!= "air" or events['voxels']['block_name'][vradius][vradius][vradius+1]!= "air" :
         #if events['voxels']['block_name'][vradius][vradius+1][vradius+1]!= "air" or events['voxels']['block_name'][vradius][vradius-1][vradius+1]!= "air" or events['voxels']['block_name'][vradius][vradius][vradius+1]!= "air":
                
@@ -2786,8 +2799,7 @@ def explore_above_ground_none(env,memory,object,underground,max_try_steps=10000)
         return False
     else:
         for i in range(max_try_steps):
-            # create_observation(env,f"observation_{i}")
-            # move_one_block(env,0,1,1)
+            events = sleep(env)
             print(f"try step is {i} and dir is {direction}")
             print(f"explore step is {explore_steps} and position is {events['location_stats']['pos']}")
             if surrounding_voxel_detect(env, object):
@@ -2797,9 +2809,33 @@ def explore_above_ground_none(env,memory,object,underground,max_try_steps=10000)
                 print("explore steps exceed limit")
                 explore_steps = 0
                 return False
-            print(f"object is {object}, {events['voxels']['block_name']}")
-            #left
-            move_one_block(env,memory,0,1,1)
+            moved = False
+            for heading_offset in range(4):
+                candidate_direction = (direction + heading_offset) % 4
+                before_position = np.array(
+                    events['location_stats']['pos'], dtype=float
+                )
+                move_succeeded = move_one_block(
+                    env, memory, candidate_direction, 1, 1
+                )
+                events = sleep(env)
+                after_position = np.array(
+                    events['location_stats']['pos'], dtype=float
+                )
+                progress = np.linalg.norm(
+                    after_position[[0, 2]] - before_position[[0, 2]]
+                )
+                if move_succeeded and progress >= UNDERGROUND_BLOCK_PROGRESS:
+                    direction = candidate_direction
+                    moved = True
+                    break
+            if not moved:
+                print(
+                    "underground retry exploration could not advance through "
+                    "any cardinal heading"
+                )
+                return False
+        return True
 
 
 def check_find(env,memory,object,underground):# tbd: scanning blocknames not enough if you want to approach live entity
