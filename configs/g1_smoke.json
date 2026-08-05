@@ -1,0 +1,15 @@
+{
+  "schema_version": "g1.v1",
+  "inherits": "configs/g0_runtime.json",
+  "policy_tag": "g1_observer_smoke",
+  "mode": "reasoning_only",
+  "evaluation_chain": "disabled_g1",
+  "adaptive_trigger": "disabled_g1",
+  "chpm": "disabled_g1",
+  "calibrator": "not_fitted_g1",
+  "legacy_workflow_memory": false,
+  "controller_low_level_recovery": false,
+  "bounded_resource_fallback": false,
+  "use_availability_masks": "pending_g3",
+  "core_smoke_seeds": [11001, 11002]
+}

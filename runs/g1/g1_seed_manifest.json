@@ -1,0 +1,7 @@
+{
+  "schema_version": "g1.v1",
+  "core_seeds": [11001, 11002],
+  "selection_rule": "11001 and 11002 were searched across repository configs, docs, and existing run artefacts before first G1 episode; neither was previously allocated.",
+  "reserved_for": "g1_observer_smoke",
+  "excluded_from": ["g3_collection", "g5_threshold_development", "g6_formal_evaluation", "alfworld_evaluation"]
+}
