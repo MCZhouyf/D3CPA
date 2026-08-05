@@ -245,6 +245,35 @@ def test_underground_exploration_rotates_after_blocked_heading(monkeypatch):
     assert attempted_directions == [0, 1, 2]
 
 
+class _DirectionalMoveEnv(_UndergroundExploreEnv):
+    def __init__(self):
+        super().__init__()
+        self.calls = []
+
+    def step(self, action):
+        self.calls.append(list(action))
+        if action[0] == 1:
+            self.events["location_stats"]["pos"][2] += 0.25
+        return self.events, 0.0, False, {}
+
+
+def test_backward_underground_move_mines_once_and_uses_real_displacement(monkeypatch):
+    env = _DirectionalMoveEnv()
+    memory = _Memory()
+    mine_directions = []
+    monkeypatch.setattr(structured_actions, "sleep", lambda _env: env.events)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda _events: None)
+    monkeypatch.setattr(
+        structured_actions,
+        "mine_ahead",
+        lambda _env, _memory, direction=0: mine_directions.append(direction) or False,
+    )
+
+    assert structured_actions.move_one_block(env, memory, 3, 1, 1)
+    assert mine_directions == [0]
+    assert len([action for action in env.calls if action[0] == 1]) == 1
+
+
 def test_underground_mine_caps_static_target_attacks(monkeypatch):
     env = _StoneAheadEnv()
     memory = _Memory()

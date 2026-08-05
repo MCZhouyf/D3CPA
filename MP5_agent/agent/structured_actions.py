@@ -1088,67 +1088,55 @@ def move_one_block(env,memory,movedir=0,underground=0,jumpornot = 0):
                     events,_,_,_ = env.step([2,0,0,12,12,0,0,0]); save_rgb_for_video(events)  
                     # events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)      
         else:
-      
-            if (movedir == 0):
-                try_num = 0    
-                mine_ahead(env,memory,0)
-                while (events['location_stats']['pos'][0]<math.ceil(events['location_stats']['pos'][0])+0.45):
-                    if (try_num > 10):
-                        return False
-                    try_num += 1
-                    # mine_ahead(env,0)
-                    events,_,_,_ = env.step([1,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-                    # events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-                    # print(f"present x is {events['location_stats']['pos'][0]} and it should be larger than {math.floor(events['location_stats']['pos'][0])+0.44}")
-            elif (movedir == 2):# right
-                events,reward,ended,addinfo = env.step([0,0,0,12,14,0,0,0]); save_rgb_for_video(events)
-                events,reward,ended,addinfo = env.step([0,0,0,12,14,0,0,0]); save_rgb_for_video(events)
-                events,reward,ended,addinfo = env.step([0,0,0,12,14,0,0,0]); save_rgb_for_video(events)
-                mine_ahead(env,memory,2)
-                try_num = 0
-                while (events['location_stats']['pos'][0]>math.floor(events['location_stats']['pos'][0])-0.45):
-                    if (try_num > 10):
-                        return False
-                    try_num += 1
-                    events,_,_,_ = env.step([1,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-                    # events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-                events,reward,ended,addinfo = env.step([0,0,0,12,10,0,0,0]); save_rgb_for_video(events)
-                events,reward,ended,addinfo = env.step([0,0,0,12,10,0,0,0]); save_rgb_for_video(events)
-                events,reward,ended,addinfo = env.step([0,0,0,12,10,0,0,0]); save_rgb_for_video(events)
+            # Rotate the camera to the requested cardinal heading, clear the
+            # newly-forward tunnel once, then require real horizontal motion.
+            # The legacy direction=3 loop compared Z against floor(X), called
+            # mine_ahead on every movement retry, and could burn a whole tool
+            # while reporting a small drift as progress.
+            turn_actions = {
+                0: [],
+                1: [[0,0,0,12,10,0,0,0]] * 3,
+                2: [[0,0,0,12,14,0,0,0]] * 3,
+                3: [[0,0,0,12,6,0,0,0]] * 3,
+            }
+            restore_actions = {
+                0: [],
+                1: [[0,0,0,12,14,0,0,0]] * 3,
+                2: [[0,0,0,12,10,0,0,0]] * 3,
+                3: [[0,0,0,12,18,0,0,0]] * 3,
+            }
 
-                
-            elif (movedir == 1):# left
-                events,reward,ended,addinfo = env.step([0,0,0,12,10,0,0,0]); save_rgb_for_video(events)
-                events,reward,ended,addinfo = env.step([0,0,0,12,10,0,0,0]); save_rgb_for_video(events)
-                events,reward,ended,addinfo = env.step([0,0,0,12,10,0,0,0]); save_rgb_for_video(events)
-                mine_ahead(env,memory,1)
-                try_num = 0
-                while (events['location_stats']['pos'][2]<math.ceil(events['location_stats']['pos'][2])+0.45):
-                    if (try_num > 10):
-                        return False
-                    try_num += 1
-                    events,_,_,_ = env.step([1,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-                    # events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-                events,reward,ended,addinfo = env.step([0,0,0,12,14,0,0,0]); save_rgb_for_video(events)
-                events,reward,ended,addinfo = env.step([0,0,0,12,14,0,0,0]); save_rgb_for_video(events)
-                events,reward,ended,addinfo = env.step([0,0,0,12,14,0,0,0]); save_rgb_for_video(events)
-                
-            else:
-                events,reward,ended,addinfo = env.step([0,0,0,12,6,0,0,0]); save_rgb_for_video(events)
-                events,reward,ended,addinfo = env.step([0,0,0,12,6,0,0,0]); save_rgb_for_video(events)
-                events,reward,ended,addinfo = env.step([0,0,0,12,6,0,0,0]); save_rgb_for_video(events)
-                try_num = 0
-                while (events['location_stats']['pos'][2]>math.floor(events['location_stats']['pos'][0])-0.45):
-                    if (try_num > 10):
-                        return False
-                    try_num += 1
-                    mine_ahead(env,memory,3)
-                    events,_,_,_ = env.step([1,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-                    # events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)  
-                events,reward,ended,addinfo = env.step([0,0,0,12,18,0,0,0]); save_rgb_for_video(events)
-                events,reward,ended,addinfo = env.step([0,0,0,12,18,0,0,0]); save_rgb_for_video(events)
-                events,reward,ended,addinfo = env.step([0,0,0,12,18,0,0,0]); save_rgb_for_video(events)
-                
+            start_position = np.array(events['location_stats']['pos'], dtype=float)
+            for turn_action in turn_actions[movedir]:
+                events,_,_,_ = env.step(turn_action); save_rgb_for_video(events)
+
+            # Camera-relative forward is direction zero after the turn.
+            mine_ahead(env, memory, 0)
+            moved = False
+            no_progress_steps = 0
+            for _ in range(12):
+                previous_position = np.array(events['location_stats']['pos'], dtype=float)
+                events,_,_,_ = env.step([1,0,0,12,12,0,0,0]); save_rgb_for_video(events)
+                current_position = np.array(events['location_stats']['pos'], dtype=float)
+                horizontal_progress = np.linalg.norm(
+                    current_position[[0, 2]] - start_position[[0, 2]]
+                )
+                if horizontal_progress >= 0.20:
+                    moved = True
+                    break
+                if np.allclose(previous_position[[0, 2]], current_position[[0, 2]]):
+                    no_progress_steps += 1
+                else:
+                    no_progress_steps = 0
+                if no_progress_steps >= 3:
+                    break
+
+            for restore_action in restore_actions[movedir]:
+                events,_,_,_ = env.step(restore_action); save_rgb_for_video(events)
+
+            if not moved:
+                return False
+
         action_tuple = (movedir, jumpornot)
         if movedir == 0 or movedir == 2:
             action_stack.append(action_tuple)
