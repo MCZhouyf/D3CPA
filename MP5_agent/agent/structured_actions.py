@@ -519,6 +519,41 @@ def mine(target,equipment,underground,env,memory):
             print(f"underground mining exhausted {max_hits} hits at {direction_label}")
         return current_events, completed
 
+    def centered_ray_hits_target(current_events, block_name, max_distance=4.5):
+        """Return true when the current crosshair ray is on a reachable target.
+
+        The voxel observation is world-axis aligned, not camera aligned.  In
+        particular, a block at voxel z-1 is not necessarily visually left of
+        the agent after ``find`` has rotated the camera.  The zero-pitch,
+        zero-yaw lidar ray is therefore the authoritative aiming signal.
+        """
+        rays = current_events.get("rays", {})
+        names = np.asarray(rays.get("block_name", []))
+        distances = np.asarray(rays.get("block_distance", []), dtype=float)
+        pitches = np.asarray(rays.get("ray_pitch", []), dtype=float)
+        yaws = np.asarray(rays.get("ray_yaw", []), dtype=float)
+        if not (len(names) and len(names) == len(distances) == len(pitches) == len(yaws)):
+            return False
+        centered = np.flatnonzero(
+            np.isclose(pitches, 0.0, atol=1e-6)
+            & np.isclose(yaws, 0.0, atol=1e-6)
+        )
+        return any(
+            names[index] == block_name
+            and 0.0 <= distances[index] <= max_distance
+            for index in centered
+        )
+
+    def mine_crosshair_target(current_events, block_name):
+        if not centered_ray_hits_target(current_events, block_name):
+            return current_events, False
+        print("underground target already centered by lidar; mining without voxel-axis camera turn")
+        return bounded_attack_until_voxel_changes(
+            current_events,
+            lambda latest: centered_ray_hits_target(latest, block_name),
+            "centered-lidar",
+        )
+
     def mine_adjacent_target(events, block_name):
         # Prefer deterministic close-range mining before relying on ray casts.
         adjacent_offsets = [
@@ -730,6 +765,12 @@ def mine(target,equipment,underground,env,memory):
         print(f"Present inventory:{events['inventory']['quantity']}")
     else:
         events = sleep(env)
+        # ``find`` normally leaves the camera on the resource.  Mine it before
+        # applying the legacy voxel-axis turn, because voxels use world axes
+        # and cannot by themselves describe screen-left/screen-right.
+        events, centered_success = mine_crosshair_target(events, target)
+        if centered_success and target_collected(events):
+            return events['inventory']['name'].tolist(), events['inventory']['quantity'].tolist()
         # MineDojo/Minecraft's visual yaw sign is opposite the legacy labels:
         # positive delta yaw (bin 14) turns toward voxel side -1 (left), while
         # negative delta yaw (bin 10) turns toward side +1 (right).

@@ -93,6 +93,36 @@ class _LeftTopIronEnv:
         return self.events, 0.0, False, {}
 
 
+class _CenteredRayIronEnv(_LeftTopIronEnv):
+    def __init__(self):
+        super().__init__()
+        ray_count = 24 * 24
+        names = np.full(ray_count, "stone", dtype=object)
+        distances = np.full(ray_count, 2.0, dtype=float)
+        pitches = np.repeat(np.deg2rad(np.arange(-60, 60, 5)), 24)
+        yaws = np.tile(np.deg2rad(np.arange(-60, 60, 5)), 24)
+        center = np.flatnonzero(
+            np.isclose(pitches, 0.0) & np.isclose(yaws, 0.0)
+        )[0]
+        names[center] = "iron ore"
+        self.events["rays"] = {
+            "block_name": names,
+            "block_distance": distances,
+            "ray_pitch": pitches,
+            "ray_yaw": yaws,
+        }
+
+    def step(self, action):
+        action = list(action)
+        self.calls.append(action)
+        if action[5] == 3:
+            self.events["inventory"]["quantity"][1] = 1.0
+            self.events["delta_inv"]["inc_name_by_other"] = np.array(
+                ["iron ore"], dtype=object
+            )
+        return self.events, 0.0, False, {}
+
+
 def test_left_top_underground_mining_turns_fully_and_restores_camera(monkeypatch):
     env = _LeftTopIronEnv()
     memory = _Memory()
@@ -108,6 +138,22 @@ def test_left_top_underground_mining_turns_fully_and_restores_camera(monkeypatch
     attack_index = next(i for i, action in enumerate(env.calls) if action[5] == 3)
     assert sum(action[3:5] == [12, 14] for action in env.calls[:attack_index]) == 3
     assert sum(action[3:5] == [12, 10] for action in env.calls[attack_index + 1:]) == 3
+
+
+def test_underground_mining_uses_centered_lidar_before_world_axis_voxel_turn(monkeypatch):
+    env = _CenteredRayIronEnv()
+    memory = _Memory()
+    monkeypatch.setattr(structured_actions, "share_memory", lambda *args: None)
+    monkeypatch.setattr(structured_actions, "sleep", lambda _env: env.events)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda _events: None)
+
+    names, quantities = structured_actions.mine(
+        "iron ore", "stone pickaxe", True, env, memory
+    )
+
+    assert dict(zip(names, quantities))["iron ore"] == 1.0
+    attack_index = next(i for i, action in enumerate(env.calls) if action[5] == 3)
+    assert all(action[3:5] not in ([12, 10], [12, 14]) for action in env.calls[:attack_index])
 
 
 def test_mine_ahead_returns_false_after_finite_attack_budget(monkeypatch):
