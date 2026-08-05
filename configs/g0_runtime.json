@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "episode_seed": 3,
+  "model": {
+    "base_url": "https://token.sensenova.cn/v1",
+    "model": "glm-5.2",
+    "api_key_environment_variable": "DC3PA_G0_API_KEY",
+    "temperature": 0.0,
+    "top_p": 1.0,
+    "max_tokens": 4096,
+    "max_retries": 1
+  },
+  "budgets": {
+    "max_replans_per_task": 30,
+    "max_environment_steps": 12000,
+    "action_attempts": {
+      "mine": 1,
+      "craft": 1,
+      "smelt": 1
+    }
+  },
+  "feature_flags": {
+    "legacy_task_hacks": false,
+    "controller_low_level_recovery": false,
+    "legacy_workflow_memory": false,
+    "dc3pa_memory": false
+  },
+  "resolution_precedence": [
+    "CLI",
+    "environment",
+    "configs/g0_runtime.json"
+  ]
+}

@@ -33,9 +33,18 @@ class Planner:
         assert  self.memory is not None, "Please input memory"
 
     def _is_non_retryable_llm_error(self, error):
-        non_retryable_types = (
-            getattr(openai.error, "AuthenticationError", ()),
-            getattr(openai.error, "PermissionError", ()),
+        # openai<1 exposed exception classes through ``openai.error`` while
+        # current SDKs export them at the module root.  G0 must classify an
+        # auth/quota refusal deterministically under either supported client.
+        error_namespace = getattr(openai, "error", openai)
+        candidates = (
+            getattr(error_namespace, "AuthenticationError", None),
+            getattr(error_namespace, "PermissionError", None),
+            getattr(openai, "AuthenticationError", None),
+            getattr(openai, "PermissionDeniedError", None),
+        )
+        non_retryable_types = tuple(
+            candidate for candidate in candidates if isinstance(candidate, type)
         )
         if isinstance(error, non_retryable_types):
             return True

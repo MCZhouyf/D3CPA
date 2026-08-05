@@ -1757,7 +1757,29 @@ class Controller:
         plan_id = ""
         if workflow:
             plan_id = str(workflow[0].get("_dc3pa_plan_id", ""))
+        emit_execution_event(
+            self,
+            "workflow_started",
+            plan_id=plan_id,
+            status="",
+            task=task_information.get("task"),
+            step_count=len(workflow),
+        )
         for step_index, step in enumerate(workflow):
+            metadata = {
+                "plan_id": str(step.get("_dc3pa_plan_id", plan_id)),
+                "plan_version": int(step.get("_dc3pa_plan_version", 0)),
+                "step_id": str(step.get("_dc3pa_step_id", f"step-{step_index}")),
+                "step_index": int(step.get("_dc3pa_step_index", step_index)),
+            }
+            emit_execution_event(
+                self,
+                "step_started",
+                **metadata,
+                status="",
+                times=step.get("times", 1),
+                action_count=len(step.get("actions", [])),
+            )
             repetitions = int(step.get("times", 1))
             for repetition in range(repetitions):
                 for action_index, action in enumerate(step.get("actions", [])):
@@ -1765,10 +1787,24 @@ class Controller:
                     args = dict(action.get("args", {}))
                     action_id = f"{step.get('_dc3pa_step_id', step_index)}:{repetition}:{action_index}"
                     before = dict(getattr(self.memory, "inventory", {}) or {})
+                    emit_execution_event(
+                        self,
+                        "action_started",
+                        **metadata,
+                        action_index=action_index,
+                        status="",
+                        action=compact_action_payload(action),
+                        inventory=snapshot_inventory(self.memory),
+                    )
                     prepared = self.check_action_preparation(env, name, args)
                     if not prepared["success"]:
                         action_type = "smelt" if name == "craft" and args.get("platform") == "furnace" else name
-                        return self._g0_result(success=False, action_type=action_type, reason_code=prepared["reason_code"], missing=prepared["missing_requirements"], before=before, after=dict(getattr(self.memory, "inventory", {}) or {}), plan_id=plan_id, action_id=action_id, feedback=prepared["feedback"]), underground
+                        result = self._g0_result(success=False, action_type=action_type, reason_code=prepared["reason_code"], missing=prepared["missing_requirements"], before=before, after=dict(getattr(self.memory, "inventory", {}) or {}), plan_id=plan_id, action_id=action_id, feedback=prepared["feedback"])
+                        emit_execution_event(self, "action_finished", **metadata, action_index=action_index, status="failure", action=compact_action_payload(action), result=result, inventory=snapshot_inventory(self.memory))
+                        emit_execution_event(self, "step_finished", **metadata, status="failure", result=result)
+                        for later_index, later in enumerate(workflow[step_index + 1:], start=step_index + 1):
+                            emit_execution_event(self, "step_finished", plan_id=str(later.get("_dc3pa_plan_id", plan_id)), plan_version=int(later.get("_dc3pa_plan_version", 0)), step_id=str(later.get("_dc3pa_step_id", f"step-{later_index}")), step_index=int(later.get("_dc3pa_step_index", later_index)), status="censored", result={"reason": "prior_step_failed"})
+                        return result, underground
                     try:
                         if name == "find":
                             explore_above_ground(env=env, args=args, object=update_find_obj_name(args.get("obj")), performer=self, memory=self.memory, task_information=dict(task_information), underground=underground)
@@ -1792,7 +1828,9 @@ class Controller:
                                 raise RuntimeError("declared_dig_down_failed")
                             underground = True
                         elif name == "dig_up":
-                            go_up(env, 60, equipment=args.get("tool") or "")
+                            if "y_level" not in args:
+                                raise RuntimeError("missing_declared_y_level")
+                            go_up(env, int(args["y_level"]), equipment=args.get("tool") or "")
                             underground = False
                         elif name in {"equip", "fight", "apply"}:
                             pass
@@ -1800,5 +1838,12 @@ class Controller:
                             raise RuntimeError("unsupported_declared_action")
                     except Exception as exc:
                         after = dict(getattr(self.memory, "inventory", {}) or {})
-                        return self._g0_result(success=False, action_type=name, reason_code=str(exc), missing=[], before=before, after=after, plan_id=plan_id, action_id=action_id, feedback=f"Declared {name} action failed: {exc}"), underground
+                        result = self._g0_result(success=False, action_type=name, reason_code=str(exc), missing=[], before=before, after=after, plan_id=plan_id, action_id=action_id, feedback=f"Declared {name} action failed: {exc}")
+                        emit_execution_event(self, "action_finished", **metadata, action_index=action_index, status="failure", action=compact_action_payload(action), result=result, inventory=snapshot_inventory(self.memory))
+                        emit_execution_event(self, "step_finished", **metadata, status="failure", result=result)
+                        for later_index, later in enumerate(workflow[step_index + 1:], start=step_index + 1):
+                            emit_execution_event(self, "step_finished", plan_id=str(later.get("_dc3pa_plan_id", plan_id)), plan_version=int(later.get("_dc3pa_plan_version", 0)), step_id=str(later.get("_dc3pa_step_id", f"step-{later_index}")), step_index=int(later.get("_dc3pa_step_index", later_index)), status="censored", result={"reason": "prior_step_failed"})
+                        return result, underground
+                    emit_execution_event(self, "action_finished", **metadata, action_index=action_index, status="success", action=compact_action_payload(action), result={}, inventory=snapshot_inventory(self.memory))
+            emit_execution_event(self, "step_finished", **metadata, status="success", result={})
         return {"success": True, "feedback": "", "suggestion": "", "plan_id": plan_id}, underground

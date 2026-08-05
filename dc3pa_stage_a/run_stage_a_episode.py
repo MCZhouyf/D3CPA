@@ -285,6 +285,9 @@ def main(argv: list[str] | None = None) -> int:
     stage6_config.write_text(json.dumps(
         _stage6_payload(config, args.snapshot_manifest, args.max_env_steps), indent=2
     ) + "\n", encoding="utf-8")
+    # G0's seed contract has one source: the episode seed.  The legacy aliases
+    # remain populated only for external MineDojo wrappers that inspect them.
+    os.environ["EPISODE_SEED"] = str(args.seed)
     os.environ["DC3PA_WORLD_SEED"] = str(args.seed)
     os.environ["DC3PA_SIM_SEED"] = str(args.seed)
 

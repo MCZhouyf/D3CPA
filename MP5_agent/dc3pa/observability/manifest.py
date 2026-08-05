@@ -79,6 +79,7 @@ def create_run_manifest(
     selected_keys = {
         "GPT_MODEL_NAME",
         "TASK_FILE",
+        "EPISODE_SEED",
         "DC3PA_WORLD_SEED",
         "DC3PA_SIM_SEED",
         "PYTHONHASHSEED",

@@ -56,6 +56,7 @@ def build_legacy_launch_spec(
     environment.update(config.feature_flags.to_environment())
     environment.update(
         {
+            "EPISODE_SEED": str(seed),
             "DC3PA_WORLD_SEED": str(seed),
             "DC3PA_SIM_SEED": str(seed),
             "PYTHONHASHSEED": str(seed),

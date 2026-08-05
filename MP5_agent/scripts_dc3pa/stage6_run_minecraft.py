@@ -22,6 +22,8 @@ from types import SimpleNamespace
 from typing import Any, Mapping, Optional
 
 ROOT = Path(__file__).resolve().parents[1]
+REPOSITORY_ROOT = ROOT.parent
+DEFAULT_G0_RUNTIME_CONFIG = REPOSITORY_ROOT / "configs" / "g0_runtime.json"
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -114,11 +116,122 @@ class TracedChatModel:
         return getattr(self._model, name)
 
 
+class EnvironmentStepBudgetExceeded(RuntimeError):
+    """Raised before the invocation exceeds its recorded environment budget."""
+
+
+class StepBudgetEnv:
+    """Transparent wrapper that enforces a whole-episode step budget."""
+
+    def __init__(self, env: Any, max_steps: int) -> None:
+        if max_steps <= 0:
+            raise ValueError("max_steps must be positive")
+        self._env = env
+        self.max_steps = int(max_steps)
+        self.step_count = 0
+
+    def step(self, *args: Any, **kwargs: Any) -> Any:
+        if self.step_count >= self.max_steps:
+            raise EnvironmentStepBudgetExceeded(
+                f"environment_step_budget_exhausted: {self.max_steps} steps"
+            )
+        self.step_count += 1
+        return self._env.step(*args, **kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._env, name)
+
+
 def _load_json(path: Path) -> Mapping[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, Mapping):
         raise ValueError(f"Config must be a JSON object: {path}")
     return payload
+
+
+def _read_key_from_private_env(path: Path, variable: str) -> str:
+    """Read one value from the local, untracked relay credential file.
+
+    The file is deliberately outside the repository and its value is never
+    logged, serialised, or included in resolved-configuration artefacts.
+    """
+    if not path.is_file():
+        return ""
+    for line in path.read_text(encoding="utf-8").splitlines():
+        key, separator, value = line.partition("=")
+        if separator and key.strip() == variable:
+            return value.strip()
+    return ""
+
+
+def _require_mapping(payload: Mapping[str, Any], key: str) -> Mapping[str, Any]:
+    value = payload.get(key, {})
+    if not isinstance(value, Mapping):
+        raise ValueError(f"{key} must be an object")
+    return value
+
+
+def _resolve_g0_runtime(args: argparse.Namespace) -> Mapping[str, Any]:
+    """Resolve G0 launcher inputs without writing credentials to disk.
+
+    Command-line arguments override environment values, which override the
+    checked-in, credential-free config.  The resolved seed is installed as the
+    one process-level episode seed consumed by ``agent.run_agent``.
+    """
+    config_path = args.g0_runtime_config.resolve()
+    payload = _load_json(config_path)
+    model = _require_mapping(payload, "model")
+    budgets = _require_mapping(payload, "budgets")
+    flags = _require_mapping(payload, "feature_flags")
+    api_variable = str(model.get("api_key_environment_variable", "")).strip()
+    if not api_variable:
+        raise ValueError("model.api_key_environment_variable is required")
+    key = args.openai_key or os.environ.get(api_variable, "") or os.environ.get("OPENAI_API_KEY", "")
+    if not key:
+        key = _read_key_from_private_env(
+            Path("/root/.config/dc3pa/relay.env"), api_variable
+        )
+    if not key:
+        raise ValueError(
+            f"openai_key is required, set --openai_key or {api_variable}"
+        )
+    model_name = (
+        args.gpt_model_name
+        or os.environ.get("GPT_MODEL_NAME", "")
+        or str(model.get("model", ""))
+    )
+    if not model_name:
+        raise ValueError("gpt_model_name is required")
+    episode_seed = (
+        args.episode_seed
+        if args.episode_seed is not None
+        else int(os.environ.get("EPISODE_SEED", payload.get("episode_seed", 3)))
+    )
+    if isinstance(episode_seed, bool) or int(episode_seed) < 0:
+        raise ValueError("episode seed must be a non-negative integer")
+    base_url = str(model.get("base_url", "")).strip()
+    if not base_url:
+        raise ValueError("model.base_url is required")
+    os.environ["OPENAI_API_BASE"] = base_url
+    os.environ["EPISODE_SEED"] = str(episode_seed)
+    os.environ["DC3PA_WORLD_SEED"] = str(episode_seed)
+    os.environ["DC3PA_SIM_SEED"] = str(episode_seed)
+    os.environ["DC3PA_LEGACY_TASK_HACKS"] = "1" if flags.get("legacy_task_hacks") else "0"
+    os.environ["DC3PA_CONTROLLER_LOW_LEVEL_RECOVERY"] = "1" if flags.get("controller_low_level_recovery") else "0"
+    os.environ["DC3PA_CONTROLLER_BOUNDED_RESOURCE_FALLBACK"] = "0"
+    os.environ["MP5_DISABLE_MEMORY"] = "0" if flags.get("legacy_workflow_memory") else "1"
+    os.environ["DC3PA_MEMORY_ENABLED"] = "1" if flags.get("dc3pa_memory") else "0"
+    return {
+        "config_path": str(config_path),
+        "episode_seed": int(episode_seed),
+        "model": model_name,
+        "base_url": base_url,
+        "max_replans_per_task": budgets.get("max_replans_per_task"),
+        "max_environment_steps": budgets.get("max_environment_steps"),
+        "action_attempts": dict(_require_mapping(budgets, "action_attempts")),
+        "credential_source": api_variable,
+        "openai_key": key,
+    }
 
 
 def _load_plugin(spec: str, config: Mapping[str, Any]) -> Any:
@@ -221,8 +334,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--mode", choices=("mp5_legacy", "reasoning_only", "dc3pa"), default="dc3pa")
     parser.add_argument("--mllm_url", default="")
-    parser.add_argument("--openai_key", default=os.environ.get("OPENAI_API_KEY", ""))
-    parser.add_argument("--gpt_model_name", default=os.environ.get("GPT_MODEL_NAME", ""))
+    parser.add_argument("--openai_key", default="")
+    parser.add_argument("--gpt_model_name", default="")
+    parser.add_argument(
+        "--g0-runtime-config",
+        type=Path,
+        default=DEFAULT_G0_RUNTIME_CONFIG,
+        help="Credential-free G0 model/seed/budget configuration.",
+    )
+    parser.add_argument(
+        "--episode-seed",
+        type=int,
+        help="Override the G0 episode seed for this invocation.",
+    )
     parser.add_argument("--task", default=os.environ.get("TASK_FILE", ""))
     parser.add_argument(
         "--config",
@@ -232,6 +356,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--memory-root", type=Path, default=ROOT / "memory" / "dc3pa_stage6")
     parser.add_argument("--trace", type=Path, default=ROOT / "runs" / "stage6_trace.jsonl")
     parser.add_argument("--max-execution-attempts", type=int)
+    parser.add_argument(
+        "--max-env-steps",
+        type=int,
+        help="Whole-episode environment-step budget; defaults to G0 config.",
+    )
     parser.add_argument("--unresolved-plan-policy", choices=("block", "reasoning_only", "execute"))
     parser.add_argument("--planner-failure-policy", choices=("raise", "reasoning_only", "return_failure"))
     parser.add_argument("--image-encoder-factory", default="")
@@ -251,31 +380,43 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Optional[list[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    if not args.openai_key:
-        parser.error("openai_key is required, set --openai_key or OPENAI_API_KEY")
-    if not args.gpt_model_name:
-        parser.error("gpt_model_name is required, set --gpt_model_name or GPT_MODEL_NAME")
+    try:
+        resolved_g0 = _resolve_g0_runtime(args)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        parser.error(str(exc))
+    args.openai_key = str(resolved_g0.pop("openai_key"))
+    args.gpt_model_name = str(resolved_g0["model"])
     if not args.task:
         parser.error("task is required, set --task or TASK_FILE")
-    if args.mode != "mp5_legacy" and not args.allow_legacy_task_hacks:
-        os.environ["DC3PA_LEGACY_TASK_HACKS"] = "0"
-    # Formal Stage-6 evaluation must not retrieve or update workflows_*.json.
-    os.environ["MP5_DISABLE_MEMORY"] = "1"
-    if args.disable_controller_recovery:
-        os.environ["DC3PA_CONTROLLER_LOW_LEVEL_RECOVERY"] = "0"
+    if args.allow_legacy_task_hacks or args.disable_controller_recovery:
+        parser.error("G0 does not permit legacy task hacks or controller recovery")
 
     args.config = args.config.resolve()
     args.task = str(Path(args.task).resolve())
     args.memory_root = args.memory_root.resolve()
     args.trace = args.trace.resolve()
+    args.trace.parent.mkdir(parents=True, exist_ok=True)
+    resolved_path = args.trace.with_suffix(args.trace.suffix + ".resolved_config.json")
+    resolved_path.write_text(
+        json.dumps(resolved_g0, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
     payload = _load_json(args.config)
     runtime_config = Stage6RuntimeConfig.from_mapping(payload.get("runtime", {}))
     runtime_config = replace(runtime_config, mode=args.mode)
-    if args.max_execution_attempts is not None:
-        runtime_config = replace(
-            runtime_config, max_execution_attempts=args.max_execution_attempts
-        )
+    max_execution_attempts = (
+        args.max_execution_attempts
+        if args.max_execution_attempts is not None
+        else int(resolved_g0["max_replans_per_task"])
+    )
+    max_env_steps = (
+        args.max_env_steps
+        if args.max_env_steps is not None
+        else int(resolved_g0["max_environment_steps"])
+    )
+    runtime_config = replace(
+        runtime_config, max_execution_attempts=max_execution_attempts
+    )
     if args.unresolved_plan_policy is not None:
         runtime_config = replace(
             runtime_config, unresolved_plan_policy=args.unresolved_plan_policy
@@ -310,6 +451,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             answer_model="mllm",
         )
         evaluator = legacy_runner.Evaluator()
+        evaluator.env = StepBudgetEnv(evaluator.env, max_env_steps)
         evaluator.env.reset()
         evaluator.env.set_inventory([])
         initial_result = evaluator.env.step([0, 0, 0, 12, 6, 0, 0, 0])

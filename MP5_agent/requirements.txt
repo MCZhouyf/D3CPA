@@ -3,3 +3,4 @@ openai
 langchain
 chromadb
 tiktoken
+scikit-image>=0.20,<0.24
