@@ -441,7 +441,13 @@ def main(argv: Optional[list[str]] = None) -> int:
     if g1_metadata is not None:
         # ExecutionObserver is an observer-only dependency; enabling it cannot
         # affect planning, Controller dispatch, or the protected log callback.
-        runtime_config = replace(runtime_config, telemetry_enabled=True)
+        runtime_config = replace(
+            runtime_config,
+            telemetry_enabled=True,
+            memory_mode="disabled",
+            record_legacy_workflow_memory=False,
+            record_multimodal_memory=False,
+        )
     if args.unresolved_plan_policy is not None:
         runtime_config = replace(
             runtime_config, unresolved_plan_policy=args.unresolved_plan_policy

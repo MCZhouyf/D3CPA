@@ -76,6 +76,7 @@ def main() -> int:
             command = [sys.executable, "scripts_dc3pa/stage6_run_minecraft.py", "--mode", "reasoning_only",
                        "--task", str(_task_path(task["task_text"])), "--episode-seed", str(seed),
                        "--g1-run-root", str(run_root), "--g1-episode-metadata", str(metadata_path),
+                       "--memory-root", str(run_root / "runtime_memory" / episode_id),
                        "--trace", str(run_root / "launcher_traces" / f"{episode_id}.jsonl")]
             result = subprocess.run(command, cwd=root / "MP5_agent", text=True, capture_output=True)
             log_path = run_root / "episode_logs" / f"{episode_id}.log"; log_path.parent.mkdir(parents=True, exist_ok=True)
