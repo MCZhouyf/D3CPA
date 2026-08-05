@@ -730,10 +730,13 @@ def mine(target,equipment,underground,env,memory):
         print(f"Present inventory:{events['inventory']['quantity']}")
     else:
         events = sleep(env)
-        left_turn = [[0,0,0,12,10,0,0,0]] * 3
-        left_restore = [[0,0,0,12,14,0,0,0]] * 3
-        right_turn = [[0,0,0,12,14,0,0,0]] * 3
-        right_restore = [[0,0,0,12,10,0,0,0]] * 3
+        # MineDojo/Minecraft's visual yaw sign is opposite the legacy labels:
+        # positive delta yaw (bin 14) turns toward voxel side -1 (left), while
+        # negative delta yaw (bin 10) turns toward side +1 (right).
+        left_turn = [[0,0,0,12,14,0,0,0]] * 3
+        left_restore = [[0,0,0,12,10,0,0,0]] * 3
+        right_turn = [[0,0,0,12,10,0,0,0]] * 3
+        right_restore = [[0,0,0,12,14,0,0,0]] * 3
 
         def apply_camera_sequence(current_events, actions):
             for camera_action in actions:

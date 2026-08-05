@@ -78,7 +78,7 @@ class _LeftTopIronEnv:
     def step(self, action):
         action = list(action)
         self.calls.append(action)
-        if action[3:5] == [12, 10]:
+        if action[3:5] == [12, 14]:
             self.left_turn_count += 1
         if action[5] == 3 and self.left_turn_count >= 3:
             self.events["inventory"]["quantity"][1] = 1.0
@@ -106,8 +106,8 @@ def test_left_top_underground_mining_turns_fully_and_restores_camera(monkeypatch
 
     assert dict(zip(names, quantities))["iron ore"] == 1.0
     attack_index = next(i for i, action in enumerate(env.calls) if action[5] == 3)
-    assert sum(action[3:5] == [12, 10] for action in env.calls[:attack_index]) == 3
-    assert sum(action[3:5] == [12, 14] for action in env.calls[attack_index + 1:]) == 3
+    assert sum(action[3:5] == [12, 14] for action in env.calls[:attack_index]) == 3
+    assert sum(action[3:5] == [12, 10] for action in env.calls[attack_index + 1:]) == 3
 
 
 def test_mine_ahead_returns_false_after_finite_attack_budget(monkeypatch):
