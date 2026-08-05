@@ -730,27 +730,40 @@ def mine(target,equipment,underground,env,memory):
         print(f"Present inventory:{events['inventory']['quantity']}")
     else:
         events = sleep(env)
+        left_turn = [[0,0,0,12,10,0,0,0]] * 3
+        left_restore = [[0,0,0,12,14,0,0,0]] * 3
+        right_turn = [[0,0,0,12,14,0,0,0]] * 3
+        right_restore = [[0,0,0,12,10,0,0,0]] * 3
+
+        def apply_camera_sequence(current_events, actions):
+            for camera_action in actions:
+                current_events,_,_,_ = env.step(camera_action)
+                save_rgb_for_video(current_events)
+            return current_events
+
         # right down
         if (events['voxels']['block_name'][vradius][vradius][vradius+1]==target):
-            events,_,_,_ = env.step([0,0,0,12,18,0,0,0]); save_rgb_for_video(events)
+            events = apply_camera_sequence(events, right_turn)
             events,_,_,_ = env.step([0,0,0,15,12,0,0,0]); save_rgb_for_video(events)
             events, _ = bounded_attack_until_voxel_changes(
                 events, lambda current: current['voxels']['block_name'][vradius][vradius][vradius+1] == target, "right-down"
             )
-            if target_collected(events):
-                return events['inventory']['name'].tolist(), events['inventory']['quantity'].tolist()
+            collected = target_collected(events)
             events,_,_,_ = env.step([0,0,0,9,12,0,0,0]); save_rgb_for_video(events)
-            events,_,_,_ = env.step([0,0,0,12,6,0,0,0]); save_rgb_for_video(events)
+            events = apply_camera_sequence(events, right_restore)
+            if collected:
+                return events['inventory']['name'].tolist(), events['inventory']['quantity'].tolist()
             sleep(env)
         # right top
         if (events['voxels']['block_name'][vradius][vradius+1][vradius+1]==target):
-            events,_,_,_ = env.step([0,0,0,12,18,0,0,0]); save_rgb_for_video(events)
+            events = apply_camera_sequence(events, right_turn)
             events, _ = bounded_attack_until_voxel_changes(
                 events, lambda current: current['voxels']['block_name'][vradius][vradius+1][vradius+1] == target, "right-top"
             )
-            if target_collected(events):
+            collected = target_collected(events)
+            events = apply_camera_sequence(events, right_restore)
+            if collected:
                 return events['inventory']['name'].tolist(), events['inventory']['quantity'].tolist()
-            events,_,_,_ = env.step([0,0,0,12,6,0,0,0]); save_rgb_for_video(events)
             sleep(env)
         # forward down
         if (events['voxels']['block_name'][vradius+1][vradius][vradius]==target):
@@ -772,25 +785,27 @@ def mine(target,equipment,underground,env,memory):
             sleep(env)
         # left down
         if (events['voxels']['block_name'][vradius][vradius][vradius-1]==target):
-            events,_,_,_ = env.step([0,0,0,12,6,0,0,0]); save_rgb_for_video(events)
+            events = apply_camera_sequence(events, left_turn)
             events,_,_,_ = env.step([0,0,0,15,12,0,0,0]); save_rgb_for_video(events)
             events, _ = bounded_attack_until_voxel_changes(
                 events, lambda current: current['voxels']['block_name'][vradius][vradius][vradius-1] == target, "left-down"
             )
-            if target_collected(events):
-                return events['inventory']['name'].tolist(), events['inventory']['quantity'].tolist()
+            collected = target_collected(events)
             events,_,_,_ = env.step([0,0,0,9,12,0,0,0]); save_rgb_for_video(events)
-            events,_,_,_ = env.step([0,0,0,12,18,0,0,0]); save_rgb_for_video(events)
+            events = apply_camera_sequence(events, left_restore)
+            if collected:
+                return events['inventory']['name'].tolist(), events['inventory']['quantity'].tolist()
             sleep(env)
         # left top
         if (events['voxels']['block_name'][vradius][vradius+1][vradius-1]==target):
-            events,_,_,_ = env.step([0,0,0,12,6,0,0,0]); save_rgb_for_video(events)
+            events = apply_camera_sequence(events, left_turn)
             events, _ = bounded_attack_until_voxel_changes(
                 events, lambda current: current['voxels']['block_name'][vradius][vradius+1][vradius-1] == target, "left-top"
             )
-            if target_collected(events):
+            collected = target_collected(events)
+            events = apply_camera_sequence(events, left_restore)
+            if collected:
                 return events['inventory']['name'].tolist(), events['inventory']['quantity'].tolist()
-            events,_,_,_ = env.step([0,0,0,12,18,0,0,0]); save_rgb_for_video(events)
             sleep(env)
         # top
         if (events['voxels']['block_name'][vradius][vradius+2][vradius]==target):
