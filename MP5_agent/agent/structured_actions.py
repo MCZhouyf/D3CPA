@@ -26,6 +26,7 @@ from utils import *
 save_count = 0
 dontstop = 0
 steplen = 0.098 
+UNDERGROUND_BLOCK_PROGRESS = 0.80
 seed = 0
 vradius = 5# voxel observation radius should be consistent with lidar range
 events = {}
@@ -1133,7 +1134,7 @@ def move_one_block(env,memory,movedir=0,underground=0,jumpornot = 0):
                 horizontal_progress = np.linalg.norm(
                     current_position[[0, 2]] - start_position[[0, 2]]
                 )
-                if horizontal_progress >= 0.20:
+                if horizontal_progress >= UNDERGROUND_BLOCK_PROGRESS:
                     moved = True
                     break
                 if np.allclose(previous_position[[0, 2]], current_position[[0, 2]]):
@@ -1804,19 +1805,28 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
             # silently consuming a pickaxe in one direction.
             moved = False
             for heading_offset in range(4):
-                candidate_direction = (i + heading_offset) % 4
+                # Keep tunnelling along the last direction that produced a
+                # real block of progress.  Using the loop index here made the
+                # agent rotate every iteration and trace a tiny square instead
+                # of extending the tunnel.
+                candidate_direction = (direction + heading_offset) % 4
                 before_position = np.array(events['location_stats']['pos'], dtype=float)
                 print(
                     f"underground exploration heading {heading_offset + 1}/4: "
                     f"direction={candidate_direction}"
                 )
-                move_one_block(env, memory, candidate_direction, 1, 1)
+                move_succeeded = move_one_block(
+                    env, memory, candidate_direction, 1, 1
+                )
                 events = sleep(env)
                 after_position = np.array(events['location_stats']['pos'], dtype=float)
                 horizontal_progress = np.linalg.norm(
                     after_position[[0, 2]] - before_position[[0, 2]]
                 )
-                if horizontal_progress >= 0.20:
+                if (
+                    move_succeeded
+                    and horizontal_progress >= UNDERGROUND_BLOCK_PROGRESS
+                ):
                     direction = candidate_direction
                     moved = True
                     print(

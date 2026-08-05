@@ -221,6 +221,7 @@ def test_underground_exploration_rotates_after_blocked_heading(monkeypatch):
     monkeypatch.setattr(structured_actions, "surrounding_voxel_detect", lambda *args: False)
     monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda _events: None)
     monkeypatch.setattr(structured_actions, "explore_steps", 0)
+    monkeypatch.setattr(structured_actions, "direction", 0)
 
     def fake_move(_env, _memory, movedir, underground, jumpornot):
         assert underground == 1 and jumpornot == 1
@@ -243,6 +244,39 @@ def test_underground_exploration_rotates_after_blocked_heading(monkeypatch):
         max_try_steps=1,
     )
     assert attempted_directions == [0, 1, 2]
+
+
+def test_underground_exploration_keeps_successful_heading(monkeypatch):
+    env = _UndergroundExploreEnv()
+    memory = _Memory()
+    attempted_directions = []
+    monkeypatch.setattr(structured_actions, "sleep", lambda _env: env.events)
+    monkeypatch.setattr(structured_actions, "surrounding_voxel_detect", lambda *args: False)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda _events: None)
+    monkeypatch.setattr(structured_actions, "explore_steps", 0)
+    monkeypatch.setattr(structured_actions, "direction", 0)
+
+    def fake_move(_env, _memory, movedir, underground, jumpornot):
+        assert underground == 1 and jumpornot == 1
+        attempted_directions.append(movedir)
+        if movedir == 2:
+            env.events["location_stats"]["pos"][2] += 1.0
+            return True
+        return False
+
+    monkeypatch.setattr(structured_actions, "move_one_block", fake_move)
+
+    assert not structured_actions.explore_above_ground(
+        env,
+        {"obj": "iron ore"},
+        "iron ore",
+        1,
+        performer=object(),
+        memory=memory,
+        task_information={},
+        max_try_steps=2,
+    )
+    assert attempted_directions == [0, 1, 2, 2]
 
 
 class _DirectionalMoveEnv(_UndergroundExploreEnv):
@@ -271,7 +305,7 @@ def test_backward_underground_move_mines_once_and_uses_real_displacement(monkeyp
 
     assert structured_actions.move_one_block(env, memory, 3, 1, 1)
     assert mine_directions == [0]
-    assert len([action for action in env.calls if action[0] == 1]) == 1
+    assert len([action for action in env.calls if action[0] == 1]) == 4
 
 
 def test_underground_move_never_walks_after_failed_tunnel_clear(monkeypatch):
