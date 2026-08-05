@@ -7,6 +7,7 @@ import hashlib
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pyarrow as pa
@@ -31,6 +32,7 @@ def main() -> int:
     parser.add_argument("--run-root", type=Path, default=Path("runs/g1"))
     parser.add_argument("--selection", type=Path, default=Path("runs/g1/g1_task_selection.json"))
     parser.add_argument("--seeds", type=Path, default=Path("runs/g1/g1_seed_manifest.json"))
+    parser.add_argument("--cooldown-seconds", type=float, default=30.0)
     args = parser.parse_args()
     root, run_root = args.repo.resolve(), args.run_root.resolve()
     selection = json.loads(args.selection.read_text(encoding="utf-8"))["selected"]
@@ -46,6 +48,11 @@ def main() -> int:
                         "policy_tag": "g1_observer_smoke", "task_text_hash": hashlib.sha256(task["task_text"].encode()).hexdigest()}
             metadata_path = metadata_dir / f"{episode_id}.json"
             metadata_path.write_text(json.dumps(metadata, sort_keys=True) + "\n", encoding="utf-8")
+            completed_part = run_root / "episodes" / f"{episode_id}.steps.parquet"
+            if completed_part.is_file():
+                matrix.append({"episode_id": episode_id, "task_id": task["task_id"], "seed": seed, "exit_code": 0,
+                               "task_failure": False, "system_error": False, "log": "resumed_completed"})
+                continue
             command = [sys.executable, "scripts_dc3pa/stage6_run_minecraft.py", "--mode", "reasoning_only",
                        "--task", str(_task_path(task["task_text"])), "--episode-seed", str(seed),
                        "--g1-run-root", str(run_root), "--g1-episode-metadata", str(metadata_path),
@@ -55,6 +62,10 @@ def main() -> int:
             log_path.write_text(result.stdout + "\n--- STDERR ---\n" + result.stderr, encoding="utf-8")
             matrix.append({"episode_id": episode_id, "task_id": task["task_id"], "seed": seed, "exit_code": result.returncode,
                            "task_failure": bool(result.returncode == 1), "system_error": bool(result.returncode not in (0, 1)), "log": str(log_path)})
+            # Uniform pacing only; it is not selected by task/item/result and
+            # avoids bursty relay traffic between independent episodes.
+            if args.cooldown_seconds > 0:
+                time.sleep(args.cooldown_seconds)
     run_root.mkdir(parents=True, exist_ok=True)
     (run_root / "run_matrix.json").write_text(json.dumps(matrix, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     parts = sorted((run_root / "episodes").glob("*.steps.parquet"))
