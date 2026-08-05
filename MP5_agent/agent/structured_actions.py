@@ -2494,11 +2494,22 @@ def action_craft(env, item, memory,use_crafting_table,use_furnace,craft_num):
                 events['inventory']['quantity'].tolist(),
             )
 
-        events,_,_,_ = env.step([0,0,0,12,12,1,0,0]); save_rgb_for_video(events) #use
-        print(f"crafting .....")
-        for i in range(craft_num):
-            events,_,_,_ = env.step([0,0,0,12,12,4,item_recipy_index,0]); save_rgb_for_video(events) #craft item
-        events = sleep(env)
+        crafted_item_name = str(item).replace('_', ' ')
+        crafted_count_before = inventory_item_count(events, crafted_item_name)
+        # Placement does not guarantee that the following single ``use``
+        # packet opens the table UI (especially just after an underground
+        # heading sweep).  Retry the physical interaction and recipe command,
+        # and verify real inventory growth before recovering the table.
+        for interaction_attempt in range(3):
+            events,_,_,_ = env.step([0,0,0,12,12,1,0,0]); save_rgb_for_video(events) #use
+            print(f"crafting interaction attempt {interaction_attempt + 1}/3 .....")
+            for i in range(craft_num):
+                events,_,_,_ = env.step([0,0,0,12,12,4,item_recipy_index,0]); save_rgb_for_video(events) #craft item
+            events = sleep(env)
+            if inventory_item_count(events, crafted_item_name) > crafted_count_before:
+                break
+        else:
+            print(f"crafting-table interaction did not produce {crafted_item_name} after 3 attempts")
         '''
         cb_inventory_index = events['inventory']['name'].tolist().index('dirt')  #################for debug, could be changed
         events,_,_,_ = env.step([0,0,0,12,12,5,0,cb_inventory_index]); save_rgb_for_video(events) #equip stone pickaxe
