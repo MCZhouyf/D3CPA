@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any, Callable, Mapping, Optional
+from typing import Any, Mapping, Optional
 
 from ..contracts import AgentState, Plan
 from ..planner.legacy_adapter import LegacyPlannerAdapter
@@ -45,25 +45,13 @@ class LegacyMP5ReasoningChain:
 
 
 class LegacyModePlanSource:
-    """Preserve legacy fixed-workflow behavior only in explicit mp5_legacy mode."""
+    """Adapt Planner output without retrieving fixed task workflows."""
 
-    def __init__(
-        self,
-        reasoning_chain: LegacyMP5ReasoningChain,
-        fixed_workflow_provider: Optional[
-            Callable[[Mapping[str, Any]], Optional[Mapping[str, Any]]]
-        ] = None,
-    ):
+    def __init__(self, reasoning_chain: LegacyMP5ReasoningChain):
         self.reasoning_chain = reasoning_chain
-        self.fixed_workflow_provider = fixed_workflow_provider
 
     def plan(self, task: str, state: AgentState, context=None) -> Plan:
         resolved = dict(context or {})
-        task_information = resolved.get("task_information", {"task": task})
-        if self.fixed_workflow_provider is not None and isinstance(task_information, Mapping):
-            fixed = self.fixed_workflow_provider(task_information)
-            if fixed is not None:
-                return Plan.from_dict(fixed, task=task)
         return self.reasoning_chain.plan(task, state, resolved)
 
 

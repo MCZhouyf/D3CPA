@@ -259,6 +259,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         parser.error("task is required, set --task or TASK_FILE")
     if args.mode != "mp5_legacy" and not args.allow_legacy_task_hacks:
         os.environ["DC3PA_LEGACY_TASK_HACKS"] = "0"
+    # Formal Stage-6 evaluation must not retrieve or update workflows_*.json.
+    os.environ["MP5_DISABLE_MEMORY"] = "1"
     if args.disable_controller_recovery:
         os.environ["DC3PA_CONTROLLER_LOW_LEVEL_RECOVERY"] = "0"
 
@@ -377,7 +379,6 @@ def main(argv: Optional[list[str]] = None) -> int:
                 multimodal_memory=multimodal_memory,
                 chat_model=getattr(memory, "llm", None),
                 legacy_reflexion=reflexion,
-                fixed_workflow_provider=getattr(evaluator, "_fixed_workflow_for_task", None),
                 hybrid_config=hybrid_config,
                 dual_chain_config=dual_config,
                 trigger_config=trigger_config,

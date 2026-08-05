@@ -92,7 +92,7 @@
       "callee": "_set_inventory_from_memory",
       "caller": "_gather_logs",
       "file": "MP5_agent/agent/controller.py",
-      "line": 639,
+      "line": 642,
       "normalized_ast_sha256": "9f6380a9f7cc13d5d5f28078b7b359c47a6221cccdb63707935f7bbad2720169",
       "ordinal": 0
     },
@@ -100,7 +100,7 @@
       "callee": "_begin_log_callback_window",
       "caller": "_gather_logs",
       "file": "MP5_agent/agent/controller.py",
-      "line": 578,
+      "line": 581,
       "normalized_ast_sha256": "441f21d2ee9852de7a00f7dab45b1a30914d9159b02bb783b432c010d59f1b60",
       "ordinal": 0
     },
@@ -108,7 +108,7 @@
       "callee": "_log_callback_due",
       "caller": "_gather_logs",
       "file": "MP5_agent/agent/controller.py",
-      "line": 586,
+      "line": 589,
       "normalized_ast_sha256": "c7e728fe6e88f7d27b285ace343ca0e26ca90a30b9965beb37f88c57b574eff3",
       "ordinal": 0
     },
@@ -116,7 +116,7 @@
       "callee": "_log_callback_due",
       "caller": "_gather_logs",
       "file": "MP5_agent/agent/controller.py",
-      "line": 617,
+      "line": 620,
       "normalized_ast_sha256": "c7e728fe6e88f7d27b285ace343ca0e26ca90a30b9965beb37f88c57b574eff3",
       "ordinal": 1
     },
@@ -124,7 +124,7 @@
       "callee": "_complete_log_callback_window",
       "caller": "_gather_logs",
       "file": "MP5_agent/agent/controller.py",
-      "line": 643,
+      "line": 646,
       "normalized_ast_sha256": "ee6fc96f7a46ad50c80fd6620d13e4050766017d37bf500ccad829e6ed122a75",
       "ordinal": 0
     },
@@ -132,7 +132,7 @@
       "callee": "_complete_log_callback_window",
       "caller": "_gather_logs",
       "file": "MP5_agent/agent/controller.py",
-      "line": 584,
+      "line": 587,
       "normalized_ast_sha256": "ee6fc96f7a46ad50c80fd6620d13e4050766017d37bf500ccad829e6ed122a75",
       "ordinal": 1
     },
@@ -140,7 +140,7 @@
       "callee": "_complete_log_callback_window",
       "caller": "_gather_logs",
       "file": "MP5_agent/agent/controller.py",
-      "line": 609,
+      "line": 612,
       "normalized_ast_sha256": "ee6fc96f7a46ad50c80fd6620d13e4050766017d37bf500ccad829e6ed122a75",
       "ordinal": 2
     },
@@ -148,7 +148,7 @@
       "callee": "_complete_log_callback_window",
       "caller": "_gather_logs",
       "file": "MP5_agent/agent/controller.py",
-      "line": 632,
+      "line": 635,
       "normalized_ast_sha256": "ee6fc96f7a46ad50c80fd6620d13e4050766017d37bf500ccad829e6ed122a75",
       "ordinal": 3
     },
@@ -156,7 +156,7 @@
       "callee": "_complete_log_callback_window",
       "caller": "_gather_logs",
       "file": "MP5_agent/agent/controller.py",
-      "line": 615,
+      "line": 618,
       "normalized_ast_sha256": "ee6fc96f7a46ad50c80fd6620d13e4050766017d37bf500ccad829e6ed122a75",
       "ordinal": 4
     }

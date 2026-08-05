@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from copy import deepcopy
 from pathlib import Path
 
 import numpy as np
@@ -51,3 +52,44 @@ def test_g0_dynamic_log_callback_trace_preserves_delayed_log_only_write(monkeypa
     assert len(env.set_calls) == 1
     assert [(item.name, item.quantity) for item in env.set_calls[0]] == [("log", 2)]
     assert controller.memory.inventory == {"log": 2.0}
+
+
+def _g0_controller(inventory=None):
+    controller = Controller.__new__(Controller)
+    controller.memory = _Memory()
+    controller.memory.inventory = dict(inventory or {})
+    controller.checker = object()
+    return controller
+
+
+def test_g0_missing_mine_craft_and_smelt_requirements_fail_without_plan_or_inventory_mutation() -> None:
+    cases = [
+        (
+            {"tool": "iron pickaxe", "obj": "diamond ore"},
+            "mine",
+            "missing_declared_tool",
+        ),
+        (
+            {"obj": {"wooden pickaxe": 1}, "materials": {"planks": 3, "stick": 2}, "platform": "crafting table"},
+            "craft",
+            "missing_declared_platform",
+        ),
+        (
+            {"obj": {"iron ingot": 1}, "materials": {"iron ore": 1, "coal": 1}, "platform": "furnace"},
+            "smelt",
+            "missing_declared_platform",
+        ),
+    ]
+    for args, expected_type, expected_reason in cases:
+        controller = _g0_controller()
+        env = _Env(controller.memory)
+        workflow = {"workflow": [{"times": "1", "actions": [{"name": "craft" if expected_type in {"craft", "smelt"} else "mine", "args": args}]}]}
+        original = deepcopy(workflow)
+        result, _ = controller.check_and_execute_workflow(env, workflow, {"task": "unrelated"}, False)
+        assert result["success"] is False
+        assert result["action_type"] == expected_type
+        assert result["reason_code"] == expected_reason
+        assert result["inventory_before_hash"] == result["inventory_after_hash"]
+        assert controller.memory.inventory == {}
+        assert env.set_calls == []
+        assert workflow == original

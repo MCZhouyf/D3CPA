@@ -187,9 +187,19 @@ def main() -> int:
         trace_payload = json.loads(args.runtime_trace.read_text(encoding="utf-8"))
         trace = trace_payload if isinstance(trace_payload, list) else [dict(trace_payload)]
     data = manifest(args.repo.resolve(), args.baseline, args.controller, trace)
+    def call_identity(entry: dict[str, Any]) -> tuple[Any, ...]:
+        # Line numbers are retained for audit readability but are not a semantic
+        # location: unrelated imports may shift them without changing either the
+        # callback function or its contained call expression.
+        return (
+            entry["file"], entry["caller"], entry["callee"], entry["ordinal"],
+            entry["normalized_ast_sha256"],
+        )
+
     unchanged = (
         data["baseline_definitions"] == data["current_definitions"]
-        and data["call_sites"] == data["current_call_sites"]
+        and [call_identity(item) for item in data["call_sites"]]
+        == [call_identity(item) for item in data["current_call_sites"]]
     )
     data["unchanged"] = unchanged
     if args.manifest:

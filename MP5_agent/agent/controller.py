@@ -1,5 +1,8 @@
 import os
 import sys
+import hashlib
+import json
+from copy import deepcopy
 from pathlib import Path
 
 from utils import *
@@ -1688,3 +1691,114 @@ class Controller:
                 print(f"task is {item},quantity is {memory.inventory[item]}")
                 return True
         return False
+
+    # G0 formal-policy implementation.  It intentionally shadows the archived
+    # compatibility implementation above: formal Stage-6 dispatch resolves this
+    # final definition.  The older method is retained only for source-history
+    # comparison while G0 removes its callers from the formal entry points.
+    @staticmethod
+    def _g0_inventory_hash(inventory):
+        normalized = {
+            normalize_inventory_name(name): float(quantity)
+            for name, quantity in dict(inventory or {}).items()
+            if normalize_inventory_name(name) and float(quantity) > 0
+        }
+        payload = json.dumps(normalized, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    def _g0_result(self, *, success, action_type, reason_code, missing, before, after, plan_id, action_id, feedback):
+        return {
+            "success": bool(success),
+            "action_type": action_type,
+            "reason_code": reason_code,
+            "missing_requirements": list(missing),
+            "environment_state_ref": "legacy_memory.inventory",
+            "inventory_before_hash": self._g0_inventory_hash(before),
+            "inventory_after_hash": self._g0_inventory_hash(after),
+            "plan_id": str(plan_id),
+            "action_id": str(action_id),
+            "feedback": feedback,
+            "suggestion": "Re-plan explicitly from the observed environment state.",
+        }
+
+    def check_action_preparation(self, env, action_name, args_dict, task_information=None, events=None):
+        """Check only declared action requirements; never repair them."""
+        inventory = dict(getattr(self.memory, "inventory", {}) or {})
+        tool_actions = {"mine", "fight", "dig_down", "dig_up", "apply"}
+        if action_name in tool_actions:
+            tool = normalize_inventory_name(args_dict.get("tool"))
+            if tool and float(inventory.get(tool, 0)) < 1:
+                return {"success": False, "reason_code": "missing_declared_tool", "missing_requirements": [tool], "feedback": f"Missing declared tool: {tool}."}
+        if action_name == "equip":
+            item = normalize_inventory_name(args_dict.get("obj"))
+            if item and float(inventory.get(item, 0)) < 1:
+                return {"success": False, "reason_code": "missing_declared_equipment", "missing_requirements": [item], "feedback": f"Missing declared equipment: {item}."}
+        if action_name == "craft":
+            platform = normalize_inventory_name(args_dict.get("platform"))
+            if platform and float(inventory.get(platform, 0)) < 1:
+                return {"success": False, "reason_code": "missing_declared_platform", "missing_requirements": [platform], "feedback": f"Missing declared platform: {platform}."}
+            missing = [
+                normalize_inventory_name(material)
+                for material, quantity in dict(args_dict.get("materials", {})).items()
+                if float(inventory.get(normalize_inventory_name(material), 0)) < float(quantity)
+            ]
+            if missing:
+                return {"success": False, "reason_code": "missing_declared_materials", "missing_requirements": missing, "feedback": "Missing declared craft materials."}
+        return {"success": True, "reason_code": "ok", "missing_requirements": [], "feedback": "Declared requirements are present."}
+
+    def check_and_execute_workflow(self, env, workflow_dict, task_information, underground):
+        """Execute exactly the Planner workflow without Controller recovery.
+
+        Low-level navigation/interactions are permitted.  Missing conditions
+        return an auditable failure with untouched inventory; this method never
+        inserts steps, selects tools, changes action arguments, or writes inventory.
+        """
+        workflow = deepcopy(workflow_dict.get("workflow", []))
+        plan_id = ""
+        if workflow:
+            plan_id = str(workflow[0].get("_dc3pa_plan_id", ""))
+        for step_index, step in enumerate(workflow):
+            repetitions = int(step.get("times", 1))
+            for repetition in range(repetitions):
+                for action_index, action in enumerate(step.get("actions", [])):
+                    name = str(action.get("name", ""))
+                    args = dict(action.get("args", {}))
+                    action_id = f"{step.get('_dc3pa_step_id', step_index)}:{repetition}:{action_index}"
+                    before = dict(getattr(self.memory, "inventory", {}) or {})
+                    prepared = self.check_action_preparation(env, name, args)
+                    if not prepared["success"]:
+                        action_type = "smelt" if name == "craft" and args.get("platform") == "furnace" else name
+                        return self._g0_result(success=False, action_type=action_type, reason_code=prepared["reason_code"], missing=prepared["missing_requirements"], before=before, after=dict(getattr(self.memory, "inventory", {}) or {}), plan_id=plan_id, action_id=action_id, feedback=prepared["feedback"]), underground
+                    try:
+                        if name == "find":
+                            explore_above_ground(env=env, args=args, object=update_find_obj_name(args.get("obj")), performer=self, memory=self.memory, task_information=dict(task_information), underground=underground)
+                        elif name == "move_to":
+                            if not approach(env=env, memory=self.memory, object=args.get("obj"), underground=underground):
+                                raise RuntimeError("declared_target_unreachable")
+                        elif name == "mine":
+                            target = update_inventory_obj_name(args.get("obj"))
+                            names, quantities = mine(env=env, memory=self.memory, target=args.get("obj"), equipment=args.get("tool") or "", underground=underground)
+                            self.memory.update_inventory(count_inventory(names, quantities))
+                            if float(self.memory.inventory.get(target, 0)) <= float(before.get(target, 0)):
+                                raise RuntimeError("declared_mine_no_observed_yield")
+                        elif name == "craft":
+                            output = normalize_inventory_name(next(iter(args["obj"])))
+                            names, quantities = action_craft(env, next(iter(args["obj"])).replace(" ", "_"), self.memory, args.get("platform") == "crafting table", args.get("platform") == "furnace", craft_num=int(next(iter(args["obj"].values()))))
+                            self.memory.update_inventory(count_inventory(names, quantities))
+                            if float(self.memory.inventory.get(output, 0)) <= float(before.get(output, 0)):
+                                raise RuntimeError("declared_craft_no_observed_yield")
+                        elif name == "dig_down":
+                            if not go_down_to_y_level(env, int(args["y_level"]), equipment=args.get("tool") or ""):
+                                raise RuntimeError("declared_dig_down_failed")
+                            underground = True
+                        elif name == "dig_up":
+                            go_up(env, 60, equipment=args.get("tool") or "")
+                            underground = False
+                        elif name in {"equip", "fight", "apply"}:
+                            pass
+                        else:
+                            raise RuntimeError("unsupported_declared_action")
+                    except Exception as exc:
+                        after = dict(getattr(self.memory, "inventory", {}) or {})
+                        return self._g0_result(success=False, action_type=name, reason_code=str(exc), missing=[], before=before, after=after, plan_id=plan_id, action_id=action_id, feedback=f"Declared {name} action failed: {exc}"), underground
+        return {"success": True, "feedback": "", "suggestion": "", "plan_id": plan_id}, underground

@@ -86,9 +86,6 @@ def build_stage6_runtime(
     multimodal_memory: Optional[MultimodalMemory] = None,
     chat_model: Any = None,
     legacy_reflexion: Any = None,
-    fixed_workflow_provider: Optional[
-        Callable[[Mapping[str, Any]], Optional[Mapping[str, Any]]]
-    ] = None,
     hybrid_config: HybridProbabilityConfig = HybridProbabilityConfig(),
     dual_chain_config: DualChainConfig = DualChainConfig(),
     trigger_config: AdaptiveTriggerConfig = AdaptiveTriggerConfig(),
@@ -102,9 +99,7 @@ def build_stage6_runtime(
 
     runtime_config.validate()
     reasoning_chain = LegacyMP5ReasoningChain(legacy_planner, legacy_memory)
-    legacy_plan_source = LegacyModePlanSource(
-        reasoning_chain, fixed_workflow_provider=fixed_workflow_provider
-    )
+    legacy_plan_source = LegacyModePlanSource(reasoning_chain)
     cognitive_planner: Optional[AdaptiveCognitiveControlPlanner] = None
     if runtime_config.mode == "dc3pa":
         if multimodal_memory is None:
