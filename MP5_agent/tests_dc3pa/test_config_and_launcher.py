@@ -48,6 +48,7 @@ def test_launcher_resolves_task_and_records_seed_without_secret(tmp_path):
         },
     )
     assert spec.environment["TASK_FILE"] == str(task.resolve())
+    assert spec.environment["EPISODE_SEED"] == "7"
     assert spec.environment["DC3PA_WORLD_SEED"] == "7"
     assert spec.environment["DC3PA_SIM_SEED"] == "7"
     assert spec.environment["PYTHONHASHSEED"] == "7"
@@ -74,6 +75,7 @@ def test_manifest_uses_launch_environment_and_excludes_api_key(tmp_path):
     manifest = create_run_manifest(config, tmp_path, environment=spec.environment)
     assert manifest.selected_environment["GPT_MODEL_NAME"] == "stub-model"
     assert manifest.selected_environment["TASK_FILE"] == str(task.resolve())
+    assert manifest.selected_environment["EPISODE_SEED"] == "13"
     assert manifest.selected_environment["DC3PA_WORLD_SEED"] == "13"
     assert manifest.selected_environment["DC3PA_SIM_SEED"] == "13"
     assert manifest.selected_environment["PYTHONHASHSEED"] == "13"

@@ -382,14 +382,13 @@ def test_material_repair_runs_after_evaluation_patch_without_extra_revision():
 
     assert outcome.revision_count == 1
     assert outcome.final_plan.version == 2
-    targets = [
-        step.metadata.get("target")
+    # G0 permits evaluator-authored edits, but never appends controller-owned
+    # acquisition or craft steps to repair the edit's missing materials.
+    assert not any(
+        step.metadata.get("dc3pa_auto_material_repair")
         for step in outcome.final_plan.steps
-        if step.metadata.get("dc3pa_auto_material_repair")
-    ]
-    assert "log" in targets
-    assert "crafting table" in targets
-    assert "stick" in targets
+    )
+    assert len(outcome.final_plan.steps) == 2
     assert outcome.unresolved == ()
 
 
@@ -434,6 +433,7 @@ def test_material_repair_handles_hard_conflict_when_evaluator_requests_replan():
     )
 
     assert outcome.revision_count == 0
-    assert outcome.final_plan.version == 2
-    assert outcome.final_plan.source == "dc3pa_material_repair"
-    assert outcome.unresolved == ()
+    assert outcome.final_plan.version == 1
+    assert outcome.final_plan.source == "reasoning_chain"
+    assert outcome.unresolved
+    assert outcome.unresolved[-1]["reason"] == "request_replan"

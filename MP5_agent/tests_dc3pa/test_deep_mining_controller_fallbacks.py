@@ -296,9 +296,6 @@ class _UpwardEnv(FakeEnv):
 def test_planned_planks_craft_does_not_consume_logs_in_bootstrap(monkeypatch):
     controller = _controller({"log": 1})
     env = FakeEnv(controller.memory)
-    craft_calls = []
-
-    monkeypatch.setattr("controller.share_memory", lambda *args, **kwargs: None)
     monkeypatch.setattr(Controller, "_is_deep_mining_task", lambda *args, **kwargs: True)
     monkeypatch.setattr(
         Controller,
@@ -308,9 +305,8 @@ def test_planned_planks_craft_does_not_consume_logs_in_bootstrap(monkeypatch):
         ),
     )
     monkeypatch.setattr(
-        Controller,
-        "_execute_craft_with_retries",
-        lambda self, *args, **kwargs: craft_calls.append(args) or True,
+        "controller.action_craft",
+        lambda *args, **kwargs: (np.array(["planks"]), np.array([4])),
     )
 
     result, underground = controller.check_and_execute_workflow(
@@ -338,8 +334,7 @@ def test_planned_planks_craft_does_not_consume_logs_in_bootstrap(monkeypatch):
 
     assert result["success"]
     assert not underground
-    assert controller.memory.inventory["log"] == 1
-    assert craft_calls
+    assert controller.memory.inventory["planks"] == 4
 
 
 def test_dig_up_invokes_physical_go_up_and_checks_elevation(monkeypatch):
@@ -363,7 +358,7 @@ def test_dig_up_invokes_physical_go_up_and_checks_elevation(monkeypatch):
                 {
                     "times": "1",
                     "actions": [
-                        {"name": "dig_up", "args": {"tool": "wooden pickaxe"}}
+                        {"name": "dig_up", "args": {"y_level": 50, "tool": "wooden pickaxe"}}
                     ],
                 }
             ]
@@ -409,8 +404,8 @@ def test_dig_down_normalizes_legacy_wooden_pickaxe_target(monkeypatch):
 
     assert result["success"]
     assert underground
-    assert called == [(env, 50, "wooden pickaxe")]
-    assert workflow["workflow"][0]["actions"][0]["args"]["y_level"] == 50
+    assert called == [(env, 60, "wooden pickaxe")]
+    assert workflow["workflow"][0]["actions"][0]["args"]["y_level"] == 60
 
 
 def test_dig_down_failure_stops_before_resource_mining(monkeypatch):
@@ -458,7 +453,7 @@ def test_dig_down_failure_stops_before_resource_mining(monkeypatch):
     assert not result["success"]
     assert not underground
     assert called == [(env, 50, "wooden pickaxe")]
-    assert "did not reach the requested Y level" in result["feedback"]
+    assert "declared_dig_down_failed" in result["feedback"]
 
 
 def test_downstream_craft_materials_cap_cobblestone_collection():
@@ -537,9 +532,6 @@ def test_downstream_material_requirement_drives_cobblestone_skip(monkeypatch):
 def test_unsatisfied_stick_craft_is_not_skipped_by_existing_wooden_pickaxe(monkeypatch):
     controller = _controller({"wooden pickaxe": 1, "planks": 2})
     env = FakeEnv(controller.memory)
-    craft_calls = []
-
-    monkeypatch.setattr("controller.share_memory", lambda *args, **kwargs: None)
     monkeypatch.setattr(Controller, "_is_deep_mining_task", lambda *args, **kwargs: True)
     monkeypatch.setattr(
         Controller, "ensure_wooden_bootstrap", lambda *args, **kwargs: True
@@ -548,9 +540,8 @@ def test_unsatisfied_stick_craft_is_not_skipped_by_existing_wooden_pickaxe(monke
         Controller, "_prepare_deep_mining_craft_dependencies", lambda *args: None
     )
     monkeypatch.setattr(
-        Controller,
-        "_execute_craft_with_retries",
-        lambda self, *args, **kwargs: craft_calls.append(args) or True,
+        "controller.action_craft",
+        lambda *args, **kwargs: (np.array(["stick"]), np.array([4])),
     )
 
     result, underground = controller.check_and_execute_workflow(
@@ -578,7 +569,7 @@ def test_unsatisfied_stick_craft_is_not_skipped_by_existing_wooden_pickaxe(monke
 
     assert result["success"]
     assert not underground
-    assert craft_calls
+    assert controller.memory.inventory["stick"] == 4
 
 
 def test_missing_sticks_are_recovered_from_logs_in_same_attempt(monkeypatch):

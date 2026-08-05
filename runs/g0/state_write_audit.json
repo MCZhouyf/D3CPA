@@ -1,5 +1,5 @@
 {
-  "count": 137,
+  "count": 142,
   "findings": [
     {
       "expression": "old_inventory = self.memory.inventory",
@@ -306,105 +306,112 @@
       "expression": "inventory = self.memory.inventory",
       "file": "MP5_agent/agent/controller.py",
       "kind": "Assign",
-      "line": 81,
+      "line": 84,
       "target": "inventory"
     },
     {
       "expression": "inventory = self.memory.inventory",
       "file": "MP5_agent/agent/controller.py",
       "kind": "Assign",
-      "line": 114,
+      "line": 117,
       "target": "inventory"
     },
     {
       "expression": "current_inventory = {normalize_inventory_name(item_name): float(quantity) for (item_name, quantity) in self.memory.inventory.items() if item_name != 'air' and quantity > 0}",
       "file": "MP5_agent/agent/controller.py",
       "kind": "Assign",
-      "line": 133,
+      "line": 136,
       "target": "current_inventory"
     },
     {
       "expression": "merged_inventory = dict(current_inventory)",
       "file": "MP5_agent/agent/controller.py",
       "kind": "Assign",
-      "line": 144,
+      "line": 147,
       "target": "merged_inventory"
     },
     {
       "expression": "self.memory.inventory = merged_inventory",
       "file": "MP5_agent/agent/controller.py",
       "kind": "Assign",
-      "line": 172,
+      "line": 175,
       "target": "self.memory.inventory"
     },
     {
       "expression": "inventory = self.memory.inventory",
       "file": "MP5_agent/agent/controller.py",
       "kind": "Assign",
-      "line": 183,
+      "line": 186,
       "target": "inventory"
     },
     {
       "expression": "inventory = self.memory.inventory",
       "file": "MP5_agent/agent/controller.py",
       "kind": "Assign",
-      "line": 450,
+      "line": 453,
       "target": "inventory"
     },
     {
       "expression": "inventory = self.memory.inventory",
       "file": "MP5_agent/agent/controller.py",
       "kind": "Assign",
-      "line": 663,
+      "line": 666,
       "target": "inventory"
     },
     {
       "expression": "inventory = self.memory.inventory",
       "file": "MP5_agent/agent/controller.py",
       "kind": "Assign",
-      "line": 687,
+      "line": 690,
       "target": "inventory"
     },
     {
       "expression": "inventory = self.memory.inventory",
       "file": "MP5_agent/agent/controller.py",
       "kind": "Assign",
-      "line": 695,
+      "line": 698,
       "target": "inventory"
     },
     {
       "expression": "inventory = self.memory.inventory",
       "file": "MP5_agent/agent/controller.py",
       "kind": "Assign",
-      "line": 700,
+      "line": 703,
       "target": "inventory"
     },
     {
       "expression": "inventory = self.memory.inventory",
       "file": "MP5_agent/agent/controller.py",
       "kind": "Assign",
-      "line": 705,
+      "line": 708,
       "target": "inventory"
     },
     {
       "expression": "inventory = self.memory.inventory",
       "file": "MP5_agent/agent/controller.py",
       "kind": "Assign",
-      "line": 712,
+      "line": 715,
       "target": "inventory"
     },
     {
       "expression": "inventory = self.memory.inventory",
       "file": "MP5_agent/agent/controller.py",
       "kind": "Assign",
-      "line": 717,
+      "line": 720,
       "target": "inventory"
     },
     {
       "expression": "inventory = self.memory.inventory",
       "file": "MP5_agent/agent/controller.py",
       "kind": "Assign",
-      "line": 732,
+      "line": 735,
+      "target": "inventory"
+    },
+    {
+      "expression": "inventory = dict(getattr(self.memory, 'inventory', {}) or {})",
+      "file": "MP5_agent/agent/controller.py",
+      "kind": "Assign",
+      "line": 1726,
       "target": "inventory"
     },
     {
@@ -412,27 +419,27 @@
       "expression": "env.set_inventory(inventory_items)",
       "file": "MP5_agent/agent/controller.py",
       "kind": "call",
-      "line": 169
+      "line": 172
     },
     {
       "expression": "inventory = self.memory.inventory",
       "file": "MP5_agent/agent/controller.py",
       "kind": "Assign",
-      "line": 726,
+      "line": 729,
       "target": "inventory"
     },
     {
       "expression": "old_inventory = self.memory.inventory",
       "file": "MP5_agent/agent/controller.py",
       "kind": "Assign",
-      "line": 1570,
+      "line": 1573,
       "target": "old_inventory"
     },
     {
       "expression": "new_inventory = self.memory.inventory",
       "file": "MP5_agent/agent/controller.py",
       "kind": "Assign",
-      "line": 1574,
+      "line": 1577,
       "target": "new_inventory"
     },
     {
@@ -447,7 +454,7 @@
       "expression": "self.env.set_inventory([])",
       "file": "MP5_agent/agent/run_agent.py",
       "kind": "call",
-      "line": 213
+      "line": 220
     },
     {
       "expression": "inventory = events['inventory']['name'].tolist()",
@@ -671,7 +678,7 @@
       "expression": "evaluator.env.set_inventory([])",
       "file": "MP5_agent/scripts_dc3pa/stage6_run_minecraft.py",
       "kind": "call",
-      "line": 312
+      "line": 456
     },
     {
       "expression": "inventory = {'log': float(max(0, self.calls - 1))}",
@@ -684,42 +691,42 @@
       "expression": "inventory: Dict[str, float]",
       "file": "MP5_agent/tests_dc3pa/helpers_stage6_cobblestone.py",
       "kind": "AnnAssign",
-      "line": 272,
+      "line": 269,
       "target": "inventory"
     },
     {
       "expression": "inventory = self.world.snapshot_inventory()",
       "file": "MP5_agent/tests_dc3pa/helpers_stage6_cobblestone.py",
       "kind": "Assign",
-      "line": 290,
+      "line": 287,
       "target": "inventory"
     },
     {
       "expression": "self.world.inventory['cobblestone'] = self.world.inventory.get('cobblestone', 0.0) + 4.0",
       "file": "MP5_agent/tests_dc3pa/helpers_stage6_cobblestone.py",
       "kind": "Assign",
-      "line": 502,
+      "line": 499,
       "target": "self.world.inventory['cobblestone']"
     },
     {
       "expression": "self.world.inventory['log'] = self.world.inventory.get('log', 0.0) + float(step.times)",
       "file": "MP5_agent/tests_dc3pa/helpers_stage6_cobblestone.py",
       "kind": "Assign",
-      "line": 479,
+      "line": 476,
       "target": "self.world.inventory['log']"
     },
     {
       "expression": "self.world.inventory[obj] = self.world.inventory.get(obj, 0.0) + float(quantity) * step.times",
       "file": "MP5_agent/tests_dc3pa/helpers_stage6_cobblestone.py",
       "kind": "Assign",
-      "line": 485,
+      "line": 482,
       "target": "self.world.inventory[obj]"
     },
     {
       "expression": "self.world.inventory[item] = self.world.inventory.get(item, 0.0) - float(quantity) * step.times",
       "file": "MP5_agent/tests_dc3pa/helpers_stage6_cobblestone.py",
       "kind": "Assign",
-      "line": 483,
+      "line": 480,
       "target": "self.world.inventory[item]"
     },
     {
@@ -754,49 +761,56 @@
       "expression": "self.memory.inventory['log'] -= craft_num",
       "file": "MP5_agent/tests_dc3pa/test_deep_mining_controller_fallbacks.py",
       "kind": "AugAssign",
-      "line": 606,
+      "line": 597,
       "target": "self.memory.inventory['log']"
     },
     {
       "expression": "self.memory.inventory['planks'] = self.memory.inventory.get('planks', 0) + 4 * craft_num",
       "file": "MP5_agent/tests_dc3pa/test_deep_mining_controller_fallbacks.py",
       "kind": "Assign",
-      "line": 607,
+      "line": 598,
       "target": "self.memory.inventory['planks']"
     },
     {
       "expression": "self.memory.inventory['planks'] -= 2 * craft_num",
       "file": "MP5_agent/tests_dc3pa/test_deep_mining_controller_fallbacks.py",
       "kind": "AugAssign",
-      "line": 609,
+      "line": 600,
       "target": "self.memory.inventory['planks']"
     },
     {
       "expression": "self.memory.inventory['stick'] = self.memory.inventory.get('stick', 0) + 4 * craft_num",
       "file": "MP5_agent/tests_dc3pa/test_deep_mining_controller_fallbacks.py",
       "kind": "Assign",
-      "line": 610,
+      "line": 601,
       "target": "self.memory.inventory['stick']"
+    },
+    {
+      "expression": "controller.memory.inventory = dict(inventory or {})",
+      "file": "MP5_agent/tests_dc3pa/test_g0_log_callback_runtime.py",
+      "kind": "Assign",
+      "line": 60,
+      "target": "controller.memory.inventory"
     },
     {
       "expression": "self.inventory: dict[str, float] = {}",
       "file": "MP5_agent/tests_dc3pa/test_g0_log_callback_runtime.py",
       "kind": "AnnAssign",
-      "line": 19,
+      "line": 20,
       "target": "self.inventory"
     },
     {
       "expression": "self.inventory = dict(inventory)",
       "file": "MP5_agent/tests_dc3pa/test_g0_log_callback_runtime.py",
       "kind": "Assign",
-      "line": 22,
+      "line": 23,
       "target": "self.inventory"
     },
     {
       "expression": "self.memory.inventory = {item.name.replace('_', ' '): float(item.quantity) for item in items}",
       "file": "MP5_agent/tests_dc3pa/test_g0_log_callback_runtime.py",
       "kind": "Assign",
-      "line": 37,
+      "line": 38,
       "target": "self.memory.inventory"
     },
     {
@@ -929,7 +943,7 @@
       "expression": "inventory = {}",
       "file": "MP5_agent/tests_dc3pa/test_stage6_scripts.py",
       "kind": "Assign",
-      "line": 139,
+      "line": 187,
       "target": "inventory"
     },
     {
@@ -959,6 +973,27 @@
       "file": "dc3pa_stage_a/test_stage_a.py",
       "kind": "call",
       "line": 52
+    },
+    {
+      "expression": "self.inventory: dict[str, float] = {}",
+      "file": "scripts/g0_trace_log_callback.py",
+      "kind": "AnnAssign",
+      "line": 24,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "self.inventory = dict(inventory)",
+      "file": "scripts/g0_trace_log_callback.py",
+      "kind": "Assign",
+      "line": 27,
+      "target": "self.inventory"
+    },
+    {
+      "expression": "self.memory.inventory = {item.name.replace('_', ' '): float(item.quantity) for item in items}",
+      "file": "scripts/g0_trace_log_callback.py",
+      "kind": "Assign",
+      "line": 39,
+      "target": "self.memory.inventory"
     }
   ]
 }

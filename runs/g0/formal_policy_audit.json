@@ -1,0 +1,51 @@
+{
+  "effective_controller_calls": [
+    "RuntimeError",
+    "_g0_result",
+    "action_craft",
+    "approach",
+    "check_action_preparation",
+    "compact_action_payload",
+    "count_inventory",
+    "deepcopy",
+    "dict",
+    "emit_execution_event",
+    "enumerate",
+    "explore_above_ground",
+    "float",
+    "get",
+    "getattr",
+    "go_down_to_y_level",
+    "go_up",
+    "int",
+    "items",
+    "iter",
+    "len",
+    "mine",
+    "next",
+    "normalize_inventory_name",
+    "range",
+    "replace",
+    "snapshot_inventory",
+    "str",
+    "update_find_obj_name",
+    "update_inventory",
+    "update_inventory_obj_name",
+    "values"
+  ],
+  "effective_controller_methods": {
+    "check_action_preparation": 1724,
+    "check_and_execute_workflow": 1749
+  },
+  "formal_entry": "scripts_dc3pa.stage6_run_minecraft.main",
+  "formal_policy_state_write_exceptions": [
+    "existing log callback only"
+  ],
+  "legacy_workflow_reachable": false,
+  "non_callback_auto_supply_paths": 0,
+  "planner_mutation_paths": 0,
+  "status": "PASS",
+  "task_conditioned_control_paths": 0,
+  "task_literals": [],
+  "violations": []
+}

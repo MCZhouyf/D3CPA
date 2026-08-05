@@ -3,7 +3,6 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import openai
 import pytest
 from langchain.schema import HumanMessage
 
@@ -43,11 +42,9 @@ def _planner_with_error(error):
 
 def test_planner_fails_fast_on_permission_or_quota_errors():
     planner = _planner_with_error(
-        openai.error.PermissionError(
-            "token quota is not enough, token remain quota: 2.35"
-        )
+        RuntimeError("token quota is not enough, token remain quota: 2.35")
     )
-    with pytest.raises(openai.error.PermissionError):
+    with pytest.raises(RuntimeError, match="token quota"):
         planner.get_workflow([HumanMessage(content="plan")])
 
     assert planner.llm.calls == 1

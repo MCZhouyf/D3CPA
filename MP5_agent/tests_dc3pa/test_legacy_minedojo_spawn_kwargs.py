@@ -32,6 +32,7 @@ def _load_run_agent(monkeypatch, tmp_path, task_name):
     monkeypatch.setattr(module, "f_mkdir", lambda path: None)
     monkeypatch.setattr(module, "f_remove", lambda path: None)
     monkeypatch.setattr(module.logging, "basicConfig", lambda **kwargs: None)
+    monkeypatch.setenv("EPISODE_SEED", "3")
     return module
 
 

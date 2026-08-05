@@ -219,7 +219,7 @@
       "condition": "target in {'diamond', 'redstone', 'gold'}",
       "file": "MP5_agent/agent/controller.py",
       "kind": "If",
-      "line": 50,
+      "line": 53,
       "target_literals": [
         "diamond",
         "gold",
@@ -231,7 +231,7 @@
       "condition": "task_information['task'] == item and task_information['quantity'] <= math.ceil(memory.inventory[item])",
       "file": "MP5_agent/agent/controller.py",
       "kind": "If",
-      "line": 1687,
+      "line": 1690,
       "target_literals": [],
       "task_conditioned": true
     },
@@ -239,7 +239,7 @@
       "condition": "item_name == 'gold'",
       "file": "MP5_agent/agent/controller.py",
       "kind": "IfExp",
-      "line": 159,
+      "line": 162,
       "target_literals": [
         "gold"
       ],
@@ -249,7 +249,7 @@
       "condition": "(target_object not in self.memory.inventory or self.memory.inventory[target_object] <= 0) and (task_information['task'] not in self.memory.inventory or self.memory.inventory[task_information['task']] <= 0)",
       "file": "MP5_agent/agent/controller.py",
       "kind": "If",
-      "line": 1578,
+      "line": 1581,
       "target_literals": [],
       "task_conditioned": true
     },
@@ -257,7 +257,7 @@
       "condition": "self._is_deep_mining_task(task_information) and inventory_obj in {'cobblestone', 'coal', 'iron ore', 'diamond', 'redstone', 'gold'} and self._fallback_mine_diamond_resource(env, inventory_obj, self._deep_mining_required_quantity(inventory_obj, action_required_quantity))",
       "file": "MP5_agent/agent/controller.py",
       "kind": "If",
-      "line": 1176,
+      "line": 1179,
       "target_literals": [
         "diamond",
         "gold",
@@ -269,7 +269,7 @@
       "condition": "task_target_name == 'redstone'",
       "file": "MP5_agent/agent/run_agent.py",
       "kind": "If",
-      "line": 111,
+      "line": 118,
       "target_literals": [
         "redstone"
       ],
@@ -279,7 +279,7 @@
       "condition": "task_information.get('task') != 'redstone'",
       "file": "MP5_agent/agent/run_agent.py",
       "kind": "If",
-      "line": 132,
+      "line": 139,
       "target_literals": [
         "redstone"
       ],

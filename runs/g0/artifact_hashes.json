@@ -1,0 +1,16 @@
+{
+  "algorithm": "sha256",
+  "files": {
+    "configs/g0_runtime.json": "3d0f7bf1562fe92d1866999c8a70952d7245c5e0432f178d07a4d098e164a988",
+    "docs/g0/code_map.md": "b495f1a3cbab3e08656ed9a9ba89e4a2f05ac0676cdd3947e95a87aaa516481e",
+    "docs/g0/log_callback_protected.md": "43c6454710c5a6834ddfa9f11a1813969650287f51b1054764f718a197704759",
+    "runs/g0/config_resolution.json": "e18fb1df7cecc931af09b937dc85980a38e0d66f360166d6b813b3d6e954d9cb",
+    "runs/g0/formal_policy_audit.json": "f47f52c5bd836e88429d0c50a40b58f7b3a73625b25d87c3600e1f3affbee3ce",
+    "runs/g0/log_callback_protected_manifest.json": "90e2348b2caee73e1ee4e607d71be52cd69e2cd5256dc2155ccc04d08d5c17a5",
+    "runs/g0/seed_determinism.json": "d75efdf799a8e9e7488613b08823dfad544eb53e6ab749f51113ec26e4b5f70d",
+    "runs/g0/state_write_audit.json": "e72f78472c0b5a47d6f9b0752c53fcb0fdd828e6a154533a9f0d071888a84d68",
+    "runs/g0/task_condition_audit.json": "151bdd4c3fd99fd1f153f45c2f7fbbe91fbe0b603a758e2a842ca57356d1b4d9",
+    "runs/g0/taskset_audit.json": "7dbda030c3ebb54d6b6c9dcca645db9e5f0939c400e38b214f5347d7efdc28a1"
+  },
+  "notes": "The hash manifest intentionally does not hash itself."
+}

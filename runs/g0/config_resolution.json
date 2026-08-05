@@ -1,0 +1,37 @@
+{
+  "final": {
+    "action_attempts": {
+      "craft": 1,
+      "mine": 1,
+      "smelt": 1
+    },
+    "base_url": "https://token.sensenova.cn/v1",
+    "credential_source": "DC3PA_G0_API_KEY",
+    "episode_seed": 3,
+    "feature_flags": {
+      "controller_low_level_recovery": false,
+      "dc3pa_memory": false,
+      "legacy_task_hacks": false,
+      "legacy_workflow_memory": false
+    },
+    "max_environment_steps": 12000,
+    "max_replans_per_task": 30,
+    "max_retries": 1,
+    "max_tokens": 4096,
+    "model": "glm-5.2",
+    "numpy_seed": 3,
+    "python_random_seed": 3,
+    "simulator_seed": 3,
+    "temperature": 0.0,
+    "top_p": 1.0,
+    "world_seed": 3
+  },
+  "resolution_precedence": [
+    "CLI",
+    "environment",
+    "configs/g0_runtime.json"
+  ],
+  "secrets_recorded": false,
+  "seed_derivation": "world_seed = simulator_seed = EPISODE_SEED",
+  "source_config": "/root/autodl-tmp/offloaded-root/tmp/dc3pa_s0_baseline_sanitisation/configs/g0_runtime.json"
+}

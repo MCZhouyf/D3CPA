@@ -92,6 +92,54 @@ def test_minecraft_entrypoint_rejects_missing_display_before_legacy_import(
     assert imported["legacy"] is False
 
 
+def test_g0_runtime_resolution_has_one_seed_and_no_legacy_recovery(monkeypatch, tmp_path):
+    import scripts_dc3pa.stage6_run_minecraft as launcher
+
+    config = tmp_path / "g0.json"
+    config.write_text(
+        json.dumps(
+            {
+                "episode_seed": 17,
+                "model": {
+                    "base_url": "https://relay.invalid/v1",
+                    "model": "glm-test",
+                    "api_key_environment_variable": "TEST_G0_KEY",
+                },
+                "budgets": {
+                    "max_replans_per_task": 30,
+                    "max_environment_steps": 12000,
+                    "action_attempts": {"mine": 1, "craft": 1, "smelt": 1},
+                },
+                "feature_flags": {
+                    "legacy_task_hacks": False,
+                    "controller_low_level_recovery": False,
+                    "legacy_workflow_memory": False,
+                    "dc3pa_memory": False,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("TEST_G0_KEY", "not-a-real-key")
+    monkeypatch.delenv("EPISODE_SEED", raising=False)
+    args = launcher.build_parser().parse_args(
+        ["--g0-runtime-config", str(config)]
+    )
+
+    resolved = launcher._resolve_g0_runtime(args)
+
+    assert resolved["model"] == "glm-test"
+    assert resolved["episode_seed"] == 17
+    assert resolved["max_replans_per_task"] == 30
+    assert resolved["action_attempts"] == {"mine": 1, "craft": 1, "smelt": 1}
+    assert os.environ["EPISODE_SEED"] == "17"
+    assert os.environ["DC3PA_WORLD_SEED"] == "17"
+    assert os.environ["DC3PA_SIM_SEED"] == "17"
+    assert os.environ["DC3PA_CONTROLLER_BOUNDED_RESOURCE_FALLBACK"] == "0"
+    assert os.environ["MP5_DISABLE_MEMORY"] == "1"
+    assert "openai_key" in resolved
+
+
 def test_minecraft_entrypoint_enters_legacy_agent_cwd_with_absolute_paths(monkeypatch, tmp_path):
     import scripts_dc3pa.stage6_run_minecraft as launcher
 
@@ -218,4 +266,4 @@ def test_minecraft_entrypoint_enters_legacy_agent_cwd_with_absolute_paths(monkey
     assert observed["cwd"] == ROOT / "agent"
     assert Path(observed["task_path"]).is_absolute()
     assert observed["memory_root"].is_absolute()
-    assert Path.cwd() == ROOT
+    assert Path.cwd() == ROOT.parent

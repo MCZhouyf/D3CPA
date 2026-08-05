@@ -1,0 +1,21 @@
+{
+  "status": "PASS",
+  "baseline_tag": "success-finish",
+  "baseline_commit": "06a708e2dcfc6bb83d48e41b1475cf0581db15d5",
+  "verification_commit": "51a2968",
+  "formal_task_count": 50,
+  "formal_task_types": ["mine", "craft", "smelt"],
+  "log_callback_unchanged": true,
+  "protected_log_callback_hash": "90e2348b2caee73e1ee4e607d71be52cd69e2cd5256dc2155ccc04d08d5c17a5",
+  "non_callback_auto_supply_paths": 0,
+  "formal_policy_state_write_exceptions": ["existing log callback only"],
+  "task_conditioned_control_paths": 0,
+  "planner_mutation_paths": 0,
+  "legacy_workflow_reachable": false,
+  "seed_protocol_pass": true,
+  "existing_tests_pass_twice": true,
+  "new_tests_pass_twice": true,
+  "remaining_risks": [
+    "The seed check is a no-model deterministic fixture; G0 intentionally does not start a formal Minecraft experiment."
+  ]
+}

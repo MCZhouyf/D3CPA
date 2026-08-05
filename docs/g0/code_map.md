@@ -5,8 +5,9 @@ Baseline: `success-finish` → `06a708e2dcfc6bb83d48e41b1475cf0581db15d5`.
 ## Formal execution path
 
 `dc3pa_stage_a/run_stage_a_episode.py:main` validates a frozen entry in
-`configs/stage_a_formal_taskset_manifest.json`, sets the two Stage-A seed
-variables, and delegates to `MP5_agent/scripts_dc3pa/stage6_run_minecraft.py:main`.
+`configs/stage_a_formal_taskset_manifest.json`, sets `EPISODE_SEED` (and legacy
+aliases for external wrappers), and delegates to
+`MP5_agent/scripts_dc3pa/stage6_run_minecraft.py:main`.
 The Stage-6 launcher imports `MP5_agent/agent/run_agent.py` dynamically, creates
 `run_agent.Evaluator`, `Work_Memory`, `Planner`, `Reflexion`, and
 `Controller`, then calls `dc3pa.integration.factory.build_stage6_runtime`.
@@ -17,13 +18,14 @@ The Stage-6 launcher imports `MP5_agent/agent/run_agent.py` dynamically, creates
 
 ## Configuration and model resolution
 
-Stage-A paper configuration is parsed by `dc3pa_stage_a/paper_config.py:load`.
-Its `export_env` precedes the Stage-6 CLI. `stage6_run_minecraft.py:main` then
-loads the JSON selected by `--config`, applies CLI mode/attempt-policy overrides,
-and reads model endpoint/key/name from CLI arguments (with environment defaults at
-argument-construction time). `dc3pa.integration.stage6_config.Stage6RuntimeConfig`
-is the Stage-6 runtime configuration type. Older `dc3pa/config.py` is used by the
-baseline launcher path rather than the Stage-A formal launcher.
+`configs/g0_runtime.json` is the credential-free G0 source for model endpoint,
+model name, temperature, top-p, token/retry limits, `EPISODE_SEED`, action budgets,
+and feature flags. `stage6_run_minecraft.py:_resolve_g0_runtime` resolves CLI,
+environment, then that file, installs the resulting seed and disables legacy
+workflow memory and controller recovery. It writes a credential-free resolved
+record adjacent to the execution trace. `dc3pa.integration.stage6_config.Stage6RuntimeConfig`
+receives the resolved replan budget; `StepBudgetEnv` enforces the resolved maximum
+environment steps.
 
 ## Planner, evaluation, controller, and memory
 
@@ -36,20 +38,19 @@ baseline launcher path rather than the Stage-A formal launcher.
   via `dc3pa/integration/controller.py:LegacyControllerAdapter.execute`.
 - State provider: `dc3pa/integration/factory.py:build_legacy_state_provider` and
   `dc3pa/integration/state.py:LegacyMP5StateProvider`.
-- Legacy workflow memory: `agent/work_memory.py:Work_Memory` reads/writes
-  `agent/memory/workflows_*.json`; its Stage-6 sink is
-  `dc3pa/integration/legacy.py:LegacyWorkflowMemorySink`.
+- Legacy workflow memory: `agent/work_memory.py:Work_Memory` contains the legacy
+  `workflows_*.json` implementation, but the G0 launcher sets
+  `MP5_DISABLE_MEMORY=1`, so the formal path neither reads nor writes it.
 - Newer memory stores: `dc3pa/memory/` and `dc3pa/integration/runtime.py`.
 
 ## Environment, seed, and budgets
 
-`agent/run_agent.py:Evaluator.__init__` creates MineDojo and reads
-`DC3PA_WORLD_SEED`/`DC3PA_SIM_SEED`, with a random world-seed fallback in the
-baseline. `dc3pa_stage_a/run_stage_a_episode.py:main` sets both variables from
-its `--seed`. `random` and NumPy are seeded in `Evaluator.__init__`; Torch has no
-active formal-run seed call. `Stage6RuntimeConfig.max_execution_attempts` is the
-runner retry budget; `StepBudgetEnv` in the Stage-A launcher optionally bounds
-environment steps.
+`agent/run_agent.py:Evaluator.__init__` requires `EPISODE_SEED`, uses it for both
+MineDojo `world_seed` and simulator `seed`, and seeds Python `random` and NumPy.
+There is no formal random-seed fallback. Torch has no active formal-run use or
+seed call. `Stage6RuntimeConfig.max_execution_attempts` is resolved from the G0
+replan budget; `scripts_dc3pa/stage6_run_minecraft.py:StepBudgetEnv` bounds every
+environment step.
 
 ## Formal task set
 
@@ -61,12 +62,13 @@ specifications are under `/external/dc3pa/task_assets_schema/formal_task_specs/`
 
 ## State writes and feature flags
 
-The formal code path clears inventory during episode setup in
-`scripts_dc3pa/stage6_run_minecraft.py` and has the delayed log write in
-`agent/controller.py:Controller._set_inventory_from_memory`. Stage-A wraps
-`set_inventory` with `dc3pa_stage_a/inventory_write_logger.py:InventoryWriteLogger`
-for audit only. Existing flags are defined in `agent/dc3pa_feature_flags.py`,
-`dc3pa/config.py:FeatureFlags`, and `dc3pa_stage_a/paper_config.py`.
+The formal launcher clears the environment inventory during episode setup; this is
+environment initialization, not policy compensation. The only policy-path direct
+inventory write is the protected delayed log callback in
+`agent/controller.py:Controller._set_inventory_from_memory`. Stage-A's
+`InventoryWriteLogger` is audit-only. The effective final Controller methods are
+audited by `scripts/g0_verify_formal_policy.py`; they only map declared actions to
+low-level commands and return structured failures.
 
 ## Visual encoder and checkpoint path
 

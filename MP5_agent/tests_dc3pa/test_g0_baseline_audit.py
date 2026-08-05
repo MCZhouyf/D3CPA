@@ -58,3 +58,45 @@ def test_g0_taskset_is_the_frozen_50_task_catalog(tmp_path: Path) -> None:
     assert payload["invalid_terminal_types"] == []
     assert payload["duplicate_task_ids"] == []
     assert payload["type_counts"] == {"craft": 37, "mine": 11, "smelt": 2}
+
+
+def test_g0_effective_formal_controller_has_no_task_privilege_or_auto_supply(
+    tmp_path: Path,
+) -> None:
+    output = tmp_path / "formal_policy.json"
+    subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPTS / "g0_verify_formal_policy.py"),
+            "--repo",
+            str(ROOT),
+            "--output",
+            str(output),
+        ],
+        cwd=ROOT,
+        check=True,
+    )
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["status"] == "PASS"
+    assert payload["non_callback_auto_supply_paths"] == 0
+    assert payload["task_conditioned_control_paths"] == 0
+    assert payload["legacy_workflow_reachable"] is False
+
+
+def test_g0_seed_fixture_is_repeatable_without_model_or_minecraft(tmp_path: Path) -> None:
+    output = tmp_path / "seed.json"
+    subprocess.run(
+        [
+            sys.executable,
+            str(SCRIPTS / "g0_verify_seed_determinism.py"),
+            "--seed",
+            "3",
+            "--output",
+            str(output),
+        ],
+        cwd=ROOT,
+        check=True,
+    )
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["identical"] is True
+    assert len(payload["first"]["first_50_observation_hashes"]) == 50

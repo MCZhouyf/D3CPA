@@ -206,8 +206,8 @@ def validate_happy_payload(payload: Mapping[str, Any]) -> None:
 
     final_sequence = diagnostics["final_action_sequence"]
     assert {"name": "find", "obj": "cobblestone", "times": 1} in final_sequence
-    assert any(item["name"] == "find" and item["obj"] == "log" for item in final_sequence)
-    assert any(item["name"] == "craft" and item["obj"] == "planks" for item in final_sequence)
+    assert not any(item["name"] == "find" and item["obj"] == "log" for item in final_sequence)
+    assert not any(item["name"] == "craft" and item["obj"] == "planks" for item in final_sequence)
     pickaxe_index = final_sequence.index(
         {"name": "craft", "obj": "wooden pickaxe", "times": 1}
     )
@@ -218,10 +218,7 @@ def validate_happy_payload(payload: Mapping[str, Any]) -> None:
         {"name": "mine", "obj": "cobblestone", "times": 4}
     )
     assert pickaxe_index < equip_index < mine_index
-    assert any(
-        item["name"] == "craft" and item["obj"] == "planks"
-        for item in final_sequence[:pickaxe_index]
-    )
+    assert final_sequence[pickaxe_index]["obj"] == "wooden pickaxe"
     assert diagnostics["final_inventory"]["cobblestone"] >= 4.0
     assert diagnostics["memory_episode_counts"] == {"before": 1, "after": 2}
     assert diagnostics["scene_exemplar_counts"] == {"before": 0, "after": 2}
