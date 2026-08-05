@@ -9,6 +9,7 @@ from dc3pa.observability.g1_labels import label_execution
 from dc3pa.observability.g1_steps import step_rows_from_telemetry
 from dc3pa.observability.g1_writer import G1EpisodeWriter, write_parquet_atomically
 from dc3pa.observability.g1_state_audit import StateWriteObserver
+from dc3pa.observability.g1_ledger import LedgerChatModel
 
 
 CONTEXT = {
@@ -77,3 +78,22 @@ def test_g1_state_observer_distinguishes_external_reset_without_controller_impor
     env.set_inventory([])
     assert calls == [[]]
     assert observer.events[0].source == "environment_reset"
+
+
+def test_g1_ledger_records_logical_call_without_raw_prompt_or_secret(tmp_path: Path):
+    class Result:
+        usage_metadata = {"input_tokens": 3, "output_tokens": 2, "total_tokens": 5}
+
+    class Model:
+        def invoke(self, prompt):
+            assert prompt == "secret-free prompt"
+            return Result()
+
+    path = tmp_path / "ledger.jsonl"
+    model = LedgerChatModel(Model(), path, context={"run_id": "r", "task_id": "t", "step_idx": 0, "caller_type": "planner", "model": "glm"})
+    model.invoke("secret-free prompt")
+    text = path.read_text(encoding="utf-8")
+    assert "secret-free prompt" not in text
+    records = [json.loads(line) for line in text.splitlines()]
+    assert records[-1]["payload"]["token_count_source"] == "api_usage"
+    assert records[-1]["payload"]["total_tokens"] == 5
