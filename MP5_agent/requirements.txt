@@ -4,3 +4,4 @@ langchain
 chromadb
 tiktoken
 scikit-image>=0.20,<0.24
+socksio>=1.0,<2
