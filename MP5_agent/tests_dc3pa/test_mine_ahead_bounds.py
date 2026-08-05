@@ -266,12 +266,23 @@ def test_backward_underground_move_mines_once_and_uses_real_displacement(monkeyp
     monkeypatch.setattr(
         structured_actions,
         "mine_ahead",
-        lambda _env, _memory, direction=0: mine_directions.append(direction) or False,
+        lambda _env, _memory, direction=0: mine_directions.append(direction) or True,
     )
 
     assert structured_actions.move_one_block(env, memory, 3, 1, 1)
     assert mine_directions == [0]
     assert len([action for action in env.calls if action[0] == 1]) == 1
+
+
+def test_underground_move_never_walks_after_failed_tunnel_clear(monkeypatch):
+    env = _DirectionalMoveEnv()
+    memory = _Memory()
+    monkeypatch.setattr(structured_actions, "sleep", lambda _env: env.events)
+    monkeypatch.setattr(structured_actions, "save_rgb_for_video", lambda _events: None)
+    monkeypatch.setattr(structured_actions, "mine_ahead", lambda *args, **kwargs: False)
+
+    assert not structured_actions.move_one_block(env, memory, 3, 1, 1)
+    assert all(action[0] != 1 for action in env.calls)
 
 
 def test_underground_mine_caps_static_target_attacks(monkeypatch):

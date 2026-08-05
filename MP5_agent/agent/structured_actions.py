@@ -1110,8 +1110,20 @@ def move_one_block(env,memory,movedir=0,underground=0,jumpornot = 0):
             for turn_action in turn_actions[movedir]:
                 events,_,_,_ = env.step(turn_action); save_rgb_for_video(events)
 
-            # Camera-relative forward is direction zero after the turn.
-            mine_ahead(env, memory, 0)
+            # Camera-relative forward is direction zero after the turn.  Never
+            # walk into a passage that mine_ahead did not confirm as clear: a
+            # short collision drift used to be misclassified as progress and
+            # left the camera pressed into a stone face.
+            tunnel_cleared = mine_ahead(env, memory, 0)
+            if not tunnel_cleared:
+                for restore_action in restore_actions[movedir]:
+                    events,_,_,_ = env.step(restore_action); save_rgb_for_video(events)
+                print(
+                    f"underground move direction {movedir} rejected: "
+                    "mine_ahead did not clear the passage"
+                )
+                return False
+
             moved = False
             no_progress_steps = 0
             for _ in range(12):
