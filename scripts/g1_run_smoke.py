@@ -26,6 +26,26 @@ def _task_path(task_text: str) -> Path:
     return path
 
 
+def _classify_exit(*, returncode: int, trace_path: Path, ledger_path: Path) -> tuple[bool, bool, str]:
+    """Keep environmental/API incidents separate from genuine task failures."""
+    if returncode == 0:
+        return False, False, "success"
+    system_markers = {"unhandled_planning_failure", "environment_reset_unavailable"}
+    for path in (trace_path, ledger_path):
+        if not path.is_file():
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            event = json.loads(line)
+            payload = event.get("payload") or {}
+            if event.get("event_type") == "llm_relay_attempt" and payload.get("status") == "failure":
+                return False, True, "relay_api_failure"
+            if event.get("event_type") == "planning_blocked" and payload.get("reason") in system_markers:
+                return False, True, str(payload["reason"])
+    if returncode not in (0, 1):
+        return False, True, f"launcher_exit_{returncode}"
+    return True, False, "task_failure"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", type=Path, default=Path.cwd())
@@ -60,8 +80,13 @@ def main() -> int:
             result = subprocess.run(command, cwd=root / "MP5_agent", text=True, capture_output=True)
             log_path = run_root / "episode_logs" / f"{episode_id}.log"; log_path.parent.mkdir(parents=True, exist_ok=True)
             log_path.write_text(result.stdout + "\n--- STDERR ---\n" + result.stderr, encoding="utf-8")
+            task_failure, system_error, outcome_kind = _classify_exit(
+                returncode=result.returncode,
+                trace_path=run_root / "launcher_traces" / f"{episode_id}.jsonl",
+                ledger_path=run_root / "llm_raw" / f"{episode_id}.jsonl",
+            )
             matrix.append({"episode_id": episode_id, "task_id": task["task_id"], "seed": seed, "exit_code": result.returncode,
-                           "task_failure": bool(result.returncode == 1), "system_error": bool(result.returncode not in (0, 1)), "log": str(log_path)})
+                           "task_failure": task_failure, "system_error": system_error, "outcome_kind": outcome_kind, "log": str(log_path)})
             # Uniform pacing only; it is not selected by task/item/result and
             # avoids bursty relay traffic between independent episodes.
             if args.cooldown_seconds > 0:

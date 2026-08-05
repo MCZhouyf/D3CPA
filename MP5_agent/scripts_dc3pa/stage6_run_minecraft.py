@@ -606,7 +606,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                         telemetry = [sanitize_for_trace(event.to_dict()) for event in execution.telemetry]
                         writer.write("controller_telemetry", {"plan_id": plan.plan_id, "events": telemetry})
                         context = {**dict(g1_metadata), "run_id": g1_run_id, "episode_id": g1_episode_id,
-                                   "episode_seed": int(os.environ["EPISODE_SEED"]), "commit_hash": resolved_g0.get("commit_hash", ""),
+                                   "episode_seed": int(os.environ["EPISODE_SEED"]), "commit_hash": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=REPOSITORY_ROOT, text=True).strip(),
                                    "config_hash": sha256_json(resolved_g0), "model_config_hash": sha256_json({key: resolved_g0[key] for key in ("model", "base_url", "temperature", "top_p", "max_tokens", "max_retries")})}
                         all_rows.extend(step_rows_from_telemetry(telemetry=telemetry, context=context))
                     writer.write("episode_result", sanitize_for_trace(result.to_dict()))
