@@ -213,6 +213,10 @@ def _resolve_g0_runtime(args: argparse.Namespace) -> Mapping[str, Any]:
     if not base_url:
         raise ValueError("model.base_url is required")
     os.environ["OPENAI_API_BASE"] = base_url
+    os.environ["DC3PA_LLM_TEMPERATURE"] = str(model.get("temperature", 0.0))
+    os.environ["DC3PA_LLM_TOP_P"] = str(model.get("top_p", 1.0))
+    os.environ["DC3PA_LLM_MAX_TOKENS"] = str(model.get("max_tokens", 4096))
+    os.environ["DC3PA_LLM_MAX_RETRIES"] = str(model.get("max_retries", 1))
     os.environ["EPISODE_SEED"] = str(episode_seed)
     os.environ["DC3PA_WORLD_SEED"] = str(episode_seed)
     os.environ["DC3PA_SIM_SEED"] = str(episode_seed)
@@ -226,6 +230,10 @@ def _resolve_g0_runtime(args: argparse.Namespace) -> Mapping[str, Any]:
         "episode_seed": int(episode_seed),
         "model": model_name,
         "base_url": base_url,
+        "temperature": model.get("temperature", 0.0),
+        "top_p": model.get("top_p", 1.0),
+        "max_tokens": model.get("max_tokens", 4096),
+        "max_retries": model.get("max_retries", 1),
         "max_replans_per_task": budgets.get("max_replans_per_task"),
         "max_environment_steps": budgets.get("max_environment_steps"),
         "action_attempts": dict(_require_mapping(budgets, "action_attempts")),

@@ -37,12 +37,19 @@ class Work_Memory:
 
         openai.api_base = api_base
 
-        self.llm = ChatOpenAI(
+        temperature = float(os.environ.get("DC3PA_LLM_TEMPERATURE", temperature))
+        llm_kwargs = dict(
             model_name=model_name,
             openai_api_base=api_base,
             openai_api_key=openai_key,
             temperature=temperature,
-            request_timeout=60,
+            request_timeout=float(os.environ.get("DC3PA_LLM_REQUEST_TIMEOUT", "180")),
+            max_retries=int(os.environ.get("DC3PA_LLM_MAX_RETRIES", "1")),
+            max_tokens=int(os.environ.get("DC3PA_LLM_MAX_TOKENS", "4096")),
+            model_kwargs={"top_p": float(os.environ.get("DC3PA_LLM_TOP_P", "1.0"))},
+        )
+        self.llm = ChatOpenAI(
+            **llm_kwargs,
         )
 
         ## Long Memory
@@ -53,13 +60,7 @@ class Work_Memory:
 
         os.environ["OPENAI_API_KEY"] = openai_key
         openai.api_base = api_base
-        self.llm = ChatOpenAI(
-            model_name=model_name,
-            openai_api_base=api_base,
-            openai_api_key=openai_key,
-            temperature=temperature,
-            request_timeout=60,
-        )
+        self.llm = ChatOpenAI(**llm_kwargs)
 
         self.retrieval_top_k = retrieval_top_k
         self.ckpt_dir = ckpt_dir

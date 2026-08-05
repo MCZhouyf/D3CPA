@@ -20,13 +20,16 @@ class Planner:
 
         openai.api_base = api_base
 
+        temperature = float(os.environ.get("DC3PA_LLM_TEMPERATURE", temperature))
         self.llm = ChatOpenAI(
             model_name=model_name,
             openai_api_base=api_base,
             openai_api_key=openai_key,
             temperature=temperature,
             request_timeout=float(os.environ.get("DC3PA_LLM_REQUEST_TIMEOUT", "180")),
-            max_retries=1,
+            max_retries=int(os.environ.get("DC3PA_LLM_MAX_RETRIES", "1")),
+            max_tokens=int(os.environ.get("DC3PA_LLM_MAX_TOKENS", "4096")),
+            model_kwargs={"top_p": float(os.environ.get("DC3PA_LLM_TOP_P", "1.0"))},
         )
 
         self.memory = memory
