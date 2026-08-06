@@ -95,6 +95,23 @@ def test_g0_missing_mine_craft_and_smelt_requirements_fail_without_plan_or_inven
         assert workflow == original
 
 
+def test_g0_craft_material_failure_names_the_missing_materials() -> None:
+    controller = _g0_controller({"planks": 3})
+    result = controller.check_action_preparation(
+        _Env(controller.memory),
+        "craft",
+        {
+            "obj": {"wooden pickaxe": 1},
+            "materials": {"planks": 3, "stick": 2},
+            "platform": None,
+        },
+    )
+
+    assert result["reason_code"] == "missing_declared_materials"
+    assert result["missing_requirements"] == ["stick"]
+    assert result["feedback"] == "Missing declared craft materials: stick."
+
+
 def test_g0_formal_dispatch_reaches_protected_log_gather_after_move_failure(monkeypatch) -> None:
     controller = _g0_controller()
     env = _Env(controller.memory)

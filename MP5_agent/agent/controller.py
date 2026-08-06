@@ -1743,7 +1743,13 @@ class Controller:
                 if float(inventory.get(normalize_inventory_name(material), 0)) < float(quantity)
             ]
             if missing:
-                return {"success": False, "reason_code": "missing_declared_materials", "missing_requirements": missing, "feedback": "Missing declared craft materials."}
+                missing_text = ", ".join(sorted(set(missing)))
+                return {
+                    "success": False,
+                    "reason_code": "missing_declared_materials",
+                    "missing_requirements": missing,
+                    "feedback": f"Missing declared craft materials: {missing_text}.",
+                }
         return {"success": True, "reason_code": "ok", "missing_requirements": [], "feedback": "Declared requirements are present."}
 
     def check_and_execute_workflow(self, env, workflow_dict, task_information, underground):
