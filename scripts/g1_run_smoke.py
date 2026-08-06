@@ -46,6 +46,24 @@ def _classify_exit(*, returncode: int, trace_path: Path, ledger_path: Path) -> t
     return True, False, "task_failure"
 
 
+def _completed_raw_event(run_root: Path, episode_id: str) -> dict | None:
+    """Return the final result only for an atomically finalized raw event file."""
+    for path in sorted((run_root / "raw_events").glob(f"{episode_id}.*.jsonl")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            event = json.loads(line)
+            if event.get("event_type") == "episode_result":
+                return dict(event.get("payload") or {})
+    return None
+
+
+def _write_status(run_root: Path, record: dict) -> None:
+    status_dir = run_root / "episode_status"
+    status_dir.mkdir(parents=True, exist_ok=True)
+    (status_dir / f"{record['episode_id']}.json").write_text(
+        json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", type=Path, default=Path.cwd())
@@ -68,26 +86,34 @@ def main() -> int:
                         "policy_tag": "g1_observer_smoke", "task_text_hash": hashlib.sha256(task["task_text"].encode()).hexdigest()}
             metadata_path = metadata_dir / f"{episode_id}.json"
             metadata_path.write_text(json.dumps(metadata, sort_keys=True) + "\n", encoding="utf-8")
-            completed_part = run_root / "episodes" / f"{episode_id}.steps.parquet"
-            if completed_part.is_file():
-                matrix.append({"episode_id": episode_id, "task_id": task["task_id"], "seed": seed, "exit_code": 0,
-                               "task_failure": False, "system_error": False, "log": "resumed_completed"})
+            trace_path = run_root / "launcher_traces" / f"{episode_id}.jsonl"
+            ledger_path = run_root / "llm_raw" / f"{episode_id}.jsonl"
+            raw_result = _completed_raw_event(run_root, episode_id)
+            if raw_result is not None:
+                returncode = 0 if raw_result.get("success") else 1
+                task_failure, system_error, outcome_kind = _classify_exit(
+                    returncode=returncode, trace_path=trace_path, ledger_path=ledger_path
+                )
+                matrix.append({"episode_id": episode_id, "task_id": task["task_id"], "seed": seed, "exit_code": returncode,
+                               "task_failure": task_failure, "system_error": system_error, "outcome_kind": outcome_kind,
+                               "log": "resumed_finalized_raw"})
                 continue
             command = [sys.executable, "scripts_dc3pa/stage6_run_minecraft.py", "--mode", "reasoning_only",
                        "--task", str(_task_path(task["task_text"])), "--episode-seed", str(seed),
                        "--g1-run-root", str(run_root), "--g1-episode-metadata", str(metadata_path),
                        "--memory-root", str(run_root / "runtime_memory" / episode_id),
-                       "--trace", str(run_root / "launcher_traces" / f"{episode_id}.jsonl")]
+                       "--trace", str(trace_path)]
             result = subprocess.run(command, cwd=root / "MP5_agent", text=True, capture_output=True)
             log_path = run_root / "episode_logs" / f"{episode_id}.log"; log_path.parent.mkdir(parents=True, exist_ok=True)
             log_path.write_text(result.stdout + "\n--- STDERR ---\n" + result.stderr, encoding="utf-8")
             task_failure, system_error, outcome_kind = _classify_exit(
                 returncode=result.returncode,
-                trace_path=run_root / "launcher_traces" / f"{episode_id}.jsonl",
-                ledger_path=run_root / "llm_raw" / f"{episode_id}.jsonl",
+                trace_path=trace_path, ledger_path=ledger_path,
             )
-            matrix.append({"episode_id": episode_id, "task_id": task["task_id"], "seed": seed, "exit_code": result.returncode,
-                           "task_failure": task_failure, "system_error": system_error, "outcome_kind": outcome_kind, "log": str(log_path)})
+            record = {"episode_id": episode_id, "task_id": task["task_id"], "seed": seed, "exit_code": result.returncode,
+                      "task_failure": task_failure, "system_error": system_error, "outcome_kind": outcome_kind, "log": str(log_path)}
+            matrix.append(record)
+            _write_status(run_root, record)
             # Uniform pacing only; it is not selected by task/item/result and
             # avoids bursty relay traffic between independent episodes.
             if args.cooldown_seconds > 0:
