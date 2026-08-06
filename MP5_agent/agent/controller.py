@@ -1812,14 +1812,14 @@ class Controller:
                         elif name == "move_to":
                             if not approach(env=env, memory=self.memory, object=args.get("obj"), underground=underground):
                                 target = update_inventory_obj_name(args.get("obj"))
-                                has_declared_log_mine = any(
+                                has_declared_followup_mine = any(
                                     later.get("name") == "mine"
                                     and update_inventory_obj_name(
                                         dict(later.get("args", {})).get("obj")
                                     ) == "log"
                                     for later in step.get("actions", [])[action_index + 1:]
                                 )
-                                if target == "log" and has_declared_log_mine:
+                                if target == "log" and has_declared_followup_mine:
                                     target_logs = max(
                                         int(self.memory.inventory.get("log", 0)),
                                         self._workflow_material_requirement(
@@ -1830,6 +1830,34 @@ class Controller:
                                         gathered_log_target = target_logs
                                     else:
                                         raise RuntimeError("declared_target_unreachable")
+                                elif any(
+                                    later.get("name") == "mine"
+                                    and update_inventory_obj_name(
+                                        dict(later.get("args", {})).get("obj")
+                                    ) == target
+                                    for later in step.get("actions", [])[action_index + 1:]
+                                ):
+                                    # ``approach`` searches a directional voxel
+                                    # window, while the declared mine action has
+                                    # its own all-direction lidar/voxel aiming
+                                    # and yield verification.  Preserve the
+                                    # navigation uncertainty in telemetry, then
+                                    # let that already-declared mine establish
+                                    # whether the resource is actually reachable.
+                                    emit_execution_event(
+                                        self,
+                                        "action_finished",
+                                        **metadata,
+                                        action_index=action_index,
+                                        status="unconfirmed",
+                                        action=compact_action_payload(action),
+                                        result={
+                                            "reason_code": "move_to_unconfirmed_followup_mine",
+                                            "success": False,
+                                        },
+                                        inventory=snapshot_inventory(self.memory),
+                                    )
+                                    continue
                                 else:
                                     raise RuntimeError("declared_target_unreachable")
                         elif name == "mine":

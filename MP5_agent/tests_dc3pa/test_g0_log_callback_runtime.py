@@ -135,3 +135,24 @@ def test_g0_formal_mine_accepts_a_real_drop_with_a_different_block_name(monkeypa
 
     assert result["success"] is True
     assert controller.memory.inventory == {"wheat seeds": 1}
+
+
+def test_g0_formal_move_uncertainty_does_not_censor_a_matching_declared_mine(monkeypatch) -> None:
+    controller = _g0_controller()
+    env = _Env(controller.memory)
+    monkeypatch.setattr("controller.approach", lambda **_kwargs: False)
+    monkeypatch.setattr(
+        "controller.mine",
+        lambda **_kwargs: (np.array(["wheat seeds"]), np.array([1])),
+    )
+    workflow = {"workflow": [{"times": 1, "actions": [
+        {"name": "move_to", "args": {"obj": "grass"}},
+        {"name": "mine", "args": {"obj": "grass", "tool": ""}},
+    ]}]}
+
+    result, _ = controller.check_and_execute_workflow(
+        env, workflow, {"task": "wheat seeds"}, False
+    )
+
+    assert result["success"] is True
+    assert controller.memory.inventory == {"wheat seeds": 1}

@@ -452,16 +452,16 @@
     }
   ],
   "catalog_sha256": "27f2dcaed41d02bdbc56a8d0b6fd4d7945cde896d412a67f1db862f8eeccda05",
-  "rule": "per terminal type, maximize difficulty coverage; SHA256(G1_SMOKE_V1|task_id) breaks ties",
+  "rule": "per terminal type, maximize difficulty coverage; SHA256(G1_SMOKE_V1|task_id) breaks ties; author-directed basic replacement mine wheat seeds -> mine dirt before execution",
   "schema_version": "g1.v1",
   "selected": [
     {
       "difficulty": "basic",
       "inference_basis": "formal_spec.operation",
-      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/mine_wheat_seeds.json",
-      "stable_rank": "0c050061d650ec9c7c2ee41e76e7db6cd7b244c746fa8033e3fff988ab55f9e5",
-      "task_id": "basic-04-mine_wheat_seeds",
-      "task_text": "mine wheat seeds",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/mine_dirt.json",
+      "stable_rank": "1f23660ba8c370e379530d9f1713da23360728808ec6428117e1465a50d38895",
+      "task_id": "basic-05-mine_dirt",
+      "task_text": "mine dirt",
       "terminal_type": "mine"
     },
     {
