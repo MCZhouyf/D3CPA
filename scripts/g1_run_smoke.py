@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import signal
 import subprocess
 import sys
 import time
@@ -64,6 +66,37 @@ def _write_status(run_root: Path, record: dict) -> None:
     )
 
 
+def _run_episode_in_cleanup_group(command: list[str], *, cwd: Path) -> tuple[int, str, str]:
+    """Run one MineDojo episode and reclaim its client process group on exit.
+
+    MineDojo may leave its Gradle/Minecraft grandchildren alive after the Python
+    launcher has returned.  A dedicated session makes those descendants a
+    precise cleanup target without touching the smoke runner or another episode.
+    """
+    process = subprocess.Popen(
+        command,
+        cwd=cwd,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        start_new_session=True,
+    )
+    stdout, stderr = process.communicate()
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    else:
+        # Give the normal Minecraft shutdown path a short chance before the
+        # guaranteed final cleanup.  The launcher itself has already exited.
+        time.sleep(3)
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    return process.returncode, stdout, stderr
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", type=Path, default=Path.cwd())
@@ -103,14 +136,16 @@ def main() -> int:
                        "--g1-run-root", str(run_root), "--g1-episode-metadata", str(metadata_path),
                        "--memory-root", str(run_root / "runtime_memory" / episode_id),
                        "--trace", str(trace_path)]
-            result = subprocess.run(command, cwd=root / "MP5_agent", text=True, capture_output=True)
+            returncode, stdout, stderr = _run_episode_in_cleanup_group(
+                command, cwd=root / "MP5_agent"
+            )
             log_path = run_root / "episode_logs" / f"{episode_id}.log"; log_path.parent.mkdir(parents=True, exist_ok=True)
-            log_path.write_text(result.stdout + "\n--- STDERR ---\n" + result.stderr, encoding="utf-8")
+            log_path.write_text(stdout + "\n--- STDERR ---\n" + stderr, encoding="utf-8")
             task_failure, system_error, outcome_kind = _classify_exit(
-                returncode=result.returncode,
+                returncode=returncode,
                 trace_path=trace_path, ledger_path=ledger_path,
             )
-            record = {"episode_id": episode_id, "task_id": task["task_id"], "seed": seed, "exit_code": result.returncode,
+            record = {"episode_id": episode_id, "task_id": task["task_id"], "seed": seed, "exit_code": returncode,
                       "task_failure": task_failure, "system_error": system_error, "outcome_kind": outcome_kind, "log": str(log_path)}
             matrix.append(record)
             _write_status(run_root, record)
