@@ -130,7 +130,7 @@ def test_g0_formal_dispatch_reaches_protected_log_gather_after_move_failure(monk
     ]}]}
     result, _ = controller.check_and_execute_workflow(env, workflow, {"task": "wooden slab"}, False)
 
-    assert result["success"] is True
+    assert result["success"] is True, result
     assert requested == [1]
     assert controller.memory.inventory["log"] == 1.0
 
@@ -173,3 +173,37 @@ def test_g0_formal_move_uncertainty_does_not_censor_a_matching_declared_mine(mon
 
     assert result["success"] is True
     assert controller.memory.inventory == {"wheat seeds": 1}
+
+
+def test_g0_declared_log_mines_run_without_a_prior_callback(monkeypatch) -> None:
+    controller = _g0_controller()
+    env = _Env(controller.memory)
+    mine_calls = []
+    callback_targets = []
+
+    def mine_log(**_kwargs):
+        mine_calls.append(True)
+        return np.array(["log"]), np.array([min(len(mine_calls), 3)])
+
+    def gather(_env, _underground, target_logs):
+        callback_targets.append(target_logs)
+        controller.memory.inventory = {"log": float(target_logs)}
+        return True
+
+    monkeypatch.setattr("controller.mine", mine_log)
+    monkeypatch.setattr(
+        "controller.action_craft",
+        lambda *_args, **_kwargs: (np.array(["log", "planks"]), np.array([4, 16])),
+    )
+    monkeypatch.setattr(controller, "_gather_logs", gather)
+    workflow = {"workflow": [
+        {"times": 4, "actions": [{"name": "mine", "args": {"obj": "log", "tool": ""}}]},
+        {"times": 1, "actions": [{"name": "craft", "args": {"obj": {"planks": 16}, "materials": {"log": 4}, "platform": None}}]},
+    ]}
+
+    result, _ = controller.check_and_execute_workflow(env, workflow, {"task": "planks"}, False)
+
+    assert result["success"] is True, result
+    assert len(mine_calls) == 4
+    assert callback_targets == [4]
+    assert controller.memory.inventory["log"] == 4.0

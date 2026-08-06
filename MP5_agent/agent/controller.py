@@ -1868,7 +1868,11 @@ class Controller:
                                     raise RuntimeError("declared_target_unreachable")
                         elif name == "mine":
                             target = update_inventory_obj_name(args.get("obj"))
-                            if target == "log" and float(self.memory.inventory.get("log", 0)) >= gathered_log_target:
+                            if (
+                                target == "log"
+                                and gathered_log_target > 0
+                                and float(self.memory.inventory.get("log", 0)) >= gathered_log_target
+                            ):
                                 emit_execution_event(self, "action_finished", **metadata, action_index=action_index, status="skipped_satisfied", action=compact_action_payload(action), result={"reason_code": "log_gathered_before_declared_mine"}, inventory=snapshot_inventory(self.memory))
                                 continue
                             names, quantities = mine(env=env, memory=self.memory, target=args.get("obj"), equipment=args.get("tool") or "", underground=underground)
@@ -1879,12 +1883,31 @@ class Controller:
                             # Validate an actual observed inventory increment,
                             # rather than requiring the block name itself to be
                             # present in the inventory.
-                            if not any(
+                            observed_yield = any(
                                 float(self.memory.inventory.get(item, 0))
                                 > float(before.get(item, 0))
                                 for item in observed_inventory
-                            ):
-                                raise RuntimeError("declared_mine_no_observed_yield")
+                            )
+                            required_logs = 0
+                            if target == "log" and repetition == repetitions - 1:
+                                required_logs = max(
+                                    gathered_log_target,
+                                    self._workflow_material_requirement(
+                                        workflow, step_index, "log", repetitions
+                                    ),
+                                )
+                            if not observed_yield:
+                                if target == "log" and repetition == repetitions - 1:
+                                    if not self._gather_logs(env, underground, required_logs):
+                                        raise RuntimeError("declared_log_target_unmet")
+                                    gathered_log_target = required_logs
+                                else:
+                                    raise RuntimeError("declared_mine_no_observed_yield")
+                            elif target == "log" and repetition == repetitions - 1:
+                                if float(self.memory.inventory.get("log", 0)) < required_logs:
+                                    if not self._gather_logs(env, underground, required_logs):
+                                        raise RuntimeError("declared_log_target_unmet")
+                                    gathered_log_target = required_logs
                         elif name == "craft":
                             output = normalize_inventory_name(next(iter(args["obj"])))
                             names, quantities = action_craft(env, next(iter(args["obj"])).replace(" ", "_"), self.memory, args.get("platform") == "crafting table", args.get("platform") == "furnace", craft_num=int(next(iter(args["obj"].values()))))
