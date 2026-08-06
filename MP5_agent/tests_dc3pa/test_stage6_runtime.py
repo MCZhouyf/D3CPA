@@ -360,6 +360,36 @@ def test_reactive_replan_notifies_state_provider_after_environment_reset():
     assert state_provider.reset_notifications == 1
 
 
+def test_missing_declared_prerequisite_preserves_world_for_replan():
+    env = ResettableEnv()
+    missing_planks = ExecutionResult(
+        success=False,
+        underground=False,
+        feedback="Missing declared craft materials: planks.",
+        suggestion="Re-plan explicitly from the observed environment state.",
+        raw={
+            "reason_code": "missing_declared_materials",
+            "missing_requirements": ["planks"],
+        },
+    )
+    runtime = build_runtime(
+        controller_results=(missing_planks, True),
+        goal_values=(True,),
+        env=env,
+    )
+
+    result = runtime.run_task({"task": "log"})
+
+    assert result.success
+    assert env.reset_calls == 0
+    preserved = [
+        event for event in result.events
+        if event.event_type == "environment_preserved_for_replan"
+    ]
+    assert len(preserved) == 1
+    assert preserved[0].payload["reason_code"] == "missing_declared_materials"
+
+
 def test_retry_stops_when_environment_cannot_be_reset():
     runtime = build_runtime(
         controller_results=(False, True),

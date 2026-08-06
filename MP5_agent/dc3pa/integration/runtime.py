@@ -130,6 +130,21 @@ class Stage6ClosedLoopRunner:
         self.trace_writer = trace_writer
         self.memory_mode = MemoryMode.parse(config.memory_mode)
 
+    @staticmethod
+    def _preserve_world_for_replan(execution: ExecutionResult) -> bool:
+        """Keep a live world only for declared prerequisites the LLM can acquire.
+
+        This is intentionally based on the Controller's generic contract
+        reason code, not an item, recipe, or action registry.  Environmental
+        and execution failures still receive a clean-world retry.
+        """
+        reason_code = str(execution.raw.get("reason_code", ""))
+        return (
+            not execution.success
+            and reason_code.startswith("missing_declared_")
+            and bool(execution.raw.get("missing_requirements"))
+        )
+
     def _emit(
         self,
         events: list[RuntimeEvent],
@@ -634,9 +649,15 @@ class Stage6ClosedLoopRunner:
         controller_executions = 0
         final_plan: Optional[Plan] = None
         failure_reason = "attempt_limit_reached"
+        reset_before_next_attempt = True
+        preserved_replan_reason = ""
 
         for attempt_index in range(1, self.config.max_execution_attempts + 1):
-            if attempt_index > 1 and self.config.reset_environment_between_attempts:
+            if (
+                attempt_index > 1
+                and self.config.reset_environment_between_attempts
+                and reset_before_next_attempt
+            ):
                 reset = getattr(self.env, "reset", None)
                 if not callable(reset):
                     failure_reason = "environment_reset_unavailable"
@@ -693,6 +714,13 @@ class Stage6ClosedLoopRunner:
                     "environment_reset_completed",
                     attempt_index,
                     {"underground": underground},
+                )
+            elif attempt_index > 1 and self.config.reset_environment_between_attempts:
+                self._emit(
+                    events,
+                    "environment_preserved_for_replan",
+                    attempt_index,
+                    {"reason_code": preserved_replan_reason},
                 )
             started = time.monotonic()
             initial_snapshot = self.state_provider.snapshot(task_information, underground)
@@ -948,6 +976,10 @@ class Stage6ClosedLoopRunner:
                 "feedback": execution.feedback,
                 "suggestion": execution.suggestion,
             }
+            reset_before_next_attempt = not self._preserve_world_for_replan(
+                execution
+            )
+            preserved_replan_reason = str(check_result.get("reason_code", ""))
             reflection = self._reflect(
                 task_information=task_information,
                 plan=plan,
