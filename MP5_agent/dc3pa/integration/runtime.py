@@ -130,21 +130,6 @@ class Stage6ClosedLoopRunner:
         self.trace_writer = trace_writer
         self.memory_mode = MemoryMode.parse(config.memory_mode)
 
-    @staticmethod
-    def _preserve_world_for_replan(execution: ExecutionResult) -> bool:
-        """Keep a live world only for declared prerequisites the LLM can acquire.
-
-        This is intentionally based on the Controller's generic contract
-        reason code, not an item, recipe, or action registry.  Environmental
-        and execution failures still receive a clean-world retry.
-        """
-        reason_code = str(execution.raw.get("reason_code", ""))
-        return (
-            not execution.success
-            and reason_code.startswith("missing_declared_")
-            and bool(execution.raw.get("missing_requirements"))
-        )
-
     def _emit(
         self,
         events: list[RuntimeEvent],
@@ -976,9 +961,12 @@ class Stage6ClosedLoopRunner:
                 "feedback": execution.feedback,
                 "suggestion": execution.suggestion,
             }
-            reset_before_next_attempt = not self._preserve_world_for_replan(
-                execution
-            )
+            # Do not discard the current environment after an incomplete
+            # controller turn.  The feedback below, together with a fresh
+            # observed state snapshot, is the sole input to Reflection and the
+            # next Planner call.  This covers execution failures and plans that
+            # completed without satisfying the requested goal.
+            reset_before_next_attempt = False
             preserved_replan_reason = str(check_result.get("reason_code", ""))
             reflection = self._reflect(
                 task_information=task_information,

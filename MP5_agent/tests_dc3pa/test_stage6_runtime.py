@@ -226,16 +226,19 @@ def test_controller_exception_is_structured_and_can_replan():
 def test_controller_success_without_goal_is_not_task_success_and_writes_no_memory():
     legacy = FakeLegacyMemorySink()
     multimodal = FakeMultimodalMemorySink()
+    env = ResettableEnv()
     runtime = build_runtime(
         controller_results=(True, True, True),
         goal_values=(False, False, False),
         legacy_memory=legacy,
         multimodal_memory=multimodal,
+        env=env,
     )
     result = runtime.run_task({"task": "log"})
     assert not result.success
     assert result.failure_reason == "goal_not_achieved"
     assert not legacy.calls and not multimodal.episodes
+    assert env.reset_calls == 0
 
 
 def test_memory_failure_trace_policy_does_not_relabel_environment_success():
@@ -317,7 +320,7 @@ def test_mismatched_plan_task_is_blocked_before_controller():
     assert result.controller_execution_count == 0
     assert result.failure_reason == "unhandled_planning_failure"
 
-def test_reactive_replan_resets_environment_and_clears_underground_state():
+def test_reactive_replan_preserves_environment_and_underground_state():
     env = ResettableEnv()
     runtime = build_runtime(
         controller_results=(False, True),
@@ -328,17 +331,20 @@ def test_reactive_replan_resets_environment_and_clears_underground_state():
     result = runtime.run_task({"task": "log"}, underground=True)
 
     assert result.success
-    assert env.reset_calls == 1
+    assert env.reset_calls == 0
     assert runtime.controller.calls[0][3] is True
-    assert runtime.controller.calls[1][3] is False
-    reset_events = [
+    assert runtime.controller.calls[1][3] is True
+    preserved_events = [
         event for event in result.events if event.event_type == "environment_reset_completed"
     ]
-    assert len(reset_events) == 1
-    assert reset_events[0].attempt == 2
+    assert not preserved_events
+    assert any(
+        event.event_type == "environment_preserved_for_replan"
+        for event in result.events
+    )
 
 
-def test_reactive_replan_notifies_state_provider_after_environment_reset():
+def test_reactive_replan_does_not_notify_state_provider_without_reset():
     class ResetAwareStateProvider(FakeStateProvider):
         def __init__(self):
             super().__init__()
@@ -357,10 +363,10 @@ def test_reactive_replan_notifies_state_provider_after_environment_reset():
     result = runtime.run_task({"task": "log"})
 
     assert result.success
-    assert state_provider.reset_notifications == 1
+    assert state_provider.reset_notifications == 0
 
 
-def test_missing_declared_prerequisite_preserves_world_for_replan():
+def test_declared_prerequisite_preserves_world_for_replan():
     env = ResettableEnv()
     missing_planks = ExecutionResult(
         success=False,
@@ -390,7 +396,7 @@ def test_missing_declared_prerequisite_preserves_world_for_replan():
     assert preserved[0].payload["reason_code"] == "missing_declared_materials"
 
 
-def test_retry_stops_when_environment_cannot_be_reset():
+def test_retry_does_not_need_environment_reset_for_controller_feedback():
     runtime = build_runtime(
         controller_results=(False, True),
         goal_values=(True,),
@@ -399,7 +405,9 @@ def test_retry_stops_when_environment_cannot_be_reset():
 
     result = runtime.run_task({"task": "log"})
 
-    assert not result.success
-    assert result.failure_reason == "environment_reset_unavailable"
-    assert result.controller_execution_count == 1
-    assert any(event.event_type == "environment_reset_failed" for event in result.events)
+    assert result.success
+    assert result.controller_execution_count == 2
+    assert any(
+        event.event_type == "environment_preserved_for_replan"
+        for event in result.events
+    )
