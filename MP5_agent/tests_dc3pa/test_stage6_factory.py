@@ -63,6 +63,19 @@ def test_state_provider_updates_legacy_memory_callback():
     assert snapshot.state.task == "log"
 
 
+def test_state_provider_discards_legacy_inventory_after_world_reset():
+    env = Env()
+    memory = LegacyMemory()
+    memory.inventory = {"planks": 12}
+    provider = build_legacy_state_provider(
+        env=env,
+        legacy_memory=memory,
+        share_memory=lambda target, observation: None,
+    )
+    provider.on_environment_reset()
+    assert memory.inventory == {}
+
+
 def test_factory_builds_reasoning_only_without_model_or_multimodal_memory():
     env = Env()
     memory = LegacyMemory()

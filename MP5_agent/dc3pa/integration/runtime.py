@@ -661,6 +661,11 @@ class Stage6ClosedLoopRunner:
                     break
                 try:
                     reset()
+                    reset_state = getattr(
+                        self.state_provider, "on_environment_reset", None
+                    )
+                    if callable(reset_state):
+                        reset_state()
                 except Exception as exc:
                     failure_reason = f"environment_reset_failed:{type(exc).__name__}"
                     self._emit(

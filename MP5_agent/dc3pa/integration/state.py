@@ -123,6 +123,7 @@ class LegacyMP5StateProvider:
         refresh_observation: Callable[[], Any],
         inventory_provider: Callable[[], Mapping[str, Any]],
         *,
+        on_environment_reset: Optional[Callable[[], None]] = None,
         position_provider: Optional[Callable[[bool, Any], str]] = None,
         scene_description_factory: Optional[
             Callable[[str, Mapping[str, float], str, Any], str]
@@ -130,8 +131,14 @@ class LegacyMP5StateProvider:
     ):
         self.refresh_observation = refresh_observation
         self.inventory_provider = inventory_provider
+        self._on_environment_reset = on_environment_reset
         self.position_provider = position_provider
         self.scene_description_factory = scene_description_factory
+
+    def on_environment_reset(self) -> None:
+        """Discard legacy state that cannot survive a fresh world reset."""
+        if self._on_environment_reset is not None:
+            self._on_environment_reset()
 
     def snapshot(
         self, task_information: Mapping[str, Any], underground: bool

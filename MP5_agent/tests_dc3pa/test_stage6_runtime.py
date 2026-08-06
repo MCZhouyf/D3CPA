@@ -338,6 +338,28 @@ def test_reactive_replan_resets_environment_and_clears_underground_state():
     assert reset_events[0].attempt == 2
 
 
+def test_reactive_replan_notifies_state_provider_after_environment_reset():
+    class ResetAwareStateProvider(FakeStateProvider):
+        def __init__(self):
+            super().__init__()
+            self.reset_notifications = 0
+
+        def on_environment_reset(self):
+            self.reset_notifications += 1
+
+    state_provider = ResetAwareStateProvider()
+    runtime = build_runtime(
+        controller_results=(False, True),
+        goal_values=(True,),
+        state_provider=state_provider,
+    )
+
+    result = runtime.run_task({"task": "log"})
+
+    assert result.success
+    assert state_provider.reset_notifications == 1
+
+
 def test_retry_stops_when_environment_cannot_be_reset():
     runtime = build_runtime(
         controller_results=(False, True),

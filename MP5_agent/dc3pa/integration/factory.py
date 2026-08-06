@@ -69,9 +69,21 @@ def build_legacy_state_provider(
         value = getattr(legacy_memory, "inventory", {})
         return value if isinstance(value, Mapping) else {}
 
+    def clear_legacy_inventory_after_environment_reset() -> None:
+        # The MineDojo world is fresh after ``env.reset()``.  Work_Memory's
+        # incremental updater otherwise retains items from the discarded world
+        # until it sees a later inventory mutation, which makes replanning use
+        # impossible materials or platforms.
+        inventory = getattr(legacy_memory, "inventory", None)
+        if isinstance(inventory, dict):
+            inventory.clear()
+        else:
+            legacy_memory.inventory = {}
+
     return LegacyMP5StateProvider(
         refresh_observation=refresh_observation,
         inventory_provider=inventory_provider,
+        on_environment_reset=clear_legacy_inventory_after_environment_reset,
     )
 
 
