@@ -116,3 +116,22 @@ def test_g0_formal_dispatch_reaches_protected_log_gather_after_move_failure(monk
     assert result["success"] is True
     assert requested == [1]
     assert controller.memory.inventory["log"] == 1.0
+
+
+def test_g0_formal_mine_accepts_a_real_drop_with_a_different_block_name(monkeypatch) -> None:
+    controller = _g0_controller()
+    env = _Env(controller.memory)
+    monkeypatch.setattr(
+        "controller.mine",
+        lambda **_kwargs: (np.array(["wheat seeds"]), np.array([1])),
+    )
+    workflow = {"workflow": [{"times": 1, "actions": [
+        {"name": "mine", "args": {"obj": "grass", "tool": ""}},
+    ]}]}
+
+    result, _ = controller.check_and_execute_workflow(
+        env, workflow, {"task": "wheat seeds"}, False
+    )
+
+    assert result["success"] is True
+    assert controller.memory.inventory == {"wheat seeds": 1}

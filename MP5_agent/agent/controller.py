@@ -1838,8 +1838,18 @@ class Controller:
                                 emit_execution_event(self, "action_finished", **metadata, action_index=action_index, status="skipped_satisfied", action=compact_action_payload(action), result={"reason_code": "log_gathered_before_declared_mine"}, inventory=snapshot_inventory(self.memory))
                                 continue
                             names, quantities = mine(env=env, memory=self.memory, target=args.get("obj"), equipment=args.get("tool") or "", underground=underground)
-                            self.memory.update_inventory(count_inventory(names, quantities))
-                            if float(self.memory.inventory.get(target, 0)) <= float(before.get(target, 0)):
+                            observed_inventory = count_inventory(names, quantities)
+                            self.memory.update_inventory(observed_inventory)
+                            # A declared voxel target is not necessarily the item
+                            # it drops (for example, grass yields wheat seeds).
+                            # Validate an actual observed inventory increment,
+                            # rather than requiring the block name itself to be
+                            # present in the inventory.
+                            if not any(
+                                float(self.memory.inventory.get(item, 0))
+                                > float(before.get(item, 0))
+                                for item in observed_inventory
+                            ):
                                 raise RuntimeError("declared_mine_no_observed_yield")
                         elif name == "craft":
                             output = normalize_inventory_name(next(iter(args["obj"])))
