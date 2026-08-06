@@ -93,3 +93,26 @@ def test_g0_missing_mine_craft_and_smelt_requirements_fail_without_plan_or_inven
         assert controller.memory.inventory == {}
         assert env.set_calls == []
         assert workflow == original
+
+
+def test_g0_formal_dispatch_reaches_protected_log_gather_after_move_failure(monkeypatch) -> None:
+    controller = _g0_controller()
+    env = _Env(controller.memory)
+    requested = []
+    monkeypatch.setattr("controller.approach", lambda *args, **kwargs: False)
+
+    def gather(_env, _underground, target_logs):
+        requested.append(target_logs)
+        controller.memory.inventory["log"] = float(target_logs)
+        return True
+
+    monkeypatch.setattr(controller, "_gather_logs", gather)
+    workflow = {"workflow": [{"times": 1, "actions": [
+        {"name": "move_to", "args": {"obj": "log"}},
+        {"name": "mine", "args": {"obj": "log", "tool": ""}},
+    ]}]}
+    result, _ = controller.check_and_execute_workflow(env, workflow, {"task": "wooden slab"}, False)
+
+    assert result["success"] is True
+    assert requested == [1]
+    assert controller.memory.inventory["log"] == 1.0

@@ -1781,6 +1781,7 @@ class Controller:
                 action_count=len(step.get("actions", [])),
             )
             repetitions = int(step.get("times", 1))
+            gathered_log_target = 0
             for repetition in range(repetitions):
                 for action_index, action in enumerate(step.get("actions", [])):
                     name = str(action.get("name", ""))
@@ -1810,9 +1811,32 @@ class Controller:
                             explore_above_ground(env=env, args=args, object=update_find_obj_name(args.get("obj")), performer=self, memory=self.memory, task_information=dict(task_information), underground=underground)
                         elif name == "move_to":
                             if not approach(env=env, memory=self.memory, object=args.get("obj"), underground=underground):
-                                raise RuntimeError("declared_target_unreachable")
+                                target = update_inventory_obj_name(args.get("obj"))
+                                has_declared_log_mine = any(
+                                    later.get("name") == "mine"
+                                    and update_inventory_obj_name(
+                                        dict(later.get("args", {})).get("obj")
+                                    ) == "log"
+                                    for later in step.get("actions", [])[action_index + 1:]
+                                )
+                                if target == "log" and has_declared_log_mine:
+                                    target_logs = max(
+                                        int(self.memory.inventory.get("log", 0)),
+                                        self._workflow_material_requirement(
+                                            workflow, step_index, "log", repetitions
+                                        ),
+                                    )
+                                    if self._gather_logs(env, underground, target_logs):
+                                        gathered_log_target = target_logs
+                                    else:
+                                        raise RuntimeError("declared_target_unreachable")
+                                else:
+                                    raise RuntimeError("declared_target_unreachable")
                         elif name == "mine":
                             target = update_inventory_obj_name(args.get("obj"))
+                            if target == "log" and float(self.memory.inventory.get("log", 0)) >= gathered_log_target:
+                                emit_execution_event(self, "action_finished", **metadata, action_index=action_index, status="skipped_satisfied", action=compact_action_payload(action), result={"reason_code": "log_gathered_before_declared_mine"}, inventory=snapshot_inventory(self.memory))
+                                continue
                             names, quantities = mine(env=env, memory=self.memory, target=args.get("obj"), equipment=args.get("tool") or "", underground=underground)
                             self.memory.update_inventory(count_inventory(names, quantities))
                             if float(self.memory.inventory.get(target, 0)) <= float(before.get(target, 0)):
