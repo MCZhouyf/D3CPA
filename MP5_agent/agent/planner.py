@@ -73,6 +73,17 @@ class Planner:
         try:   
             #print(f"{message[1]}")
             log_info("Planner LLM request started")
+            if os.environ.get("DC3PA_G1_COMPACT_JSON", "").lower() in {"1", "true", "yes", "on"}:
+                message = [
+                    SystemMessage(
+                        content=(
+                            "Return only one complete, valid JSON object. Do not use Markdown fences, "
+                            "do not add prose, and keep whitespace minimal. The object must contain a "
+                            "non-empty workflow array; finish all brackets before ending the response."
+                        )
+                    ),
+                    *list(message),
+                ]
             workflow_dict = self.llm(message).content
             log_info("Planner LLM request finished")
             print(f"Plan are finished")

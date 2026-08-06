@@ -12,5 +12,7 @@
   "bounded_resource_fallback": false,
   "use_availability_masks": "pending_g3",
   "core_smoke_seeds": [11001, 11002],
-  "llm_max_tokens": 8192
+  "llm_max_tokens": 6144,
+  "llm_request_timeout": 120,
+  "compact_json": true
 }

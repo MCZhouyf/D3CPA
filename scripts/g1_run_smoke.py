@@ -107,8 +107,14 @@ def main() -> int:
     parser.add_argument(
         "--llm-max-tokens",
         type=int,
-        default=8192,
+        default=6144,
         help="G1-only completion limit; prevents long valid workflows from truncating.",
+    )
+    parser.add_argument(
+        "--llm-request-timeout",
+        type=float,
+        default=120.0,
+        help="G1-only per-request timeout in seconds.",
     )
     args = parser.parse_args()
     root, run_root = args.repo.resolve(), args.run_root.resolve()
@@ -142,7 +148,9 @@ def main() -> int:
                        "--g1-run-root", str(run_root), "--g1-episode-metadata", str(metadata_path),
                        "--memory-root", str(run_root / "runtime_memory" / episode_id),
                        "--trace", str(trace_path),
-                       "--g1-llm-max-tokens", str(args.llm_max_tokens)]
+                       "--g1-llm-max-tokens", str(args.llm_max_tokens),
+                       "--g1-llm-request-timeout", str(args.llm_request_timeout),
+                       "--g1-compact-json"]
             returncode, stdout, stderr = _run_episode_in_cleanup_group(
                 command, cwd=root / "MP5_agent"
             )

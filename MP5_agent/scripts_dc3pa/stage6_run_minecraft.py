@@ -370,6 +370,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="G1-only completion limit override, recorded in the resolved run config.",
     )
     parser.add_argument(
+        "--g1-llm-request-timeout",
+        type=float,
+        help="G1-only per-request timeout in seconds.",
+    )
+    parser.add_argument(
+        "--g1-compact-json",
+        action="store_true",
+        help="Require compact, complete JSON workflow output for G1 planning.",
+    )
+    parser.add_argument(
         "--max-env-steps",
         type=int,
         help="Whole-episode environment-step budget; defaults to G0 config.",
@@ -429,6 +439,18 @@ def main(argv: Optional[list[str]] = None) -> int:
             parser.error("--g1-llm-max-tokens must be positive")
         resolved_g0["max_tokens"] = int(args.g1_llm_max_tokens)
         os.environ["DC3PA_LLM_MAX_TOKENS"] = str(args.g1_llm_max_tokens)
+    if args.g1_llm_request_timeout is not None:
+        if g1_metadata is None:
+            parser.error("--g1-llm-request-timeout requires G1 episode metadata")
+        if args.g1_llm_request_timeout <= 0:
+            parser.error("--g1-llm-request-timeout must be positive")
+        os.environ["DC3PA_LLM_REQUEST_TIMEOUT"] = str(args.g1_llm_request_timeout)
+        resolved_g0["g1_llm_request_timeout"] = args.g1_llm_request_timeout
+    if args.g1_compact_json:
+        if g1_metadata is None:
+            parser.error("--g1-compact-json requires G1 episode metadata")
+        os.environ["DC3PA_G1_COMPACT_JSON"] = "1"
+        resolved_g0["g1_compact_json"] = True
     resolved_path = args.trace.with_suffix(args.trace.suffix + ".resolved_config.json")
     resolved_path.write_text(
         json.dumps(resolved_g0, indent=2, sort_keys=True) + "\n", encoding="utf-8"
