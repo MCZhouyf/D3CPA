@@ -104,6 +104,12 @@ def main() -> int:
     parser.add_argument("--selection", type=Path, default=Path("runs/g1/g1_task_selection.json"))
     parser.add_argument("--seeds", type=Path, default=Path("runs/g1/g1_seed_manifest.json"))
     parser.add_argument("--cooldown-seconds", type=float, default=30.0)
+    parser.add_argument(
+        "--llm-max-tokens",
+        type=int,
+        default=8192,
+        help="G1-only completion limit; prevents long valid workflows from truncating.",
+    )
     args = parser.parse_args()
     root, run_root = args.repo.resolve(), args.run_root.resolve()
     selection = json.loads(args.selection.read_text(encoding="utf-8"))["selected"]
@@ -135,7 +141,8 @@ def main() -> int:
                        "--task", str(_task_path(task["task_text"])), "--episode-seed", str(seed),
                        "--g1-run-root", str(run_root), "--g1-episode-metadata", str(metadata_path),
                        "--memory-root", str(run_root / "runtime_memory" / episode_id),
-                       "--trace", str(trace_path)]
+                       "--trace", str(trace_path),
+                       "--g1-llm-max-tokens", str(args.llm_max_tokens)]
             returncode, stdout, stderr = _run_episode_in_cleanup_group(
                 command, cwd=root / "MP5_agent"
             )

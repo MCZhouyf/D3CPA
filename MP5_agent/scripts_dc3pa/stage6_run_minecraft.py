@@ -365,6 +365,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--trace", type=Path, default=ROOT / "runs" / "stage6_trace.jsonl")
     parser.add_argument("--max-execution-attempts", type=int)
     parser.add_argument(
+        "--g1-llm-max-tokens",
+        type=int,
+        help="G1-only completion limit override, recorded in the resolved run config.",
+    )
+    parser.add_argument(
         "--max-env-steps",
         type=int,
         help="Whole-episode environment-step budget; defaults to G0 config.",
@@ -417,6 +422,13 @@ def main(argv: Optional[list[str]] = None) -> int:
         args.g1_run_root = args.g1_run_root.resolve()
         args.g1_episode_metadata = args.g1_episode_metadata.resolve()
         g1_metadata = _load_json(args.g1_episode_metadata)
+    if args.g1_llm_max_tokens is not None:
+        if g1_metadata is None:
+            parser.error("--g1-llm-max-tokens requires G1 episode metadata")
+        if args.g1_llm_max_tokens <= 0:
+            parser.error("--g1-llm-max-tokens must be positive")
+        resolved_g0["max_tokens"] = int(args.g1_llm_max_tokens)
+        os.environ["DC3PA_LLM_MAX_TOKENS"] = str(args.g1_llm_max_tokens)
     resolved_path = args.trace.with_suffix(args.trace.suffix + ".resolved_config.json")
     resolved_path.write_text(
         json.dumps(resolved_g0, indent=2, sort_keys=True) + "\n", encoding="utf-8"

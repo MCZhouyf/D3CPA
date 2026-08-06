@@ -11,5 +11,6 @@
   "controller_low_level_recovery": false,
   "bounded_resource_fallback": false,
   "use_availability_masks": "pending_g3",
-  "core_smoke_seeds": [11001, 11002]
+  "core_smoke_seeds": [11001, 11002],
+  "llm_max_tokens": 8192
 }
