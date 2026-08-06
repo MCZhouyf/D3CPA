@@ -5,6 +5,7 @@ import json
 import pytest
 
 from dc3pa.integration import Stage6ClosedLoopRunner, Stage6RuntimeConfig
+from dc3pa.integration.controller import ExecutionResult
 from tests_dc3pa.helpers_stage6 import (
     FakeCognitivePlanner,
     FakeController,
@@ -266,6 +267,32 @@ def test_goal_check_exception_is_structured_and_treated_as_incomplete_by_default
     assert not result.success
     assert any(event.event_type == "goal_check_exception" for event in result.events)
     assert result.reactive_replan_count == 2
+
+
+def test_declared_mine_yield_false_negative_uses_goal_check_before_replanning():
+    execution = ExecutionResult(
+        success=False,
+        underground=False,
+        feedback="Declared mine action failed: declared_mine_no_observed_yield",
+        suggestion="Re-plan explicitly from the observed environment state.",
+        raw={"reason_code": "declared_mine_no_observed_yield"},
+    )
+    reasoning = StaticPlanSource(simple_plan())
+    runtime = build_runtime(
+        controller_results=(execution,),
+        goal_values=(True,),
+        reasoning=reasoning,
+    )
+
+    result = runtime.run_task({"task": "log"})
+
+    assert result.success
+    assert result.controller_execution_count == 1
+    assert len(reasoning.calls) == 1
+    assert any(
+        event.event_type == "goal_checked_after_declared_yield_false_negative"
+        for event in result.events
+    )
 
 
 def test_final_scene_capture_failure_does_not_relabel_task_success_under_trace_policy():

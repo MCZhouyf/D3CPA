@@ -812,7 +812,18 @@ class Stage6ClosedLoopRunner:
                 )
             underground = bool(execution.underground)
             goal_success = False
-            if execution.success:
+            # The legacy controller updates its inventory before validating the
+            # observed mine yield.  A yielded item can therefore satisfy the task
+            # even when that post-action validation reports the explicit
+            # ``declared_mine_no_observed_yield`` false-negative.  Check the real
+            # task goal in that narrowly defined case, rather than asking the
+            # planner for an invalid empty workflow on the next attempt.
+            goal_check_after_yield_false_negative = (
+                not execution.success
+                and str(execution.raw.get("reason_code", ""))
+                == "declared_mine_no_observed_yield"
+            )
+            if execution.success or goal_check_after_yield_false_negative:
                 if self.config.require_goal_check:
                     try:
                         goal_success = self.goal_checker.is_done(task_information)
@@ -828,6 +839,13 @@ class Stage6ClosedLoopRunner:
                         )
                 else:
                     goal_success = True
+            if goal_check_after_yield_false_negative:
+                self._emit(
+                    events,
+                    "goal_checked_after_declared_yield_false_negative",
+                    attempt_index,
+                    {"goal_success": goal_success},
+                )
             self._emit(
                 events,
                 "controller_completed",
