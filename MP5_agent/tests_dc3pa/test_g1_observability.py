@@ -118,3 +118,26 @@ def test_g1_ledger_marks_usage_unavailable_when_relay_omits_usage_metadata(tmp_p
     assert payload["prompt_tokens"] is None
     assert payload["completion_tokens"] is None
     assert payload["total_tokens"] is None
+
+
+def test_g1_ledger_retries_a_rate_limit_and_keeps_attempt_indices(tmp_path: Path):
+    class RateLimitError(Exception):
+        pass
+
+    class Result:
+        usage_metadata = {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2}
+
+    class Model:
+        calls = 0
+
+        def invoke(self, _prompt):
+            self.calls += 1
+            if self.calls == 1:
+                raise RateLimitError("429")
+            return Result()
+
+    path = tmp_path / "ledger.jsonl"
+    LedgerChatModel(Model(), path, context={}, min_relay_interval_seconds=0, rate_limit_backoff_seconds=0).invoke("x")
+    attempts = [json.loads(line)["payload"] for line in path.read_text(encoding="utf-8").splitlines()
+                if json.loads(line)["event_type"] == "llm_relay_attempt"]
+    assert [(row["retry_idx"], row["status"]) for row in attempts] == [(0, "failure"), (1, "success")]
