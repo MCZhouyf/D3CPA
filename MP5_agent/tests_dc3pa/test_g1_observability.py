@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import pyarrow.parquet as pq
@@ -141,3 +142,25 @@ def test_g1_ledger_retries_a_rate_limit_and_keeps_attempt_indices(tmp_path: Path
     attempts = [json.loads(line)["payload"] for line in path.read_text(encoding="utf-8").splitlines()
                 if json.loads(line)["event_type"] == "llm_relay_attempt"]
     assert [(row["retry_idx"], row["status"]) for row in attempts] == [(0, "failure"), (1, "success")]
+
+
+def test_g1_ledger_enforces_and_records_a_hard_request_timeout(tmp_path: Path):
+    class Model:
+        def invoke(self, _prompt):
+            time.sleep(0.2)
+
+    path = tmp_path / "ledger.jsonl"
+    model = LedgerChatModel(
+        Model(), path, context={}, min_relay_interval_seconds=0,
+        request_timeout_seconds=0.02,
+    )
+    try:
+        model.invoke("x")
+    except TimeoutError:
+        pass
+    else:
+        raise AssertionError("the G1 hard timeout did not interrupt the relay call")
+    attempts = [json.loads(line)["payload"] for line in path.read_text(encoding="utf-8").splitlines()
+                if json.loads(line)["event_type"] == "llm_relay_attempt"]
+    assert attempts[-1]["error_type"] == "TimeoutError"
+    assert attempts[-1]["request_timeout_seconds"] == 0.02

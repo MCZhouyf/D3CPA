@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import signal
 import threading
 import time
 import uuid
@@ -52,24 +54,63 @@ def _usage(result: Any) -> tuple[int | None, int | None, int | None, str]:
 class LedgerChatModel:
     """Proxy that observes calls without modifying request/response semantics."""
 
-    def __init__(self, model: Any, path: str | Path, *, context: Mapping[str, Any], min_relay_interval_seconds: float = 15.0, max_rate_limit_retries: int = 3, rate_limit_backoff_seconds: float = 30.0) -> None:
+    def __init__(self, model: Any, path: str | Path, *, context: Mapping[str, Any], min_relay_interval_seconds: float = 15.0, max_rate_limit_retries: int = 3, rate_limit_backoff_seconds: float = 30.0, request_timeout_seconds: float | None = None) -> None:
         self._model = model
         self._writer = JsonlTraceWriter(path)
         self._context = dict(context)
         self._min_relay_interval_seconds = float(min_relay_interval_seconds)
         self._max_rate_limit_retries = int(max_rate_limit_retries)
         self._rate_limit_backoff_seconds = float(rate_limit_backoff_seconds)
+        configured_timeout = os.environ.get("DC3PA_LLM_REQUEST_TIMEOUT", "")
+        self._request_timeout_seconds = float(
+            configured_timeout if request_timeout_seconds is None else request_timeout_seconds
+        ) if (configured_timeout or request_timeout_seconds is not None) else 0.0
+        if self._request_timeout_seconds < 0:
+            raise ValueError("request_timeout_seconds must be non-negative")
+
+    def _invoke_with_hard_timeout(self, method_name: str, *args: Any, **kwargs: Any) -> Any:
+        """Bound an old relay client's blocking call in the G1 subprocess.
+
+        ``request_timeout`` is not consistently honored by the pinned client
+        version.  SIGALRM interrupts the blocking request without spawning a
+        background thread, so a timeout cannot create concurrent relay calls.
+        """
+        callback = getattr(self._model, method_name)
+        timeout = self._request_timeout_seconds
+        if (
+            timeout <= 0
+            or threading.current_thread() is not threading.main_thread()
+            or not hasattr(signal, "setitimer")
+        ):
+            return callback(*args, **kwargs)
+        active_timer, _ = signal.getitimer(signal.ITIMER_REAL)
+        if active_timer > 0:
+            return callback(*args, **kwargs)
+
+        previous_handler = signal.getsignal(signal.SIGALRM)
+
+        def _raise_timeout(_signum: int, _frame: Any) -> None:
+            raise TimeoutError(f"G1 LLM request exceeded {timeout:g} seconds")
+
+        signal.signal(signal.SIGALRM, _raise_timeout)
+        signal.setitimer(signal.ITIMER_REAL, timeout)
+        try:
+            return callback(*args, **kwargs)
+        finally:
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            signal.signal(signal.SIGALRM, previous_handler)
 
     def _call(self, method_name: str, *args: Any, **kwargs: Any) -> Any:
         logical_call_id = uuid.uuid4().hex
         base = {**self._context, "logical_call_id": logical_call_id, "caller_type": self._context.get("caller_type", "other"),
-                "relay_request_id": None, "request_payload_hash": _hash_request(args, kwargs)}
+                "relay_request_id": None, "request_payload_hash": _hash_request(args, kwargs),
+                "request_timeout_seconds": self._request_timeout_seconds or None}
         self._writer.write("llm_logical_call_started", {**base, "method": method_name})
         for retry_idx in range(self._max_rate_limit_retries + 1):
             _reserve_relay_slot(self._min_relay_interval_seconds)
             started = time.perf_counter()
             try:
-                result = getattr(self._model, method_name)(*args, **kwargs)
+                result = self._invoke_with_hard_timeout(method_name, *args, **kwargs)
             except Exception as exc:
                 self._writer.write("llm_relay_attempt", {**base, "retry_idx": retry_idx, "status": "failure", "error_type": type(exc).__name__, "latency_ms": round((time.perf_counter() - started) * 1000, 3), "prompt_tokens": None, "completion_tokens": None, "total_tokens": None, "token_count_source": "unavailable"})
                 if not _is_rate_limit(exc) or retry_idx >= self._max_rate_limit_retries:
