@@ -1,0 +1,48 @@
+{
+  "aggregation_semantics": "Supplementary G1 recovery outcomes are counted in addition to, and never overwrite, frozen core-matrix entries.",
+  "schema_version": 1,
+  "supplementary_successes": [
+    {
+      "episode_id": "complex-41-obtain_diamond--seed-13003-rerun1",
+      "evidence": "raw_events/complex-41-obtain_diamond--seed-13003-rerun1.4ce2c558adda4df3b188a28084454be2.jsonl",
+      "seed": 13003,
+      "success": true,
+      "task_id": "complex-41-obtain_diamond"
+    },
+    {
+      "episode_id": "complex-41-obtain_diamond--seed-11006",
+      "evidence": "raw_events/complex-41-obtain_diamond--seed-11006.ed5a397afe0b43418de194f786cdd07a.jsonl",
+      "seed": 11006,
+      "success": true,
+      "task_id": "complex-41-obtain_diamond"
+    },
+    {
+      "episode_id": "hard-35-craft_iron_pickaxe--seed-12011",
+      "evidence": "raw_events/hard-35-craft_iron_pickaxe--seed-12011.f5fb5125ac4e4c07be258a6ecefbd1a2.jsonl",
+      "seed": 12011,
+      "success": true,
+      "task_id": "hard-35-craft_iron_pickaxe"
+    },
+    {
+      "episode_id": "hard-35-craft_iron_pickaxe--seed-12019",
+      "evidence": "raw_events/hard-35-craft_iron_pickaxe--seed-12019.0bf59102768447239cbc09888cb77c3c.jsonl",
+      "seed": 12019,
+      "success": true,
+      "task_id": "hard-35-craft_iron_pickaxe"
+    },
+    {
+      "episode_id": "hard-32-smelt_iron_ingot--seed-12021",
+      "evidence": "raw_events/hard-32-smelt_iron_ingot--seed-12021.564646ae273a4ccfa968f4d9d5f21a91.jsonl",
+      "seed": 12021,
+      "success": true,
+      "task_id": "hard-32-smelt_iron_ingot"
+    },
+    {
+      "episode_id": "hard-32-smelt_iron_ingot--seed-12022",
+      "evidence": "raw_events/hard-32-smelt_iron_ingot--seed-12022.6581d97fe85349859bb2cceb86fc7424.jsonl",
+      "seed": 12022,
+      "success": true,
+      "task_id": "hard-32-smelt_iron_ingot"
+    }
+  ]
+}

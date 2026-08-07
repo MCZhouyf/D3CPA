@@ -43,7 +43,8 @@ dig_down(y_level, tool): dig down to the y-level with the tool: This action is o
 - y_level: a number, the y-level to dig down to.
 - tool: a string, the tool used for digging down, like "wooden pickaxe". Set to null if without any tool.
 
-dig_up(tool): dig up to the ground from underground: This action is only required when you need to return to the ground to handle the object on the ground.
+dig_up(y_level, tool): dig up to the target y-level from underground: This action is only required when you need to return to a higher level to handle an object.
+- y_level: an integer target y-level to dig up to. You must always provide it.
 - tool: a string, the tool used for digging down, like "wooden pickaxe". Set to null if without any tool.
 
 apply(obj, tool): apply the tool on the object: used for carrying water, milk, lava with the tool bucket, pooling water or lava to the object with the tool water bucket or lava bucket, shearing sheep with the tool shears, blocking attacks with the tool shield. 
@@ -56,6 +57,8 @@ You must follow the following criteria:
 (3) Whether you are underground, for the task of 'Mine' object like iron ore, you need to dig down to the y level where they often appear.
 (4) If there are insufficient materials, please carefully consider whether the remaining objects in your current inventory can be used to craft these lacking materials. If possible, prioritize using what's in the inventory instead of going out to find them.
 (5) The tools like "wooden pickaxe" and the platform like "crafting table" and "furnace" must be crafted first, but not found by the 'find' action.
+(6) Minecraft recipe/platform facts must be reflected in your declared arguments: only planks, sticks, and a crafting table itself may use `platform: null`; a furnace, dropper, and every pickaxe require `platform: "crafting table"`; iron ingots require `platform: "furnace"` and iron ore as their material. Do not add unrelated materials to a recipe. These are planning requirements: explicitly declare the necessary platform and materials; the controller will not silently choose them for you.
+(7) Before committing a workflow, total the sticks and planks required by every declared wooden/stone/iron tool in that workflow, including tools made later. If the total is insufficient, plan the additional logs/planks/sticks before descending.
 
 RESPONSE FORMAT: 
 {

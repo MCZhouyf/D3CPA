@@ -155,6 +155,18 @@ def fix_and_parse_json(
         # print('-----', json_str)
         return json.loads(json_str)
     except json.JSONDecodeError as _:  # noqa: F841
+        # Relay models occasionally prepend a short explanation before an
+        # otherwise valid JSON workflow.  Isolate that complete object before
+        # applying syntax repairs; repairing the prose-plus-JSON string makes
+        # ``balance_braces`` raise before the existing fallback can run.
+        brace_index = json_str.find("{")
+        last_brace_index = json_str.rfind("}")
+        if brace_index != -1 and last_brace_index > brace_index:
+            candidate = json_str[brace_index : last_brace_index + 1]
+            try:
+                return json.loads(candidate)
+            except json.JSONDecodeError:
+                json_str = candidate
         json_str = correct_json(json_str)
         # print('=====', json_str)
         try:
@@ -170,5 +182,4 @@ def fix_and_parse_json(
         return json.loads(json_str)
     except json.JSONDecodeError as e:  # noqa: F841
         raise e
-
 

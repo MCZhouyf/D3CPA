@@ -1,0 +1,415 @@
+{
+  "duplicate_task_ids": [],
+  "invalid_terminal_types": [],
+  "missing_fields": [],
+  "source_file": "/external/dc3pa/task_assets_schema/final_task_catalog.csv",
+  "source_sha256": "27f2dcaed41d02bdbc56a8d0b6fd4d7945cde896d412a67f1db862f8eeccda05",
+  "task_count": 50,
+  "tasks": [
+    {
+      "difficulty": "basic",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/mine_log.json",
+      "task_id": "basic-01-mine_log",
+      "task_text": "mine log",
+      "terminal_type": "mine"
+    },
+    {
+      "difficulty": "basic",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/mine_sand.json",
+      "task_id": "basic-02-mine_sand",
+      "task_text": "mine sand",
+      "terminal_type": "mine"
+    },
+    {
+      "difficulty": "basic",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/mine_sapling.json",
+      "task_id": "basic-03-mine_sapling",
+      "task_text": "mine sapling",
+      "terminal_type": "mine"
+    },
+    {
+      "difficulty": "basic",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/mine_wheat_seeds.json",
+      "task_id": "basic-04-mine_wheat_seeds",
+      "task_text": "mine wheat seeds",
+      "terminal_type": "mine"
+    },
+    {
+      "difficulty": "basic",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/mine_dirt.json",
+      "task_id": "basic-05-mine_dirt",
+      "task_text": "mine dirt",
+      "terminal_type": "mine"
+    },
+    {
+      "difficulty": "basic",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/mine_grass.json",
+      "task_id": "basic-06-mine_grass",
+      "task_text": "mine grass",
+      "terminal_type": "mine"
+    },
+    {
+      "difficulty": "basic",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_plank.json",
+      "task_id": "basic-07-craft_plank",
+      "task_text": "craft plank",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "basic",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_stick.json",
+      "task_id": "basic-08-craft_stick",
+      "task_text": "craft stick",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "basic",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_button.json",
+      "task_id": "basic-09-craft_button",
+      "task_text": "craft button",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "basic",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_crafting_table.json",
+      "task_id": "basic-10-craft_crafting_table",
+      "task_text": "craft crafting table",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "easy",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_chest.json",
+      "task_id": "easy-11-craft_chest",
+      "task_text": "craft chest",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "easy",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_bowl.json",
+      "task_id": "easy-12-craft_bowl",
+      "task_text": "craft bowl",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "easy",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_boat.json",
+      "task_id": "easy-13-craft_boat",
+      "task_text": "craft boat",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "easy",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_wooden_slab.json",
+      "task_id": "easy-14-craft_wooden_slab",
+      "task_text": "craft wooden slab",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "easy",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_wooden_pressure_plate.json",
+      "task_id": "easy-15-craft_wooden_pressure_plate",
+      "task_text": "craft wooden pressure plate",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "easy",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_ladder.json",
+      "task_id": "easy-16-craft_ladder",
+      "task_text": "craft ladder",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "easy",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_barrel.json",
+      "task_id": "easy-17-craft_barrel",
+      "task_text": "craft barrel",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "easy",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_wooden_axe.json",
+      "task_id": "easy-18-craft_wooden_axe",
+      "task_text": "craft wooden axe",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "easy",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_wooden_pickaxe.json",
+      "task_id": "easy-19-craft_wooden_pickaxe",
+      "task_text": "craft wooden pickaxe",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "easy",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_wooden_sword.json",
+      "task_id": "easy-20-craft_wooden_sword",
+      "task_text": "craft wooden sword",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "medium",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/mine_cobblestone.json",
+      "task_id": "medium-21-mine_cobblestone",
+      "task_text": "mine cobblestone",
+      "terminal_type": "mine"
+    },
+    {
+      "difficulty": "medium",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/mine_coal_ore.json",
+      "task_id": "medium-22-mine_coal_ore",
+      "task_text": "mine coal ore",
+      "terminal_type": "mine"
+    },
+    {
+      "difficulty": "medium",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_furnace.json",
+      "task_id": "medium-23-craft_furnace",
+      "task_text": "craft furnace",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "medium",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_lever.json",
+      "task_id": "medium-24-craft_lever",
+      "task_text": "craft lever",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "medium",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_stone_pickaxe.json",
+      "task_id": "medium-25-craft_stone_pickaxe",
+      "task_text": "craft stone pickaxe",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "medium",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_stone_axe.json",
+      "task_id": "medium-26-craft_stone_axe",
+      "task_text": "craft stone axe",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "medium",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_stone_hoe.json",
+      "task_id": "medium-27-craft_stone_hoe",
+      "task_text": "craft stone hoe",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "medium",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_stone_shovel.json",
+      "task_id": "medium-28-craft_stone_shovel",
+      "task_text": "craft stone shovel",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "medium",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_stone_sword.json",
+      "task_id": "medium-29-craft_stone_sword",
+      "task_text": "craft stone sword",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "medium",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/mine_iron_ore.json",
+      "task_id": "medium-30-mine_iron_ore",
+      "task_text": "mine iron ore",
+      "terminal_type": "mine"
+    },
+    {
+      "difficulty": "hard",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/smelt_glass.json",
+      "task_id": "hard-31-smelt_glass",
+      "task_text": "smelt glass",
+      "terminal_type": "smelt"
+    },
+    {
+      "difficulty": "hard",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/smelt_iron_ingot.json",
+      "task_id": "hard-32-smelt_iron_ingot",
+      "task_text": "smelt iron ingot",
+      "terminal_type": "smelt"
+    },
+    {
+      "difficulty": "hard",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_iron_bars.json",
+      "task_id": "hard-33-craft_iron_bars",
+      "task_text": "craft iron bars",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "hard",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_carpentry_table.json",
+      "task_id": "hard-34-craft_carpentry_table",
+      "task_text": "craft carpentry table",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "hard",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_iron_pickaxe.json",
+      "task_id": "hard-35-craft_iron_pickaxe",
+      "task_text": "craft iron pickaxe",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "hard",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_iron_door.json",
+      "task_id": "hard-36-craft_iron_door",
+      "task_text": "craft iron door",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "hard",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_iron_trapdoor.json",
+      "task_id": "hard-37-craft_iron_trapdoor",
+      "task_text": "craft iron trapdoor",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "hard",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_rail.json",
+      "task_id": "hard-38-craft_rail",
+      "task_text": "craft rail",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "hard",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_cauldron.json",
+      "task_id": "hard-39-craft_cauldron",
+      "task_text": "craft cauldron",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "hard",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_bucket.json",
+      "task_id": "hard-40-craft_bucket",
+      "task_text": "craft bucket",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "complex",
+      "inference_basis": "author_approved_structured_obtain_with_tool",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/obtain_diamond.json",
+      "task_id": "complex-41-obtain_diamond",
+      "task_text": "obtain diamond",
+      "terminal_type": "mine"
+    },
+    {
+      "difficulty": "complex",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/mine_redstone.json",
+      "task_id": "complex-42-mine_redstone",
+      "task_text": "mine redstone",
+      "terminal_type": "mine"
+    },
+    {
+      "difficulty": "complex",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_dropper.json",
+      "task_id": "complex-43-craft_dropper",
+      "task_text": "craft dropper",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "complex",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_redstone_torch.json",
+      "task_id": "complex-44-craft_redstone_torch",
+      "task_text": "craft redstone torch",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "complex",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_compass.json",
+      "task_id": "complex-45-craft_compass",
+      "task_text": "craft compass",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "complex",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_clock.json",
+      "task_id": "complex-46-craft_clock",
+      "task_text": "craft clock",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "complex",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_piston.json",
+      "task_id": "complex-47-craft_piston",
+      "task_text": "craft piston",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "complex",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_diamond_pickaxe.json",
+      "task_id": "complex-48-craft_diamond_pickaxe",
+      "task_text": "craft diamond pickaxe",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "complex",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_diamond_sword.json",
+      "task_id": "complex-49-craft_diamond_sword",
+      "task_text": "craft diamond sword",
+      "terminal_type": "craft"
+    },
+    {
+      "difficulty": "complex",
+      "inference_basis": "formal_spec.operation",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_raw_gold_block.json",
+      "task_id": "complex-50-craft_raw_gold_block",
+      "task_text": "craft raw gold block",
+      "terminal_type": "craft"
+    }
+  ],
+  "type_counts": {
+    "craft": 37,
+    "mine": 11,
+    "smelt": 2
+  }
+}

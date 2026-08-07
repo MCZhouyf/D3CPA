@@ -164,6 +164,23 @@ def _read_key_from_private_env(path: Path, variable: str) -> str:
     return ""
 
 
+def _read_keys_from_private_env(path: Path, variable: str) -> list[str]:
+    """Return all distinct occurrences of a private relay key variable.
+
+    This supports a local key-rotation pool while keeping credentials outside
+    the repository and out of every run artefact.
+    """
+    if not path.is_file():
+        return []
+    keys: list[str] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        name, separator, value = line.partition("=")
+        candidate = value.strip()
+        if separator and name.strip() == variable and candidate and candidate not in keys:
+            keys.append(candidate)
+    return keys
+
+
 def _require_mapping(payload: Mapping[str, Any], key: str) -> Mapping[str, Any]:
     value = payload.get(key, {})
     if not isinstance(value, Mapping):
@@ -186,15 +203,20 @@ def _resolve_g0_runtime(args: argparse.Namespace) -> Mapping[str, Any]:
     api_variable = str(model.get("api_key_environment_variable", "")).strip()
     if not api_variable:
         raise ValueError("model.api_key_environment_variable is required")
+    private_key_path = Path("/root/.config/dc3pa/relay.env")
     key = args.openai_key or os.environ.get(api_variable, "") or os.environ.get("OPENAI_API_KEY", "")
     if not key:
-        key = _read_key_from_private_env(
-            Path("/root/.config/dc3pa/relay.env"), api_variable
-        )
+        key = _read_key_from_private_env(private_key_path, api_variable)
     if not key:
         raise ValueError(
             f"openai_key is required, set --openai_key or {api_variable}"
         )
+    # Include every locally configured key (plus an explicitly supplied key)
+    # for Planner's *serial* transport-failure rotation.  This is process-only:
+    # neither the values nor this environment variable are written to artefacts.
+    relay_keys = [key, *_read_keys_from_private_env(private_key_path, api_variable)]
+    os.environ["DC3PA_LLM_API_KEYS"] = ",".join(dict.fromkeys(relay_keys))
+    os.environ.setdefault("DC3PA_LLM_PLANNER_MAX_RETRIES", "8")
     model_name = (
         args.gpt_model_name
         or os.environ.get("GPT_MODEL_NAME", "")
@@ -451,6 +473,12 @@ def main(argv: Optional[list[str]] = None) -> int:
             parser.error("--g1-compact-json requires G1 episode metadata")
         os.environ["DC3PA_G1_COMPACT_JSON"] = "1"
         resolved_g0["g1_compact_json"] = True
+    if args.max_env_steps is not None:
+        if args.max_env_steps <= 0:
+            parser.error("--max-env-steps must be positive")
+        # Record the effective command-line override with the episode rather
+        # than leaving the resolved evidence at the config-file default.
+        resolved_g0["max_environment_steps"] = int(args.max_env_steps)
     resolved_path = args.trace.with_suffix(args.trace.suffix + ".resolved_config.json")
     resolved_path.write_text(
         json.dumps(resolved_g0, indent=2, sort_keys=True) + "\n", encoding="utf-8"

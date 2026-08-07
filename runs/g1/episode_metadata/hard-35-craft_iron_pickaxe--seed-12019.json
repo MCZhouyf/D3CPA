@@ -1,0 +1,13 @@
+{
+  "difficulty": "hard",
+  "episode_id": "hard-35-craft_iron_pickaxe--seed-12019",
+  "inference_basis": "formal_spec.operation; user-directed G1 substitution for smelt glass",
+  "policy_tag": "g1_supplemental_recovery",
+  "run_id": "g1-supplemental-v1",
+  "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_iron_pickaxe.json",
+  "stable_rank": "8b53bbc9c3eafeb664d670d9155d04dc3d0475bbf1543a54c37c63eef5e7bfc1",
+  "task_id": "hard-35-craft_iron_pickaxe",
+  "task_text": "craft iron pickaxe",
+  "task_text_hash": "b1e7e6dd0406937bcc85951abde28909d64feebc815464ccd483f91cc442ded5",
+  "terminal_type": "craft"
+}

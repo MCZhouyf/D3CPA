@@ -62,7 +62,12 @@ class Action:
             "fight": {"obj", "tool"},
             "equip": {"obj"},
             "dig_down": {"y_level", "tool"},
-            "dig_up": {"tool"},
+            # Both vertical-navigation actions require the target height.  The
+            # controller cannot infer it safely from the current frame: that
+            # would turn an omitted LLM parameter into a hidden execution
+            # policy and, before this contract check, let the malformed action
+            # reach the controller only to fail at runtime.
+            "dig_up": {"y_level", "tool"},
             "apply": {"obj", "tool"},
         }[self.name]
         missing = required - set(self.args)
@@ -89,11 +94,13 @@ class Action:
                         raise ContractValidationError(
                             f"{label}[{key!r}] must be positive"
                         )
-        if self.name == "dig_down":
+        if self.name in {"dig_down", "dig_up"}:
             try:
                 int(self.args["y_level"])
             except (TypeError, ValueError) as exc:
-                raise ContractValidationError("dig_down.y_level must be an integer") from exc
+                raise ContractValidationError(
+                    f"{self.name}.y_level must be an integer"
+                ) from exc
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "Action":

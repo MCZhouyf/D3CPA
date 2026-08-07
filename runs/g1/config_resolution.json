@@ -1,0 +1,28 @@
+{
+  "base_config_sha256": null,
+  "base_resolution": "runs/g1/g0_runtime_resolution.json",
+  "overlay": {
+    "adaptive_trigger": "disabled_g1",
+    "bounded_resource_fallback": false,
+    "calibrator": "not_fitted_g1",
+    "chpm": "disabled_g1",
+    "compact_json": true,
+    "controller_low_level_recovery": false,
+    "core_smoke_seeds": [
+      11001,
+      11002
+    ],
+    "evaluation_chain": "disabled_g1",
+    "inherits": "configs/g0_runtime.json",
+    "legacy_workflow_memory": false,
+    "llm_max_tokens": 6144,
+    "llm_request_timeout": 120,
+    "mode": "reasoning_only",
+    "policy_tag": "g1_observer_smoke",
+    "schema_version": "g1.v1",
+    "use_availability_masks": "pending_g3"
+  },
+  "overlay_path": "configs/g1_smoke.json",
+  "resolved_model_source": "G0 runtime resolution; G1 overlay deliberately stores no endpoint, key, or model secret",
+  "schema_version": "g1.v1"
+}

@@ -110,6 +110,19 @@ class Controller:
     def _inventory_count(self, item_name):
         return self.memory.inventory.get(normalize_inventory_name(item_name), 0)
 
+    def _mine_step_goal_reached(self, target_name, initial_quantity, repetitions):
+        """Whether a repeated mine step has already observed its requested yield.
+
+        In the workflow grammar, a mine step's ``times`` is the requested
+        resource quantity.  One physical mine action can legitimately collect
+        several adjacent blocks.  Continuing to issue the remaining attacks
+        after the requested quantity is present only consumes the declared
+        tool, and can prevent the following craft from happening.
+        """
+        return self._inventory_count(target_name) >= (
+            float(initial_quantity) + int(repetitions)
+        )
+
     def _is_optional_deep_mining_craft(self, crafted_obj):
         return normalize_inventory_name(crafted_obj) in {"torch"}
 
@@ -656,7 +669,9 @@ class Controller:
             False,
             craft_num=craft_num,
         )
-        self.memory.update_inventory(count_inventory(inventory_name_list, inventory_num_list))
+        update_memory_inventory_from_observation(
+            self.memory, count_inventory(inventory_name_list, inventory_num_list)
+        )
 
     def ensure_wooden_bootstrap(self, env, underground):
         if underground:
@@ -769,7 +784,14 @@ class Controller:
                 self._sync_memory(env)
                 continue
             print(f"{inventory_name_list},{inventory_num_list}")
-            self.memory.update_inventory(count_inventory(inventory_name_list, inventory_num_list))
+            # ``action_craft`` returns a direct MineDojo inventory frame.  It
+            # can transiently be all-air immediately after a placed-furnace
+            # interaction; apply it through the same confirmation guard used
+            # by every normal environment synchronization so that one frame
+            # cannot erase the physical-material ledger before re-planning.
+            update_memory_inventory_from_observation(
+                self.memory, count_inventory(inventory_name_list, inventory_num_list)
+            )
             self._sync_memory(env)
             if self._inventory_count(target_name) >= expected_quantity:
                 return True
@@ -920,11 +942,7 @@ class Controller:
                     # returns.  Expose the workflow-derived resource demand to
                     # that low-level operation so it stops clearing as soon as
                     # the actual collection requirement has been met.
-                    if (
-                        self._is_deep_mining_task(task_information)
-                        and name in {"find", "move_to", "mine"}
-                        and action_target
-                    ):
+                    if name in {"find", "move_to", "mine"} and action_target:
                         planned_resource_tool = next(
                             (
                                 normalize_inventory_name(
@@ -940,10 +958,15 @@ class Controller:
                             "item": action_target,
                             "quantity": action_required_quantity,
                         }
-                        # This is copied from the LLM-authored mine action.  It
+                        # This is copied from the LLM-authored mine action. It
                         # lets low-level movement report that the planned tool
                         # has disappeared without choosing or crafting a tool
-                        # in controller code.
+                        # in controller code.  Resource demand must be exposed
+                        # for every mine workflow, not only the historical
+                        # diamond/redstone/gold subset: otherwise a workflow
+                        # such as "mine two more iron ore" treats one already
+                        # held ore as satisfying a default one-item goal and
+                        # repeatedly targets a stale voxel.
                         self.memory._dc3pa_active_resource_tool = planned_resource_tool
                         if action_target == "log":
                             self._begin_log_callback_window(
@@ -1257,6 +1280,16 @@ class Controller:
                             max_attempts=craft_attempts,
                             keep_crafting_table_placed=keep_table_placed,
                         )
+                        craft_execution_failure = self._consume_execution_failure()
+                        if craft_execution_failure is not None:
+                            return finish_failure(
+                                step,
+                                step_index,
+                                action_index,
+                                action,
+                                craft_execution_failure,
+                                underground,
+                            )
                         if not craft_success and self._is_deep_mining_task(task_information):
                             check_result = {
                                 "feedback": f"Physical crafting did not produce {crafted_obj}.",
@@ -1309,7 +1342,10 @@ class Controller:
                         #print(f"mine----inventory_name_list is {inventory_name_list}")
                         #print(f"mine----inventory_num_list is {inventory_num_list}")
 
-                        self.memory.update_inventory(count_inventory(inventory_name_list, inventory_num_list))
+                        update_memory_inventory_from_observation(
+                            self.memory,
+                            count_inventory(inventory_name_list, inventory_num_list),
+                        )
                         new_quantity = self.memory.inventory.get(inventory_obj, 0)
                         if new_quantity <= old_quantity and new_quantity < action_required_quantity:
                             if attempt_idx < execution_attempts - 1:
@@ -1386,6 +1422,30 @@ class Controller:
                         check_result = self.check_action_preparation(env,"equip",args,task_information,events)
                         if not check_result["success"]:
                             return finish_failure(step, step_index, action_index, action, check_result, underground)
+                        # ``equip`` is a planner-declared physical action, not
+                        # merely an inventory precondition.  Mining happened
+                        # to select its tool internally, but a following
+                        # dig/craft action could otherwise leave the client
+                        # visibly holding the previous block or tool.
+                        requested_item = normalize_inventory_name(args.get("obj"))
+                        inventory_names = events["inventory"]["name"].tolist()
+                        slot_index = next(
+                            (
+                                index
+                                for index, item_name in enumerate(inventory_names)
+                                if normalize_inventory_name(item_name) == requested_item
+                            ),
+                            None,
+                        )
+                        if slot_index is None:
+                            check_result = {
+                                "feedback": f"Declared equip item is absent from the observed inventory: {requested_item}.",
+                                "success": False,
+                                "suggestion": "Re-plan from the current observed inventory.",
+                            }
+                            return finish_failure(step, step_index, action_index, action, check_result, underground)
+                        events,_,_,_ = env.step([0,0,0,12,12,5,0,slot_index])
+                        share_memory(self.memory,events)
                         emit_action_finished(step, step_index, action_index, action, "success", check_result)
 
 
@@ -1788,7 +1848,38 @@ class Controller:
             )
             repetitions = int(step.get("times", 1))
             gathered_log_target = 0
+            declared_mine_targets = {
+                normalize_inventory_name(
+                    update_inventory_obj_name(
+                        dict(candidate.get("args", {})).get("obj")
+                    )
+                )
+                for candidate in step.get("actions", [])
+                if candidate.get("name") == "mine"
+            }
+            # Mine batches are only quantity-governed when they have one
+            # unambiguous declared target.  Mixed-target action groups retain
+            # their literal workflow repetition semantics.
+            step_mine_target = (
+                next(iter(declared_mine_targets))
+                if len(declared_mine_targets) == 1
+                else ""
+            )
+            step_mine_initial_quantity = self._inventory_count(step_mine_target)
             for repetition in range(repetitions):
+                if (
+                    step_mine_target
+                    and self._mine_step_goal_reached(
+                        step_mine_target,
+                        step_mine_initial_quantity,
+                        repetitions,
+                    )
+                ):
+                    print(
+                        f"mine step target already satisfied for {step_mine_target}; "
+                        f"skipping {repetitions - repetition} remaining repetitions"
+                    )
+                    break
                 for action_index, action in enumerate(step.get("actions", [])):
                     name = str(action.get("name", ""))
                     args = dict(action.get("args", {}))
@@ -1877,7 +1968,9 @@ class Controller:
                                 continue
                             names, quantities = mine(env=env, memory=self.memory, target=args.get("obj"), equipment=args.get("tool") or "", underground=underground)
                             observed_inventory = count_inventory(names, quantities)
-                            self.memory.update_inventory(observed_inventory)
+                            update_memory_inventory_from_observation(
+                                self.memory, observed_inventory
+                            )
                             # A declared voxel target is not necessarily the item
                             # it drops (for example, grass yields wheat seeds).
                             # Validate an actual observed inventory increment,
@@ -1910,9 +2003,20 @@ class Controller:
                                     gathered_log_target = required_logs
                         elif name == "craft":
                             output = normalize_inventory_name(next(iter(args["obj"])))
-                            names, quantities = action_craft(env, next(iter(args["obj"])).replace(" ", "_"), self.memory, args.get("platform") == "crafting table", args.get("platform") == "furnace", craft_num=int(next(iter(args["obj"].values()))))
-                            self.memory.update_inventory(count_inventory(names, quantities))
-                            if float(self.memory.inventory.get(output, 0)) <= float(before.get(output, 0)):
+                            craft_name = next(iter(args["obj"])).replace(" ", "_")
+                            craft_succeeded = self._execute_craft_with_retries(
+                                env,
+                                args,
+                                craft_name,
+                                int(next(iter(args["obj"].values()))),
+                            )
+                            craft_failure = self._consume_execution_failure()
+                            if craft_failure is not None:
+                                raise RuntimeError(
+                                    f"{craft_failure['reason']}: "
+                                    f"{craft_failure['feedback']}"
+                                )
+                            if not craft_succeeded:
                                 raise RuntimeError("declared_craft_no_observed_yield")
                         elif name == "dig_down":
                             if not go_down_to_y_level(env, int(args["y_level"]), equipment=args.get("tool") or ""):
@@ -1923,7 +2027,34 @@ class Controller:
                                 raise RuntimeError("missing_declared_y_level")
                             go_up(env, int(args["y_level"]), equipment=args.get("tool") or "")
                             underground = False
-                        elif name in {"equip", "fight", "apply"}:
+                        elif name == "equip":
+                            # Make the LLM-declared equip step physical.  The
+                            # legacy implementation only checked inventory,
+                            # leaving the client visibly holding a previous
+                            # block until mine() happened to re-equip a tool.
+                            events = self._sync_memory(env)
+                            requested_item = normalize_inventory_name(args.get("obj"))
+                            slot_index = next(
+                                (
+                                    index
+                                    for index, item_name in enumerate(
+                                        events["inventory"]["name"].tolist()
+                                    )
+                                    if normalize_inventory_name(item_name)
+                                    == requested_item
+                                ),
+                                None,
+                            )
+                            if slot_index is None:
+                                raise RuntimeError(
+                                    "declared_equip_item_absent_after_sync: "
+                                    f"{requested_item}"
+                                )
+                            events, _, _, _ = env.step(
+                                [0, 0, 0, 12, 12, 5, 0, slot_index]
+                            )
+                            share_memory(self.memory, events)
+                        elif name in {"fight", "apply"}:
                             pass
                         else:
                             raise RuntimeError("unsupported_declared_action")
@@ -1936,5 +2067,55 @@ class Controller:
                             emit_execution_event(self, "step_finished", plan_id=str(later.get("_dc3pa_plan_id", plan_id)), plan_version=int(later.get("_dc3pa_plan_version", 0)), step_id=str(later.get("_dc3pa_step_id", f"step-{later_index}")), step_index=int(later.get("_dc3pa_step_index", later_index)), status="censored", result={"reason": "prior_step_failed"})
                         return result, underground
                     emit_execution_event(self, "action_finished", **metadata, action_index=action_index, status="success", action=compact_action_payload(action), result={}, inventory=snapshot_inventory(self.memory))
+
+                    # A low-level action (not only the declared terminal
+                    # ``mine`` action) can change the physical inventory.  For
+                    # example, movement may collect a nearby drop.  Check the
+                    # task condition immediately after every successfully
+                    # observed action so a plan with repeated search/mine steps
+                    # does not keep consuming blocks after its goal is met.
+                    # ``check_done`` reads the same fresh MineDojo inventory
+                    # snapshot that was used for the action telemetry; this is
+                    # a generic task-goal check, not a diamond-specific rule.
+                    # Formal task records include the required quantity.
+                    # Some archived/free-form callers do not, so leave their
+                    # historical end-of-workflow behavior unchanged.
+                    if (
+                        task_information.get("quantity") is not None
+                        and self.check_done(task_information, self.memory)
+                    ):
+                        after = dict(getattr(self.memory, "inventory", {}) or {})
+                        result = self._g0_result(
+                            success=True,
+                            action_type=name,
+                            reason_code="task_goal_satisfied_after_action",
+                            missing=[],
+                            before=before,
+                            after=after,
+                            plan_id=plan_id,
+                            action_id=action_id,
+                            feedback="Task goal satisfied by the observed inventory.",
+                        )
+                        emit_execution_event(
+                            self,
+                            "step_finished",
+                            **metadata,
+                            status="short_circuited_goal_satisfied",
+                            result=result,
+                        )
+                        for later_index, later in enumerate(
+                            workflow[step_index + 1 :], start=step_index + 1
+                        ):
+                            emit_execution_event(
+                                self,
+                                "step_finished",
+                                plan_id=str(later.get("_dc3pa_plan_id", plan_id)),
+                                plan_version=int(later.get("_dc3pa_plan_version", 0)),
+                                step_id=str(later.get("_dc3pa_step_id", f"step-{later_index}")),
+                                step_index=int(later.get("_dc3pa_step_index", later_index)),
+                                status="censored",
+                                result={"reason": "task_goal_satisfied"},
+                            )
+                        return result, underground
             emit_execution_event(self, "step_finished", **metadata, status="success", result={})
         return {"success": True, "feedback": "", "suggestion": "", "plan_id": plan_id}, underground

@@ -1,0 +1,13 @@
+{
+  "difficulty": "complex",
+  "episode_id": "complex-41-obtain_diamond--seed-11006",
+  "inference_basis": "G1 recovery execution after crafting-table pickup clearance and dig_up contract-prompt alignment; retained as an additional seed",
+  "policy_tag": "g1_recovery_execution",
+  "run_id": "g1-smoke-v1",
+  "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/obtain_diamond.json",
+  "stable_rank": "6ae616dab991dab35451f24c1451415fd0cb95c5713747e77aba5006cda30739",
+  "task_id": "complex-41-obtain_diamond",
+  "task_text": "obtain diamond",
+  "task_text_hash": "097701c49b08d11c8b602ed1f1908fd2289a8567e62da5ecc19e9db5463b22e4",
+  "terminal_type": "mine"
+}

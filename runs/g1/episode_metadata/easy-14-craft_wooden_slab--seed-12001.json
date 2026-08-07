@@ -1,0 +1,13 @@
+{
+  "difficulty": "easy",
+  "episode_id": "easy-14-craft_wooden_slab--seed-12001",
+  "inference_basis": "G1 easy-priority recovery execution; retained separately from frozen core entries",
+  "policy_tag": "g1_recovery_execution",
+  "run_id": "g1-smoke-v1",
+  "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_wooden_slab.json",
+  "stable_rank": "02ba3d873ceba6ce5d0f4d0ccfc499ec7282ef61ff27dafd9280ac2ab655c4bf",
+  "task_id": "easy-14-craft_wooden_slab",
+  "task_text": "craft wooden slab",
+  "task_text_hash": "a0c9114827c285afece38ad6988509eb6099df2d791ec547b0561d617bcef43a",
+  "terminal_type": "craft"
+}

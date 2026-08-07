@@ -1,0 +1,45 @@
+{
+  "all_tests_pass_twice": true,
+  "availability_mask_rule_frozen": true,
+  "base_commit": "93b081a",
+  "core_slot_semantics": "author-approved substitutions; actual seeds preserved in run_matrix",
+  "core_smoke_episodes": 12,
+  "diagnostic_extension_episodes": 0,
+  "eligible_steps": 638,
+  "episodes_per_day": 110.20805104013716,
+  "failure_mode_accuracy": 1.0,
+  "failure_mode_coverage": 0.08620689655172414,
+  "final_commit": "80a2084251c1c8c3a527ae7e8d0e0dd777ef3563",
+  "formal_task_count": 50,
+  "g0_invariants_pass": true,
+  "generated_at": "2026-08-07T06:27:39.411778+00:00",
+  "llm_logical_calls": 105,
+  "logger_behavior_equivalence": true,
+  "pE_status_counts": {
+    "source_not_connected": 674
+  },
+  "pK_status_counts": {
+    "source_not_connected": 674
+  },
+  "pL_status_counts": {
+    "source_not_connected": 674
+  },
+  "protected_log_callback_unchanged": true,
+  "relay_request_attempts": 115,
+  "remaining_risks": [
+    "The repository contains pre-existing and generated uncommitted changes; no unrelated change was overwritten or committed."
+  ],
+  "status": "PASS",
+  "task_catalog_hash": "27f2dcaed41d02bdbc56a8d0b6fd4d7945cde896d412a67f1db862f8eeccda05",
+  "task_type_counts": {
+    "craft": 37,
+    "harvest": 0,
+    "mine": 11,
+    "smelt": 2
+  },
+  "token_count_source": "unavailable",
+  "trace_audit_rows": 30,
+  "use_availability_masks": "pending_g3",
+  "working_tree_clean": false,
+  "y_exec_trace_accuracy": 1.0
+}

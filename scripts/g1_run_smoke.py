@@ -116,7 +116,15 @@ def main() -> int:
         default=120.0,
         help="G1-only per-request timeout in seconds.",
     )
+    parser.add_argument(
+        "--hard-max-env-steps",
+        type=int,
+        default=15000,
+        help="Whole-episode step limit applied only to hard-difficulty tasks.",
+    )
     args = parser.parse_args()
+    if args.hard_max_env_steps <= 0:
+        parser.error("--hard-max-env-steps must be positive")
     root, run_root = args.repo.resolve(), args.run_root.resolve()
     selection = json.loads(args.selection.read_text(encoding="utf-8"))["selected"]
     seeds = json.loads(args.seeds.read_text(encoding="utf-8"))["core_seeds"]
@@ -151,6 +159,8 @@ def main() -> int:
                        "--g1-llm-max-tokens", str(args.llm_max_tokens),
                        "--g1-llm-request-timeout", str(args.llm_request_timeout),
                        "--g1-compact-json"]
+            if task.get("difficulty") == "hard":
+                command.extend(["--max-env-steps", str(args.hard_max_env_steps)])
             returncode, stdout, stderr = _run_episode_in_cleanup_group(
                 command, cwd=root / "MP5_agent"
             )

@@ -452,7 +452,7 @@
     }
   ],
   "catalog_sha256": "27f2dcaed41d02bdbc56a8d0b6fd4d7945cde896d412a67f1db862f8eeccda05",
-  "rule": "per terminal type, maximize difficulty coverage; SHA256(G1_SMOKE_V1|task_id) breaks ties; author-directed basic replacement mine wheat seeds -> mine dirt before execution",
+  "rule": "per terminal type, maximize difficulty coverage; SHA256(G1_SMOKE_V1|task_id) breaks ties; author-directed basic replacement mine wheat seeds -> mine dirt and complex mine redstone -> obtain diamond before execution",
   "schema_version": "g1.v1",
   "selected": [
     {
@@ -466,11 +466,11 @@
     },
     {
       "difficulty": "complex",
-      "inference_basis": "formal_spec.operation",
-      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/mine_redstone.json",
-      "stable_rank": "2dee140af11fb7649db568ae4966bcadc2ebed533f308efaffcf6619d162320d",
-      "task_id": "complex-42-mine_redstone",
-      "task_text": "mine redstone",
+      "inference_basis": "formal_spec.operation; user-directed G1 substitution for mine redstone",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/obtain_diamond.json",
+      "stable_rank": "6ae616dab991dab35451f24c1451415fd0cb95c5713747e77aba5006cda30739",
+      "task_id": "complex-41-obtain_diamond",
+      "task_text": "obtain diamond",
       "terminal_type": "mine"
     },
     {
@@ -502,12 +502,12 @@
     },
     {
       "difficulty": "hard",
-      "inference_basis": "formal_spec.operation",
-      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/smelt_glass.json",
-      "stable_rank": "58a34c780d0fb194d0c9187ac01c932c3d7be77705a489ec967ee46e0606cace",
-      "task_id": "hard-31-smelt_glass",
-      "task_text": "smelt glass",
-      "terminal_type": "smelt"
+      "inference_basis": "formal_spec.operation; user-directed G1 substitution for smelt glass",
+      "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/craft_iron_pickaxe.json",
+      "stable_rank": "8b53bbc9c3eafeb664d670d9155d04dc3d0475bbf1543a54c37c63eef5e7bfc1",
+      "task_id": "hard-35-craft_iron_pickaxe",
+      "task_text": "craft iron pickaxe",
+      "terminal_type": "craft"
     }
   ]
 }

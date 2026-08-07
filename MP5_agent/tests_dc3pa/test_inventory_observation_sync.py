@@ -11,7 +11,10 @@ AGENT_DIR = ROOT / "agent"
 if str(AGENT_DIR) not in sys.path:
     sys.path.insert(0, str(AGENT_DIR))
 
-from utils.common_utils import share_memory  # noqa: E402
+from utils.common_utils import (  # noqa: E402
+    share_memory,
+    update_memory_inventory_from_observation,
+)
 
 
 class _Memory:
@@ -58,3 +61,14 @@ def test_nonempty_observation_resets_empty_frame_confirmation():
     share_memory(memory, empty_events)
 
     assert memory.inventory == {"cobblestone": 18.0}
+
+
+def test_direct_inventory_observation_uses_the_same_empty_frame_guard():
+    """Action helpers returning inventory arrays must not bypass share_memory."""
+    memory = _Memory({"stone pickaxe": 1.0, "cobblestone": 24.0})
+
+    assert not update_memory_inventory_from_observation(memory, {})
+    assert memory.inventory == {"stone pickaxe": 1.0, "cobblestone": 24.0}
+
+    assert update_memory_inventory_from_observation(memory, {})
+    assert memory.inventory == {}

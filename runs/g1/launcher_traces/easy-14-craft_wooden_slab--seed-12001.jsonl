@@ -1,0 +1,7 @@
+{"event_type": "planning_started", "payload": {"attempt": 1, "inventory": {}, "mode": "reasoning_only", "task": "wooden slab", "underground": false}, "timestamp": "2026-08-06T14:12:58.869649+00:00"}
+{"event_type": "llm_call_started", "payload": {"actual_method": "__call__", "method": "__call__", "purpose": "planning"}, "timestamp": "2026-08-06T14:12:58.870400+00:00"}
+{"event_type": "llm_call_completed", "payload": {"actual_method": "__call__", "method": "__call__", "purpose": "planning"}, "timestamp": "2026-08-06T14:13:19.214479+00:00"}
+{"event_type": "plan_ready_for_controller", "payload": {"attempt": 1, "fallback_used": false, "plan_id": "e7839cf381c34884966f3816b07e8522", "plan_version": 1, "source": "reasoning_chain", "step_count": 4, "unsafe_unresolved_execution": false}, "timestamp": "2026-08-06T14:13:19.215242+00:00"}
+{"event_type": "controller_completed", "payload": {"attempt": 1, "controller_success": true, "feedback": "Task goal satisfied by the observed inventory.", "goal_success": true, "plan_id": "e7839cf381c34884966f3816b07e8522", "suggestion": "Re-plan explicitly from the observed environment state.", "underground": false}, "timestamp": "2026-08-06T14:13:58.251920+00:00"}
+{"event_type": "memory_recording_skipped", "payload": {"attempt": 1, "memory_mode": "disabled", "task": "wooden slab"}, "timestamp": "2026-08-06T14:13:58.374164+00:00"}
+{"event_type": "task_succeeded", "payload": {"acquisition_recorded": false, "attempt": 1, "memory_recorded": false, "task": "wooden slab"}, "timestamp": "2026-08-06T14:13:58.374356+00:00"}

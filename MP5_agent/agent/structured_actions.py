@@ -331,7 +331,54 @@ def nearby_voxel_present(events, block_name):
     blocks = events.get("voxels", {}).get("block_name")
     if blocks is None:
         return False
-    return bool(np.any(np.asarray(blocks) == block_name))
+    normalized_blocks = np.char.replace(np.asarray(blocks).astype(str), "_", " ")
+    normalized_target = str(block_name).replace("_", " ")
+    return bool(np.any(normalized_blocks == normalized_target))
+
+
+def placement_support_voxels(events, max_distance=4.5):
+    """List visible solid blocks with a reachable empty placement face.
+
+    A crafting table or furnace can be placed on a top face *or* against a
+    horizontal face in a two-block-high tunnel.  Requiring only air above the
+    support incorrectly rejects the latter, even though Minecraft accepts the
+    side placement.  The server remains authoritative: callers still issue a
+    bounded placement sweep and verify the observed inventory/world result.
+    """
+    blocks = events.get("voxels", {}).get("block_name")
+    if blocks is None:
+        return []
+    normalized = np.char.replace(np.asarray(blocks).astype(str), "_", " ")
+    shape = normalized.shape
+    candidates = []
+    for x_index, y_index, z_index in np.argwhere(
+        (normalized != "air") & (normalized != "water")
+    ):
+        exposed_faces = []
+        for x_delta, y_delta, z_delta in (
+            (0, 1, 0), (1, 0, 0), (-1, 0, 0),
+            (0, 0, 1), (0, 0, -1),
+        ):
+            neighbor = (x_index + x_delta, y_index + y_delta, z_index + z_delta)
+            if any(index < 0 or index >= shape[axis] for axis, index in enumerate(neighbor)):
+                continue
+            if normalized[neighbor] == "air":
+                exposed_faces.append((x_delta, y_delta, z_delta))
+        if not exposed_faces:
+            continue
+        distance = math.sqrt(
+            (int(x_index) - vradius) ** 2
+            + (int(y_index) - vradius) ** 2
+            + (int(z_index) - vradius) ** 2
+        )
+        if 0.5 <= distance <= max_distance:
+            # Prefer a top face when it exists, then other exposed faces.  A
+            # deterministic order lets the bounded caller cover alternatives.
+            top_face_available = (0, 1, 0) in exposed_faces
+            candidates.append(
+                (not top_face_available, distance, int(x_index), int(y_index), int(z_index))
+            )
+    return [candidate[2:] for candidate in sorted(candidates)]
 
 
 def camera_action_toward_voxel(events, x_index, y_index, z_index):
@@ -2409,10 +2456,9 @@ def explore_above_ground(env,args,object,underground,performer,memory,task_infor
 
             # Do not repeatedly clear the same forward wall.  A failed bounded
             # mine_ahead means this heading did not open a passage, so probe the
-            # remaining cardinal headings and require observed displacement
-            # before treating the move as progress.  If all four fail, return
-            # control to the controller so the episode pauses instead of
-            # silently consuming a pickaxe in one direction.
+            # cardinal headings and require observed displacement before treating
+            # the move as progress.  This only broadens geometric recovery; the
+            # planner still chooses the resource and equipment.
             moved = False
             for heading_offset in range(4):
                 # Keep tunnelling along the last direction that produced a
@@ -2836,13 +2882,32 @@ def action_craft(
     events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events) #get event
     recipy = MC.ALL_CRAFT_SMELT_ITEMS
     item_recipy_index = recipy.index(item)
+    # Both surface and underground table placement share the verified
+    # placement routine.  Derive this guard from the live inventory before
+    # branching so an underground wooden-pickaxe holder is never treated as
+    # a no-tool surface bootstrap case.
+    has_pickaxe = any(
+        str(name).replace('_', ' ') in {
+            'wooden pickaxe', 'stone pickaxe', 'iron pickaxe',
+            'golden pickaxe', 'diamond pickaxe',
+        }
+        and float(quantity) > 0
+        for name, quantity in zip(
+            events['inventory']['name'].tolist(),
+            events['inventory']['quantity'].tolist(),
+        )
+    )
 
     if (not use_crafting_table):
         if use_furnace:
-            if (events['location_stats']['pos'][1]<=56):
+            # Use one support-face placement protocol at every height.  The
+            # legacy surface branch below is retained for compatibility but
+            # deliberately bypassed: its fixed-front geometry is not a
+            # Minecraft placement requirement.
+            if True:
                 events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
                 share_memory(memory,events)
-                print("underground furnace use: skip tunnel clearing and try bounded placement")
+                print("furnace use: skip fixed-front tunnel preparation and try support-face placement")
             else:
                 move_to_middle(env)
                 events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
@@ -2898,16 +2963,49 @@ def action_craft(
             furnace_count_before = inventory_item_count(events, 'furnace')
             furnace_placed = False
             for placement_attempt in range(8):
+                supports = placement_support_voxels(events)
+                if supports:
+                    x_index, y_index, z_index = supports[placement_attempt % len(supports)]
+                    placement_aim = camera_action_toward_voxel(
+                        events, x_index, y_index, z_index
+                    )
+                    if placement_aim is not None:
+                        events,_,_,_ = env.step(placement_aim); save_rgb_for_video(events)
+                        events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
+                    print(
+                        "furnace placement support "
+                        f"{placement_attempt + 1}/8 at ({x_index}, {y_index}, {z_index})"
+                    )
+                else:
+                    events,_,_,_ = env.step([0,0,0,12,15,0,0,0]); save_rgb_for_video(events)
                 events,_,_,_ = env.step([0,0,0,12,12,6,0,0]); save_rgb_for_video(events)
                 events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-                if inventory_item_count(events, 'furnace') < furnace_count_before:
+                if (
+                    inventory_item_count(events, 'furnace') < furnace_count_before
+                    or nearby_tool_available(events, 'furnace')
+                    or nearby_voxel_present(events, 'furnace')
+                ):
                     furnace_placed = True
                     break
-                if placement_attempt < 7:
-                    events,_,_,_ = env.step([0,0,0,12,15,0,0,0]); save_rgb_for_video(events)
 
             if not furnace_placed:
                 print("furnace placement failed after 8 headings; returning without smelting")
+                memory._dc3pa_execution_failure = {
+                    "reason": "furnace_placement_failed",
+                    "resource_goal": getattr(memory, "_dc3pa_active_resource_goal", None),
+                    "observed_underground": events['location_stats']['pos'][1] <= 56,
+                    "feedback": (
+                        "The furnace remained in inventory after eight bounded "
+                        "placement headings; no reachable support face was observed "
+                        "at the current position."
+                    ),
+                    "success": False,
+                    "suggestion": (
+                        "Re-plan from the current observed location. Establish a "
+                        "reachable horizontal placement face or move to another "
+                        "location before attempting furnace smelting again."
+                    ),
+                }
                 return (
                     events['inventory']['name'].tolist(),
                     events['inventory']['quantity'].tolist(),
@@ -2926,7 +3024,10 @@ def action_craft(
                 """
                 blocks = current_events.get('voxels', {}).get('block_name')
                 if blocks is not None:
-                    candidates = np.argwhere(np.asarray(blocks) == 'furnace')
+                    normalized_blocks = np.char.replace(
+                        np.asarray(blocks).astype(str), '_', ' '
+                    )
+                    candidates = np.argwhere(normalized_blocks == 'furnace')
                     if len(candidates):
                         nearest = min(
                             candidates,
@@ -2970,6 +3071,21 @@ def action_craft(
                     f"furnace interaction did not produce {crafted_item_name} "
                     "after 3 attempts; leave the furnace placed for re-planning"
                 )
+                memory._dc3pa_execution_failure = {
+                    "reason": "furnace_craft_nearby_no_observed_yield",
+                    "resource_goal": getattr(memory, "_dc3pa_active_resource_goal", None),
+                    "observed_underground": events['location_stats']['pos'][1] <= 56,
+                    "feedback": (
+                        f"A furnace was physically placed, but craftNearby did not "
+                        f"produce {crafted_item_name} after three attempts."
+                    ),
+                    "success": False,
+                    "suggestion": (
+                        "Re-plan from the observed inventory and placed furnace; "
+                        "verify the declared recipe materials and choose the next "
+                        "location or action through the planner."
+                    ),
+                }
                 return (
                     events['inventory']['name'].tolist(),
                     events['inventory']['quantity'].tolist(),
@@ -3029,72 +3145,12 @@ def action_craft(
             print("aciton_crafting---4")
             move_to_middle(env)
             events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-
-            print(events['voxels']['block_name'][vradius+1][vradius-1][vradius])
-            print(events['voxels']['block_name'][vradius+1][vradius][vradius])
-            ready_for_table = (
-                events['voxels']['block_name'][vradius+1][vradius][vradius] != "water"
-                and events['voxels']['block_name'][vradius+1][vradius-1][vradius] not in ("air", "water")
-                and events['voxels']['block_name'][vradius+1][vradius][vradius] == "air"
-                and events['voxels']['block_name'][vradius+1][vradius+1][vradius] == "air"
-            )
-            inventory_names = {
-                str(name).replace('_', ' ')
-                for name, quantity in zip(
-                    events['inventory']['name'].tolist(),
-                    events['inventory']['quantity'].tolist(),
-                )
-                if float(quantity) > 0
-            }
-            has_pickaxe = any(
-                name in inventory_names
-                for name in (
-                    'wooden pickaxe',
-                    'stone pickaxe',
-                    'iron pickaxe',
-                    'golden pickaxe',
-                    'diamond pickaxe',
-                )
-            )
-            if not ready_for_table and has_pickaxe:
-                # Keep table-placement preparation bounded; getting stuck here blocks all later tool upgrades.
-                for prep_try in range(3):
-                    print(f"crafting-table prep try {prep_try + 1}/3")
-                    cleared = mine_ahead(env, memory, max_hits=6)
-                    if not cleared:
-                        print("crafting-table prep clearance failed; continuing to bounded placement recovery")
-                    move_to_middle(env)
-                    events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-                    ready_for_table = (
-                        events['voxels']['block_name'][vradius+1][vradius][vradius] != "water"
-                        and events['voxels']['block_name'][vradius+1][vradius-1][vradius] not in ("air", "water")
-                        and events['voxels']['block_name'][vradius+1][vradius][vradius] == "air"
-                        and events['voxels']['block_name'][vradius+1][vradius+1][vradius] == "air"
-                    )
-                    if ready_for_table:
-                        break
-                    move_one_block(env,memory,3,0,0)
-                    events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
-            elif not ready_for_table:
-                # The first wooden pickaxe is exactly what this recipe is
-                # trying to create.  Repeatedly punching stone here cannot
-                # prepare a table site and previously consumed all bootstrap
-                # retries.  The physical placement loop below already checks
-                # eight headings and verifies success by inventory decrease,
-                # so let it search for an exposed floor/face directly.
-                print(
-                    "crafting-table front site is blocked and no pickaxe is "
-                    "available; trying bounded 8-heading placement"
-                )
-            print(f"action_craft: front floor{events['voxels']['block_name'][vradius+1][vradius-1][vradius]}\n block in front of body is {events['voxels']['block_name'][vradius+1][vradius][vradius]} \n and block in front of head is {events['voxels']['block_name'][vradius+1][vradius+1][vradius]}\n begin crafting {item}")
-            print(f"7777777777")
-            if ready_for_table and has_pickaxe:
-                mine_ahead(env,memory)
-            elif not ready_for_table:
-                print(
-                    "crafting-table front site remains blocked; deferring to "
-                    "verified 8-heading placement"
-                )
+            # Do not impose a fixed "front floor" geometry or mine a site
+            # before placement.  Minecraft itself is the authority on whether
+            # a clicked block face can accept the table; the placement sweep
+            # below selects visible exposed support blocks and verifies the
+            # result from observation.
+            print("crafting-table placement will use observed exposed support faces")
             move_to_middle(env)
         events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
         #events = sleep(env)
@@ -3136,6 +3192,10 @@ def action_craft(
                 if str(name).replace('_', ' ') == target
             )
 
+        def table_placement_supports(current_events):
+            """Use the same physical support predicate as furnace placement."""
+            return placement_support_voxels(current_events)
+
         # A crafting recipe that requires a table is only valid after a real
         # table has been placed.  The legacy implementation equipped the table
         # and immediately sent "use", which merely interacted with empty space
@@ -3144,7 +3204,37 @@ def action_craft(
         table_count_before = inventory_item_count(events, 'crafting table')
         table_placed = reusing_placed_table
         if not reusing_placed_table:
+            if events['location_stats']['pos'][1] <= 56:
+                # Digging commonly leaves the camera pitched at the shaft
+                # floor.  A table "use" then targets air or the floor rather
+                # than a side face.  Re-aim at the observed front body voxel
+                # before the bounded placement sweep; this is geometric
+                # recovery, not a resource- or tool-specific plan.
+                placement_aim = camera_action_toward_voxel(
+                    events, vradius + 1, vradius, vradius
+                )
+                if placement_aim is not None:
+                    events,_,_,_ = env.step(placement_aim); save_rgb_for_video(events)
+                    events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
             for placement_attempt in range(8):
+                supports = table_placement_supports(events)
+                if supports:
+                    x_index, y_index, z_index = supports[placement_attempt % len(supports)]
+                    placement_aim = camera_action_toward_voxel(
+                        events, x_index, y_index, z_index
+                    )
+                    if placement_aim is not None:
+                        events,_,_,_ = env.step(placement_aim); save_rgb_for_video(events)
+                        events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
+                    print(
+                        "crafting-table placement support "
+                        f"{placement_attempt + 1}/8 at ({x_index}, {y_index}, {z_index})"
+                    )
+                else:
+                    # No support is visible in the voxel window.  Retain a
+                    # bounded heading sweep as a last physical attempt, but
+                    # do not move or dig solely to satisfy an artificial gate.
+                    events,_,_,_ = env.step([0,0,0,12,15,0,0,0]); save_rgb_for_video(events)
                 events,_,_,_ = env.step([0,0,0,12,12,6,0,0]); save_rgb_for_video(events)
                 events,_,_,_ = env.step([0,0,0,12,12,0,0,0]); save_rgb_for_video(events)
                 if (
@@ -3154,11 +3244,25 @@ def action_craft(
                 ):
                     table_placed = True
                     break
-                if placement_attempt < 7:
-                    events,_,_,_ = env.step([0,0,0,12,15,0,0,0]); save_rgb_for_video(events)
 
         if not table_placed:
             print("crafting-table placement failed after 8 headings; returning without crafting")
+            memory._dc3pa_execution_failure = {
+                "reason": "crafting_table_placement_failed",
+                "resource_goal": getattr(memory, "_dc3pa_active_resource_goal", None),
+                "observed_underground": events['location_stats']['pos'][1] <= 56,
+                "feedback": (
+                    "The crafting table remained in inventory after eight bounded "
+                    "placement headings; no reachable support face was observed at "
+                    "the current position."
+                ),
+                "success": False,
+                "suggestion": (
+                    "Re-plan from the current observed location. Establish a "
+                    "reachable horizontal placement face or move to another "
+                    "location before attempting the table recipe again."
+                ),
+            }
             return (
                 events['inventory']['name'].tolist(),
                 events['inventory']['quantity'].tolist(),
@@ -3173,7 +3277,10 @@ def action_craft(
             """
             blocks = current_events.get('voxels', {}).get('block_name')
             if blocks is not None:
-                candidates = np.argwhere(np.asarray(blocks) == 'crafting table')
+                normalized_blocks = np.char.replace(
+                    np.asarray(blocks).astype(str), '_', ' '
+                )
+                candidates = np.argwhere(normalized_blocks == 'crafting table')
                 if len(candidates):
                     nearest = min(
                         candidates,
@@ -3232,6 +3339,21 @@ def action_craft(
                     "for the immediately following table craft"
                 )
             else:
+                memory._dc3pa_execution_failure = {
+                    "reason": "craft_nearby_no_observed_yield",
+                    "resource_goal": getattr(memory, "_dc3pa_active_resource_goal", None),
+                    "observed_underground": events['location_stats']['pos'][1] <= 56,
+                    "feedback": (
+                        f"A crafting table was physically placed, but craftNearby "
+                        f"did not produce {crafted_item_name} after three attempts."
+                    ),
+                    "success": False,
+                    "suggestion": (
+                        "Re-plan from the observed inventory and placed table; "
+                        "verify the declared recipe materials and choose the next "
+                        "location or action through the planner."
+                    ),
+                }
                 print(
                     f"leaving crafting table placed after failed {crafted_item_name} "
                     "craft for controller recovery"
@@ -3240,24 +3362,212 @@ def action_craft(
                 events['inventory']['name'].tolist(),
                 events['inventory']['quantity'].tolist(),
             )
-        '''
-        cb_inventory_index = events['inventory']['name'].tolist().index('dirt')  #################for debug, could be changed
-        events,_,_,_ = env.step([0,0,0,12,12,5,0,cb_inventory_index]); save_rgb_for_video(events) #equip stone pickaxe
-        '''
-        for i in range(5):# may have to adjust
-            events,_,_,_ = env.step([0,0,0,12,12,3,0,0]); save_rgb_for_video(events) #attack 5 times to get crafting table
-        events,_,_,_ = env.step([0,0,0,8,12,0,0,0]); save_rgb_for_video(events)
-        events = sleep(env)
-        
-        share_memory(memory,events)
-        print(f"{memory.inventory}")
-        print('crafting table' in memory.inventory)
+        def nearest_crafting_table_voxel(current_events):
+            blocks = current_events.get('voxels', {}).get('block_name')
+            if blocks is None:
+                return None
+            normalized_blocks = np.char.replace(
+                np.asarray(blocks).astype(str), '_', ' '
+            )
+            candidates = np.argwhere(normalized_blocks == 'crafting table')
+            if not len(candidates):
+                return None
+            return min(
+                candidates,
+                key=lambda index: sum(abs(int(index[axis]) - vradius) for axis in range(3)),
+            )
 
-        if 'crafting table' not in memory.inventory:
-            for i in range(10):
-                events,_,_,_ = env.step([1,0,0,12,12,0,0,0]); save_rgb_for_video(events) #get crafting table
-            for i in range(10):
-                events,_,_,_ = env.step([2,0,0,12,12,0,0,0]); save_rgb_for_video(events) #go back
+        def crafting_table_is_on_crosshair(current_events):
+            rays = current_events.get('rays', {})
+            names = np.char.replace(
+                np.asarray(rays.get('block_name', [])).astype(str), '_', ' '
+            )
+            distances = np.asarray(rays.get('block_distance', []), dtype=float)
+            pitches = np.asarray(rays.get('ray_pitch', []), dtype=float)
+            yaws = np.asarray(rays.get('ray_yaw', []), dtype=float)
+            if not (len(names) and len(names) == len(distances) == len(pitches) == len(yaws)):
+                return False
+            return bool(np.any(
+                (names == 'crafting table')
+                & np.isclose(pitches, 0.0, atol=1e-6)
+                & np.isclose(yaws, 0.0, atol=1e-6)
+                & (distances >= 0.0)
+                & (distances <= 4.5)
+            ))
+
+        def collect_drop_in_direction(
+            current_events, direction, count_before_recovery, allow_clearance=False
+        ):
+            """Walk one short out-and-back segment while facing a world heading.
+
+            ``allow_clearance`` is only enabled for the heading inferred from
+            the observed crafting-table drop.  It may clear a blocking front
+            voxel to reach that known drop, but never mines while probing
+            arbitrary directions.
+            """
+            turn_action, restore_action, _, _ = world_heading_turn_and_restore(
+                current_events, direction
+            )
+            current_events,_,_,_ = env.step(turn_action)
+            save_rgb_for_video(current_events)
+            blocked_steps = 0
+            for _ in range(6):
+                previous_position = np.asarray(
+                    current_events['location_stats']['pos'], dtype=float
+                )
+                current_events,_,_,_ = env.step([1,0,0,12,12,0,0,0])
+                save_rgb_for_video(current_events)
+                if inventory_item_count(current_events, 'crafting table') > count_before_recovery:
+                    return current_events, True
+                current_position = np.asarray(
+                    current_events['location_stats']['pos'], dtype=float
+                )
+                blocked_steps = blocked_steps + 1 if np.allclose(
+                    previous_position, current_position
+                ) else 0
+                if allow_clearance and blocked_steps >= 2:
+                    print(
+                        "crafting-table pickup path is blocked; clearing the "
+                        "observed drop heading once before retrying"
+                    )
+                    mine_ahead(env, memory, max_hits=6)
+                    blocked_steps = 0
+            for _ in range(6):
+                current_events,_,_,_ = env.step([2,0,0,12,12,0,0,0])
+                save_rgb_for_video(current_events)
+                if inventory_item_count(current_events, 'crafting table') > count_before_recovery:
+                    return current_events, True
+            current_events,_,_,_ = env.step(restore_action)
+            save_rgb_for_video(current_events)
+            return current_events, False
+
+        def collect_placed_crafting_table(current_events):
+            """Break and verify collection of the temporary crafting table.
+
+            The legacy code sent five blind attack packets after craftNearby.
+            craftNearby may adjust the camera, so those attacks can hit air while
+            the table remains behind the player.  A later dig/move then strands
+            the only table.  Collection is therefore an observed physical
+            operation: aim at the voxel, break it, walk once toward its drop,
+            and require the inventory count to increase.
+            """
+            count_before_recovery = inventory_item_count(
+                current_events, 'crafting table'
+            )
+            for recovery_attempt in range(3):
+                table_voxel = nearest_crafting_table_voxel(current_events)
+                # ``nearby_tools`` only means the table is nearby; it does not
+                # prove the attack ray hits it.  Refine the camera a few times
+                # and attack only after the central lidar ray confirms reach.
+                for _ in range(3):
+                    current_events, _ = aim_at_nearby_crafting_table(current_events)
+                    if crafting_table_is_on_crosshair(current_events):
+                        break
+                if crafting_table_is_on_crosshair(current_events):
+                    for _ in range(16):
+                        current_events,_,_,_ = env.step([0,0,0,12,12,3,0,0])
+                        save_rgb_for_video(current_events)
+                        if (
+                            inventory_item_count(current_events, 'crafting table')
+                            > count_before_recovery
+                        ):
+                            return current_events, True
+                        if not nearby_voxel_present(current_events, 'crafting table'):
+                            break
+                elif table_voxel is not None:
+                    print("crafting table is visible but not on the attack crosshair")
+
+                # A broken table drops as an entity at its former horizontal
+                # position.  Sweep the exact heading first, then boundedly
+                # probe all eight headings.  This movement never digs or
+                # creates items and restores the original location after each
+                # missed pickup attempt.
+                if not nearby_voxel_present(current_events, 'crafting table'):
+                    directions = []
+                    if table_voxel is not None:
+                        x_offset = int(table_voxel[0]) - vradius
+                        z_offset = int(table_voxel[2]) - vradius
+                        diagonal_direction = {
+                            (1, -1): 4,
+                            (-1, -1): 5,
+                            (-1, 1): 6,
+                            (1, 1): 7,
+                        }.get((int(np.sign(x_offset)), int(np.sign(z_offset))))
+                        if diagonal_direction is not None:
+                            directions.append(diagonal_direction)
+                        if x_offset > 0:
+                            directions.append(0)
+                        elif x_offset < 0:
+                            directions.append(3)
+                        if z_offset > 0:
+                            directions.append(2)
+                        elif z_offset < 0:
+                            directions.append(1)
+                    directions.extend(
+                        direction for direction in range(8) if direction not in directions
+                    )
+                    for direction_index, direction in enumerate(directions):
+                        current_events, collected = collect_drop_in_direction(
+                            current_events,
+                            direction,
+                            count_before_recovery,
+                            allow_clearance=(
+                                table_voxel is not None and direction_index == 0
+                            ),
+                        )
+                        if collected:
+                            return current_events, True
+                elif table_voxel is not None:
+                    # The table survived the attack pass.  Move once toward
+                    # its observed support block before trying the next aim.
+                    x_offset = int(table_voxel[0]) - vradius
+                    z_offset = int(table_voxel[2]) - vradius
+                    directions = []
+                    if x_offset > 0:
+                        directions.append(0)
+                    elif x_offset < 0:
+                        directions.append(3)
+                    if z_offset > 0:
+                        directions.append(2)
+                    elif z_offset < 0:
+                        directions.append(1)
+                    for direction in directions:
+                        move_one_block(
+                            env, memory, direction, underground=0, jumpornot=0
+                        )
+                        current_events,_,_,_ = env.step([0,0,0,12,12,0,0,0])
+                        save_rgb_for_video(current_events)
+                        if (
+                            inventory_item_count(current_events, 'crafting table')
+                            > count_before_recovery
+                        ):
+                            return current_events, True
+                print(
+                    f"crafting-table recovery attempt {recovery_attempt + 1}/3 "
+                    "did not restore it to inventory"
+                )
+            return current_events, False
+
+        events, table_recovered = collect_placed_crafting_table(events)
+        share_memory(memory, events)
+        if not table_recovered:
+            memory._dc3pa_execution_failure = {
+                "reason": "crafting_table_recovery_failed",
+                "resource_goal": getattr(memory, "_dc3pa_active_resource_goal", None),
+                "observed_underground": events['location_stats']['pos'][1] <= 56,
+                "feedback": (
+                    "The crafting table used for the completed recipe could not "
+                    "be confirmed back in inventory after bounded break-and-pickup "
+                    "recovery."
+                ),
+                "success": False,
+                "suggestion": (
+                    "Re-plan from the observed world state. Locate the placed "
+                    "crafting table or obtain materials for a new one; do not "
+                    "assume a missing table remains in inventory."
+                ),
+            }
+            print("crafting-table recovery failed; returning for planner re-evaluation")
     #print(events['inventory']['name'].tolist())
     name = events['inventory']['name'].tolist()
     num  = events['inventory']['quantity'].tolist()
@@ -3619,6 +3929,15 @@ def explore_above_ground_none(env,memory,object,underground,max_try_steps=10000)
         print("end of exploration")
         return False
     else:
+        # A permanently clear forward tunnel used to keep the old search on
+        # exactly one world heading until the active pickaxe was exhausted.
+        # Resource veins are sparse, so rotate the *preferred* heading through
+        # all eight compass directions after a short bounded sweep.  The
+        # remaining headings are still tried as fallbacks when that preferred
+        # direction is blocked.  This is path coverage only: target selection,
+        # tool choice, and resource requirements remain plan-controlled.
+        heading_sweep_origin = direction % 8
+        heading_sweep_stride = 6
         for i in range(max_try_steps):
             events = sleep(env)
             print(f"try step is {i} and dir is {direction}")
@@ -3631,8 +3950,15 @@ def explore_above_ground_none(env,memory,object,underground,max_try_steps=10000)
                 explore_steps = 0
                 return False
             moved = False
-            for heading_offset in range(4):
-                candidate_direction = (direction + heading_offset) % 4
+            primary_direction = (
+                heading_sweep_origin + (i // heading_sweep_stride)
+            ) % 8
+            for heading_offset in range(8):
+                candidate_direction = (primary_direction + heading_offset) % 8
+                print(
+                    "underground exploration heading "
+                    f"{heading_offset + 1}/8: direction={candidate_direction}"
+                )
                 before_position = np.array(
                     events['location_stats']['pos'], dtype=float
                 )

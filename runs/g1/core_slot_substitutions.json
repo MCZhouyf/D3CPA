@@ -1,0 +1,139 @@
+{
+  "decision": "author-approved: two successful distinct-seed executions satisfy the 11001/11002 core slots",
+  "invariant": "actual_execution_seed and source evidence are retained; raw events are never relabelled",
+  "schema_version": "g1.v2",
+  "slots": [
+    {
+      "actual_execution_seed": 11001,
+      "author_approved": true,
+      "core_episode_id": "basic-05-mine_dirt--core-seed-11001",
+      "core_slot_seed": 11001,
+      "raw_event": "runs/g1/raw_events/basic-05-mine_dirt--seed-11001.82546b03b8aa4f209c3b43e7560d6be5.jsonl",
+      "raw_event_sha256": "ff30d5e0b8d8bed9feee69600f07a8eb0db3e24a36c531ffbb3b3c7541414058",
+      "semantic": "core_slot_replacement_preserving_actual_seed",
+      "source_episode_id": "basic-05-mine_dirt--seed-11001",
+      "task_id": "basic-05-mine_dirt"
+    },
+    {
+      "actual_execution_seed": 11002,
+      "author_approved": true,
+      "core_episode_id": "basic-05-mine_dirt--core-seed-11002",
+      "core_slot_seed": 11002,
+      "raw_event": "runs/g1/raw_events/basic-05-mine_dirt--seed-11002.159a807f585d4d5bbb8490ad3efdf11d.jsonl",
+      "raw_event_sha256": "c6bc6467fbbdf978c9741ff2568c793ff9e354908fb8c57274d1ee62148b1ed5",
+      "semantic": "core_slot_replacement_preserving_actual_seed",
+      "source_episode_id": "basic-05-mine_dirt--seed-11002",
+      "task_id": "basic-05-mine_dirt"
+    },
+    {
+      "actual_execution_seed": 11006,
+      "author_approved": true,
+      "core_episode_id": "complex-41-obtain_diamond--core-seed-11001",
+      "core_slot_seed": 11001,
+      "raw_event": "runs/g1/raw_events/complex-41-obtain_diamond--seed-11006.ed5a397afe0b43418de194f786cdd07a.jsonl",
+      "raw_event_sha256": "aa9a2c2d9c7a0cf5006e2d9e626c0f6b28f084dea6b76b30ce0d1c10c68077bc",
+      "semantic": "core_slot_replacement_preserving_actual_seed",
+      "source_episode_id": "complex-41-obtain_diamond--seed-11006",
+      "task_id": "complex-41-obtain_diamond"
+    },
+    {
+      "actual_execution_seed": 13003,
+      "author_approved": true,
+      "core_episode_id": "complex-41-obtain_diamond--core-seed-11002",
+      "core_slot_seed": 11002,
+      "raw_event": "runs/g1/raw_events/complex-41-obtain_diamond--seed-13003-rerun1.4ce2c558adda4df3b188a28084454be2.jsonl",
+      "raw_event_sha256": "e86a94ac50d980cae796d0ead42b200f1241f189ad1087739bbde7c0134b9119",
+      "semantic": "core_slot_replacement_preserving_actual_seed",
+      "source_episode_id": "complex-41-obtain_diamond--seed-13003-rerun1",
+      "task_id": "complex-41-obtain_diamond"
+    },
+    {
+      "actual_execution_seed": 12001,
+      "author_approved": true,
+      "core_episode_id": "easy-14-craft_wooden_slab--core-seed-11001",
+      "core_slot_seed": 11001,
+      "raw_event": "runs/g1/raw_events/easy-14-craft_wooden_slab--seed-12001.566e6d61a151459a99aab6162e5b1931.jsonl",
+      "raw_event_sha256": "ad5b0c9185e24e763002381f0d1668f64e571428d90a90ef381423b0042906d4",
+      "semantic": "core_slot_replacement_preserving_actual_seed",
+      "source_episode_id": "easy-14-craft_wooden_slab--seed-12001",
+      "task_id": "easy-14-craft_wooden_slab"
+    },
+    {
+      "actual_execution_seed": 12002,
+      "author_approved": true,
+      "core_episode_id": "easy-14-craft_wooden_slab--core-seed-11002",
+      "core_slot_seed": 11002,
+      "raw_event": "runs/g1/raw_events/easy-14-craft_wooden_slab--seed-12002.2f301af5f3164f968440021dc77b8d2c.jsonl",
+      "raw_event_sha256": "864c5e0b537857a7482b7f61936972623937cef6bd74aab555b9444814c6c040",
+      "semantic": "core_slot_replacement_preserving_actual_seed",
+      "source_episode_id": "easy-14-craft_wooden_slab--seed-12002",
+      "task_id": "easy-14-craft_wooden_slab"
+    },
+    {
+      "actual_execution_seed": 12005,
+      "author_approved": true,
+      "core_episode_id": "complex-43-craft_dropper--core-seed-11001",
+      "core_slot_seed": 11001,
+      "raw_event": "runs/g1/raw_events/complex-43-craft_dropper--seed-12005.59cfdfbf53704c0a91d18d23a45e2549.jsonl",
+      "raw_event_sha256": "9e623acf84b3435486d89ab88e3d4439bda16581c298bbdd55a5606656b9b357",
+      "semantic": "core_slot_replacement_preserving_actual_seed",
+      "source_episode_id": "complex-43-craft_dropper--seed-12005",
+      "task_id": "complex-43-craft_dropper"
+    },
+    {
+      "actual_execution_seed": 12009,
+      "author_approved": true,
+      "core_episode_id": "complex-43-craft_dropper--core-seed-11002",
+      "core_slot_seed": 11002,
+      "raw_event": "runs/g1/raw_events/complex-43-craft_dropper--seed-12009.5e756f6242d84d65b90ad7d43590c00c.jsonl",
+      "raw_event_sha256": "1a0d7f09fb8ae46d55ea38da057850692a9df228fa4b3f35ca40789adff5ae64",
+      "semantic": "core_slot_replacement_preserving_actual_seed",
+      "source_episode_id": "complex-43-craft_dropper--seed-12009",
+      "task_id": "complex-43-craft_dropper"
+    },
+    {
+      "actual_execution_seed": 12021,
+      "author_approved": true,
+      "core_episode_id": "hard-32-smelt_iron_ingot--core-seed-11001",
+      "core_slot_seed": 11001,
+      "raw_event": "runs/g1/raw_events/hard-32-smelt_iron_ingot--seed-12021.564646ae273a4ccfa968f4d9d5f21a91.jsonl",
+      "raw_event_sha256": "cef844391d4866ed36ac39a37ef706ff779a60c5b8b268040df54823872e3336",
+      "semantic": "core_slot_replacement_preserving_actual_seed",
+      "source_episode_id": "hard-32-smelt_iron_ingot--seed-12021",
+      "task_id": "hard-32-smelt_iron_ingot"
+    },
+    {
+      "actual_execution_seed": 12022,
+      "author_approved": true,
+      "core_episode_id": "hard-32-smelt_iron_ingot--core-seed-11002",
+      "core_slot_seed": 11002,
+      "raw_event": "runs/g1/raw_events/hard-32-smelt_iron_ingot--seed-12022.6581d97fe85349859bb2cceb86fc7424.jsonl",
+      "raw_event_sha256": "f2d8e649e9b091ebfa1a97f02781329e28272e7d6aae4a2bc18e164d7c02f517",
+      "semantic": "core_slot_replacement_preserving_actual_seed",
+      "source_episode_id": "hard-32-smelt_iron_ingot--seed-12022",
+      "task_id": "hard-32-smelt_iron_ingot"
+    },
+    {
+      "actual_execution_seed": 12011,
+      "author_approved": true,
+      "core_episode_id": "hard-35-craft_iron_pickaxe--core-seed-11001",
+      "core_slot_seed": 11001,
+      "raw_event": "runs/g1/raw_events/hard-35-craft_iron_pickaxe--seed-12011.f5fb5125ac4e4c07be258a6ecefbd1a2.jsonl",
+      "raw_event_sha256": "2d3eaa026fb9a0bef433687a8aa3bc74eb077cbe40aa3b8a667323325b797912",
+      "semantic": "core_slot_replacement_preserving_actual_seed",
+      "source_episode_id": "hard-35-craft_iron_pickaxe--seed-12011",
+      "task_id": "hard-35-craft_iron_pickaxe"
+    },
+    {
+      "actual_execution_seed": 12019,
+      "author_approved": true,
+      "core_episode_id": "hard-35-craft_iron_pickaxe--core-seed-11002",
+      "core_slot_seed": 11002,
+      "raw_event": "runs/g1/raw_events/hard-35-craft_iron_pickaxe--seed-12019.0bf59102768447239cbc09888cb77c3c.jsonl",
+      "raw_event_sha256": "baa5a8aae9b6c99c76245a55d78bd74a19d02cd1e3f887d8327c46ad9f3bcdd2",
+      "semantic": "core_slot_replacement_preserving_actual_seed",
+      "source_episode_id": "hard-35-craft_iron_pickaxe--seed-12019",
+      "task_id": "hard-35-craft_iron_pickaxe"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "difficulty": "hard",
+  "episode_id": "hard-32-smelt_iron_ingot--seed-12022",
+  "inference_basis": "formal_spec.operation",
+  "policy_tag": "g1_supplemental_recovery",
+  "run_id": "g1-supplemental-v1",
+  "source_location": "/external/dc3pa/task_assets_schema/formal_task_specs/smelt_iron_ingot.json",
+  "stable_rank": "32cf44f9d2a83622e30c0ce49b2e9205d92f6cfe8092cb6d3ca0d2d839ce7f8c",
+  "task_id": "hard-32-smelt_iron_ingot",
+  "task_text": "smelt iron ingot",
+  "task_text_hash": "92d8886192c2e68567afc40adce34971b561a4325ef67b3b0a779574900be55a",
+  "terminal_type": "smelt"
+}

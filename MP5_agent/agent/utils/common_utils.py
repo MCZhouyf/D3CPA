@@ -48,11 +48,13 @@ def count_inventory(inventory_name_list, inventory_num_list):
     return inventory_dict
 
 
-def share_memory(memory, events):
-    inventory_name_list = events['inventory']['name'].tolist()
-    inventory_num_list = events['inventory']['quantity'].tolist()
-    observed_inventory = count_inventory(inventory_name_list, inventory_num_list)
+def update_memory_inventory_from_observation(memory, observed_inventory):
+    """Apply an observed inventory through the single-frame-empty guard.
 
+    Some action helpers return inventory arrays directly rather than a full
+    MineDojo event.  They must use the same guard as ``share_memory`` so one
+    transient all-air frame cannot erase the physical-material ledger.
+    """
     # MineDojo occasionally emits a single all-``air`` inventory frame while
     # the player is moving out of a vertical tunnel.  Treating that one frame
     # as authoritative erases the controller's material ledger, although the
@@ -68,11 +70,19 @@ def share_memory(memory, events):
                 "Ignoring one transient empty inventory observation; "
                 "waiting for confirmation before clearing the ledger."
             )
-            return
+            return False
     else:
         memory._dc3pa_empty_inventory_observations = 0
 
     memory.update_inventory(observed_inventory)
+    return True
+
+
+def share_memory(memory, events):
+    inventory_name_list = events['inventory']['name'].tolist()
+    inventory_num_list = events['inventory']['quantity'].tolist()
+    observed_inventory = count_inventory(inventory_name_list, inventory_num_list)
+    return update_memory_inventory_from_observation(memory, observed_inventory)
 
 def update_find_obj_name(obj_name):
     normalized = obj_name.lower().strip() if isinstance(obj_name, str) else obj_name

@@ -83,22 +83,29 @@ class LedgerChatModel:
             or not hasattr(signal, "setitimer")
         ):
             return callback(*args, **kwargs)
-        active_timer, _ = signal.getitimer(signal.ITIMER_REAL)
-        if active_timer > 0:
-            return callback(*args, **kwargs)
-
+        active_timer, active_interval = signal.getitimer(signal.ITIMER_REAL)
         previous_handler = signal.getsignal(signal.SIGALRM)
 
         def _raise_timeout(_signum: int, _frame: Any) -> None:
             raise TimeoutError(f"G1 LLM request exceeded {timeout:g} seconds")
 
+        # A surrounding library can already own ITIMER_REAL.  The previous
+        # implementation bypassed the request timeout in that situation,
+        # leaving a relay read unbounded.  Preserve the earlier deadline by
+        # using the shorter of the two timers, then restore its remaining
+        # duration after this call exits.
+        effective_timeout = min(timeout, active_timer) if active_timer > 0 else timeout
+        started = time.monotonic()
         signal.signal(signal.SIGALRM, _raise_timeout)
-        signal.setitimer(signal.ITIMER_REAL, timeout)
+        signal.setitimer(signal.ITIMER_REAL, effective_timeout)
         try:
             return callback(*args, **kwargs)
         finally:
             signal.setitimer(signal.ITIMER_REAL, 0)
             signal.signal(signal.SIGALRM, previous_handler)
+            if active_timer > 0:
+                remaining = max(0.0, active_timer - (time.monotonic() - started))
+                signal.setitimer(signal.ITIMER_REAL, remaining, active_interval)
 
     def _call(self, method_name: str, *args: Any, **kwargs: Any) -> Any:
         logical_call_id = uuid.uuid4().hex

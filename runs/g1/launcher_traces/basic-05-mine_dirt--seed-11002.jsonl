@@ -1,0 +1,7 @@
+{"event_type": "planning_started", "payload": {"attempt": 1, "inventory": {}, "mode": "reasoning_only", "task": "dirt", "underground": false}, "timestamp": "2026-08-06T04:37:58.073931+00:00"}
+{"event_type": "llm_call_started", "payload": {"actual_method": "__call__", "method": "__call__", "purpose": "planning"}, "timestamp": "2026-08-06T04:37:58.074543+00:00"}
+{"event_type": "llm_call_completed", "payload": {"actual_method": "__call__", "method": "__call__", "purpose": "planning"}, "timestamp": "2026-08-06T04:38:02.962941+00:00"}
+{"event_type": "plan_ready_for_controller", "payload": {"attempt": 1, "fallback_used": false, "plan_id": "3ed1c3bb6d434658a943be22c18ee885", "plan_version": 1, "source": "reasoning_chain", "step_count": 1, "unsafe_unresolved_execution": false}, "timestamp": "2026-08-06T04:38:02.963598+00:00"}
+{"event_type": "controller_completed", "payload": {"attempt": 1, "controller_success": true, "feedback": "", "goal_success": true, "plan_id": "3ed1c3bb6d434658a943be22c18ee885", "suggestion": "", "underground": false}, "timestamp": "2026-08-06T04:38:12.997595+00:00"}
+{"event_type": "memory_recording_skipped", "payload": {"attempt": 1, "memory_mode": "disabled", "task": "dirt"}, "timestamp": "2026-08-06T04:38:13.126085+00:00"}
+{"event_type": "task_succeeded", "payload": {"acquisition_recorded": false, "attempt": 1, "memory_recorded": false, "task": "dirt"}, "timestamp": "2026-08-06T04:38:13.126260+00:00"}

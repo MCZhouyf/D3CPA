@@ -1,0 +1,17 @@
+{
+  "channels": {
+    "p_E_status": {
+      "source_not_connected": 674
+    },
+    "p_K_status": {
+      "source_not_connected": 674
+    },
+    "p_L_status": {
+      "source_not_connected": 674
+    }
+  },
+  "row_count": 674,
+  "schema_version": "g1.v1",
+  "semantics": "source_not_connected uses null availability and is not negative evidence",
+  "use_availability_masks": "pending_g3"
+}

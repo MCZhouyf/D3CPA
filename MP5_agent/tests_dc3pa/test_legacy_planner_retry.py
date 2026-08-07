@@ -33,6 +33,15 @@ class RaisingLLM:
         raise self.error
 
 
+class SuccessfulLLM:
+    def __init__(self):
+        self.calls = 0
+
+    def __call__(self, message):
+        self.calls += 1
+        return type("Response", (), {"content": '{"workflow": [{"times": "1", "actions": []}]}'})()
+
+
 def _planner_with_error(error):
     planner = Planner.__new__(Planner)
     planner.memory = FakeMemory()
@@ -60,3 +69,23 @@ def test_planner_still_retries_transient_errors(monkeypatch):
     assert result == {}
     assert planner.llm.calls == 2
     assert planner.memory.reset_calls == 2
+
+
+def test_transport_failure_rotates_to_the_next_configured_key(monkeypatch):
+    planner = _planner_with_error(RuntimeError("APIConnectionError: connection error"))
+    planner._api_keys = ("primary-key", "backup-key")
+    planner._active_key_index = 0
+    built_keys = []
+
+    def build_llm(key):
+        built_keys.append(key)
+        return SuccessfulLLM()
+
+    planner._build_llm = build_llm
+    monkeypatch.setattr("planner.time.sleep", lambda seconds: None)
+
+    result = planner.get_workflow([HumanMessage(content="plan")], max_retries=2)
+
+    assert result["workflow"]
+    assert built_keys == ["backup-key"]
+    assert planner._active_key_index == 1

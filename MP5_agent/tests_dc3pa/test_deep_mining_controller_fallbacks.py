@@ -27,8 +27,10 @@ class FakeEnv:
     def __init__(self, memory):
         self.memory = memory
         self.set_inventory_calls = []
+        self.actions = []
 
     def step(self, action):
+        self.actions.append(list(action))
         return (
             {
                 "inventory": {
@@ -219,6 +221,13 @@ def test_cobblestone_step_requires_stone_pickaxe_minimum():
     assert controller._diamond_step_already_satisfied(step)
 
 
+def test_repeated_mine_step_stops_when_observed_resource_goal_is_met():
+    controller = _controller({"cobblestone": 11})
+
+    assert controller._mine_step_goal_reached("cobblestone", 0, 11)
+    assert not controller._mine_step_goal_reached("cobblestone", 11, 1)
+
+
 def test_dependency_preparation_does_not_synthesize_cobblestone_or_sticks():
     controller = _controller({"wooden pickaxe": 1, "cobblestone": 2})
     env = FakeEnv(controller.memory)
@@ -335,6 +344,47 @@ def test_planned_planks_craft_does_not_consume_logs_in_bootstrap(monkeypatch):
     assert result["success"]
     assert not underground
     assert controller.memory.inventory["planks"] == 4
+
+
+def test_observed_goal_short_circuits_remaining_plan_actions(monkeypatch):
+    """A physical inventory update must stop a repeated terminal step early."""
+    controller = _controller()
+    env = FakeEnv(controller.memory)
+    calls = []
+
+    def find_that_collects_target(*args, **kwargs):
+        calls.append("find")
+        controller.memory.update_inventory({"diamond": 1})
+
+    monkeypatch.setattr("controller.explore_above_ground", find_that_collects_target)
+    monkeypatch.setattr(
+        "controller.approach",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("move_to must be skipped once the task goal is observed")
+        ),
+    )
+
+    result, underground = controller.check_and_execute_workflow(
+        env,
+        {
+            "workflow": [
+                {
+                    "times": "10",
+                    "actions": [
+                        {"name": "find", "args": {"obj": "diamond"}},
+                        {"name": "move_to", "args": {"obj": "diamond"}},
+                    ],
+                }
+            ]
+        },
+        {"task": "diamond", "quantity": 1},
+        underground=False,
+    )
+
+    assert result["success"]
+    assert result["reason_code"] == "task_goal_satisfied_after_action"
+    assert calls == ["find"]
+    assert not underground
 
 
 def test_dig_up_invokes_physical_go_up_and_checks_elevation(monkeypatch):
@@ -570,6 +620,29 @@ def test_unsatisfied_stick_craft_is_not_skipped_by_existing_wooden_pickaxe(monke
     assert result["success"]
     assert not underground
     assert controller.memory.inventory["stick"] == 4
+
+
+def test_declared_equip_selects_the_observed_inventory_slot(monkeypatch):
+    controller = _controller({"stone pickaxe": 1})
+    env = FakeEnv(controller.memory)
+    monkeypatch.setattr("controller.share_memory", lambda *args, **kwargs: None)
+
+    result, _ = controller.check_and_execute_workflow(
+        env,
+        {
+            "workflow": [
+                {
+                    "times": "1",
+                    "actions": [{"name": "equip", "args": {"obj": "stone pickaxe"}}],
+                }
+            ]
+        },
+        {"task": "diamond"},
+        underground=False,
+    )
+
+    assert result["success"]
+    assert [0, 0, 0, 12, 12, 5, 0, 0] in env.actions
 
 
 def test_missing_sticks_are_recovered_from_logs_in_same_attempt(monkeypatch):

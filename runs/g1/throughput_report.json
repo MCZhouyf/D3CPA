@@ -1,0 +1,22 @@
+{
+  "episode_count": 12,
+  "episodes_per_day_at_observed_mean": 110.20805104013716,
+  "mean_episode_seconds": 783.971762358211,
+  "median_episode_seconds": 920.0898774773814,
+  "method": "episode duration is the sum of recorded controller-attempt durations in finalized raw events",
+  "p90_episode_seconds": 1437.9253768832423,
+  "planner_calls": 66,
+  "planner_calls_per_episode": 5.5,
+  "relay_latency_ms_p90": 54442.6846,
+  "relay_latency_ms_total": 2785636.992,
+  "relay_request_attempts": 115,
+  "relay_request_attempts_per_episode": 9.583333333333334,
+  "schema_version": "g1.v1",
+  "successful_episode_count": 12,
+  "system_error_rate": 0.0,
+  "token_count_source": "unavailable",
+  "token_count_sources": {
+    "unavailable": 115
+  },
+  "total_episode_seconds": 9407.661148298532
+}
